@@ -5,7 +5,7 @@ last_updated: 2026-09-10
 license: Apache-2.0
 status: draft
 ---
-<!-- generated from zerosoc-framework@c31e797369b6 : 04-Playbooks/99-Shared/sub_enrichment_email_message.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@86a43c8b9167 : 04-Playbooks/99-Shared/sub_enrichment_email_message.md — do not edit; regenerate with tools/build_references.py -->
 
 # Email Message Entity Enrichment
 

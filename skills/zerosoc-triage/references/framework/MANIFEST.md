@@ -1,6 +1,6 @@
 # Generated framework references
 
-Source: zerosoc-framework@c31e797369b6b1724888d228299ada1956896294 (Apache-2.0).
+Source: zerosoc-framework@86a43c8b9167d6eaea5ebfc7dcdce0762c9783ce (Apache-2.0).
 
 Do not edit these files; regenerate with `python3 tools/build_references.py`.
 
@@ -11,7 +11,14 @@ Do not edit these files; regenerate with `python3 tools/build_references.py`.
 - `references/framework/02-Taxonomy/case_schema.md`
 - `references/framework/02-Taxonomy/incident_categories.md`
 - `references/framework/03-Processes/02-detection_and_analysis.md`
+- `references/framework/04-Playbooks/01-Triage/application.md`
+- `references/framework/04-Playbooks/01-Triage/cloud.md`
+- `references/framework/04-Playbooks/01-Triage/data.md`
+- `references/framework/04-Playbooks/01-Triage/email.md`
 - `references/framework/04-Playbooks/01-Triage/endpoint.md`
+- `references/framework/04-Playbooks/01-Triage/identity.md`
+- `references/framework/04-Playbooks/01-Triage/network.md`
+- `references/framework/04-Playbooks/01-Triage/ot-ics.md`
 - `references/framework/04-Playbooks/99-Shared/sub_enrichment_artifact.md`
 - `references/framework/04-Playbooks/99-Shared/sub_enrichment_asset.md`
 - `references/framework/04-Playbooks/99-Shared/sub_enrichment_email_message.md`

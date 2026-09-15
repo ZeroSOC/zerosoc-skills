@@ -52,6 +52,7 @@ python3 tools/build_references.py            # regenerate references/ after bump
 python3 tools/check_skills.py                # spec and portability lint
 python3 tools/build_references.py --check    # references up to date with the pin
 python3 -m unittest discover -s tests        # script tests
+python3 tools/package.py                     # rebuild skills/<name>.zip for hosts that take an archive
 ```
 
 Versioning: a skills release conforms to one framework commit, recorded in `metadata.framework`. Bump the
@@ -59,9 +60,10 @@ submodule, regenerate, rerun the checks, tag.
 
 ## Scope and status
 
-The skills cover what the framework at the pinned commit publishes. Playbooks are copied as they exist
-there; where a domain or category has no playbook yet, the skill says so and applies the method directly.
-Status `draft`, like the framework documents they execute.
+The skills cover what the framework at the pinned commit publishes: at `86a43c8` that is the eight domain
+triage playbooks, the fifteen Incident Category playbooks plus the catch-all, and the five shared
+enrichment sub-playbooks, all `draft`. Where a future pin lacks a playbook, the skill says so and applies
+the method directly. Status `draft`, like the framework documents they execute.
 
 ## License
 
