@@ -37,6 +37,8 @@ def main():
     skills_dir = os.path.join(ROOT, "skills")
     for skill in sorted(os.listdir(skills_dir)):
         base = os.path.join(skills_dir, skill)
+        if not os.path.isdir(base):
+            continue  # packaged archives and stray files are not skills
         path = os.path.join(base, "SKILL.md")
         if not os.path.isfile(path):
             failures.append(f"{skill}: no SKILL.md"); continue
