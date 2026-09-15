@@ -1,0 +1,15 @@
+name: checks
+on: [push, pull_request]
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python3 tools/check_skills.py
+      - run: python3 tools/build_references.py --check
+      - run: python3 -m unittest discover -s tests -v

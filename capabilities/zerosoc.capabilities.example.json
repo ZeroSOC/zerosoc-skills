@@ -1,0 +1,28 @@
+{
+  "deployment": "example — one XDR tenant with an MCP server for the XDR platform",
+  "capabilities": {
+    "reputation.multi_engine": {"tool": "mcp:threat-intel/lookup_indicator", "notes": "hashes, IPs, domains only (egress rule)"},
+    "domain.registration": {"tool": "mcp:threat-intel/whois"},
+    "asset.cmdb": {"tool": "mcp:xdr/get_device"},
+    "identity.directory": {"tool": "mcp:directory/get_user"},
+    "soc.knowledge_base": {"tool": "file:./soc-kb/"},
+    "cases.store": {"tool": "mcp:xdr/list_incidents"},
+    "telemetry.endpoint": {"tool": "mcp:xdr/run_hunting_query", "notes": "translate playbook questions to the platform query language"},
+    "telemetry.identity": {"tool": "mcp:xdr/run_hunting_query"},
+    "telemetry.email": {"tool": "mcp:xdr/run_hunting_query"},
+    "containment.isolate_host": {"tool": "mcp:xdr/isolate_machine", "notes": "reversed by unisolate_machine"},
+    "containment.suspend_sessions": {"tool": "mcp:directory/revoke_sessions"},
+    "containment.block_indicator": {"tool": "mcp:xdr/submit_indicator"},
+    "ticketing": {"tool": "mcp:itsm/create_ticket"}
+  },
+  "data_sources": {
+    "EDR / endpoint process telemetry": true,
+    "Anti-virus / anti-malware": true,
+    "File-integrity monitoring": false,
+    "Email gateway / sandbox": true,
+    "Mailbox audit logs": true,
+    "Proxy / DNS logs": false,
+    "Identity provider sign-in logs": true,
+    "EDR": true
+  }
+}

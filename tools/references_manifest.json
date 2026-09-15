@@ -1,0 +1,57 @@
+{
+  "framework_dir": "framework",
+  "common": [
+    "01-Foundation/definitions.md",
+    "02-Taxonomy/case_schema.md",
+    "02-Taxonomy/case_schema.json",
+    "04-Playbooks/playbook_architecture.md",
+    "04-Playbooks/README.md",
+    "07-Governance/agentic_guardrails.md",
+    "07-Governance/agentic_supervision.md"
+  ],
+  "skills": {
+    "zerosoc-triage": {
+      "files": [
+        "03-Processes/02-detection_and_analysis.md",
+        "02-Taxonomy/alert_types.md",
+        "02-Taxonomy/incident_categories.md",
+        "06-Deliverables/triage_note.md"
+      ],
+      "globs": [
+        "04-Playbooks/01-Triage/*.md",
+        "04-Playbooks/99-Shared/*.md"
+      ],
+      "shared_scripts": [
+        "select_playbook.py"
+      ]
+    },
+    "zerosoc-investigation": {
+      "files": [
+        "03-Processes/02-detection_and_analysis.md",
+        "02-Taxonomy/incident_categories.md",
+        "06-Deliverables/investigation_note.md",
+        "03-Processes/03-response.md"
+      ],
+      "globs": [
+        "04-Playbooks/02-Investigation-Response/*.md",
+        "04-Playbooks/99-Shared/*.md"
+      ],
+      "shared_scripts": [
+        "select_playbook.py"
+      ]
+    },
+    "zerosoc-response": {
+      "files": [
+        "03-Processes/03-response.md",
+        "03-Processes/02-detection_and_analysis.md",
+        "02-Taxonomy/incident_categories.md"
+      ],
+      "globs": [
+        "04-Playbooks/02-Investigation-Response/*.md"
+      ],
+      "shared_scripts": [
+        "select_playbook.py"
+      ]
+    }
+  }
+}

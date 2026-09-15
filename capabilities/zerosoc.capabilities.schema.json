@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ZeroSOC/zerosoc-skills/capabilities/zerosoc.capabilities.schema.json",
+  "title": "ZeroSOC capability binding",
+  "type": "object",
+  "required": ["capabilities", "data_sources"],
+  "properties": {
+    "deployment": {"type": "string", "description": "Free-text label of the deployment this binding describes."},
+    "capabilities": {
+      "type": "object",
+      "description": "capability class -> tool binding",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["tool"],
+        "properties": {
+          "tool": {"type": "string", "description": "What the host invokes: an MCP server/tool, a CLI, an endpoint."},
+          "notes": {"type": "string"}
+        }
+      }
+    },
+    "data_sources": {
+      "type": "object",
+      "description": "required_data_sources name (as written in playbook frontmatter) -> available to the executor",
+      "additionalProperties": {"type": "boolean"}
+    }
+  }
+}
