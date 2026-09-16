@@ -5,7 +5,7 @@ status: draft
 last_updated: 2026-09-10
 license: Apache-2.0
 ---
-<!-- generated from zerosoc-framework@9a3c1d91cb89 : 07-Governance/agentic_guardrails.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@bba85278b26a : 07-Governance/agentic_guardrails.md — do not edit; regenerate with tools/build_references.py -->
 
 # Agentic Governance & Guardrail Protocols
 
