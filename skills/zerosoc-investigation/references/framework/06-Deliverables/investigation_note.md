@@ -5,7 +5,7 @@ last_updated: 2026-09-10
 license: Apache-2.0
 status: development
 ---
-<!-- generated from zerosoc-framework@86a43c8b9167 : 06-Deliverables/investigation_note.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@9a3c1d91cb89 : 06-Deliverables/investigation_note.md — do not edit; regenerate with tools/build_references.py -->
 
 # Investigation Note
 

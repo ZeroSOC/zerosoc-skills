@@ -22,7 +22,7 @@ required_data_sources:
   - Change / maintenance schedule
 status: draft
 ---
-<!-- generated from zerosoc-framework@86a43c8b9167 : 04-Playbooks/02-Investigation-Response/14-ot_ics.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@9a3c1d91cb89 : 04-Playbooks/02-Investigation-Response/14-ot_ics.md — do not edit; regenerate with tools/build_references.py -->
 
 # 14-OT/ICS Attack Investigation & Response
 

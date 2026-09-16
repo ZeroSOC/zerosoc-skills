@@ -4,7 +4,7 @@ description: Triage a security alert under the ZeroSOC Framework (Phase 2.a). Se
 license: Apache-2.0
 metadata:
   version: "0.1.0"
-  framework: "zerosoc-framework@86a43c8 (main, 2026-09-15)"
+  framework: "zerosoc-framework@9a3c1d9 (main, 2026-09-16)"
   status: draft
   author: ZeroSOC
 ---

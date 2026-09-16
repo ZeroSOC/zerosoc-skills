@@ -5,7 +5,7 @@ status: development
 last_updated: 2026-09-08
 license: Apache-2.0
 ---
-<!-- generated from zerosoc-framework@86a43c8b9167 : 02-Taxonomy/incident_categories.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@9a3c1d91cb89 : 02-Taxonomy/incident_categories.md — do not edit; regenerate with tools/build_references.py -->
 
 # Incident Categories Taxonomy
 

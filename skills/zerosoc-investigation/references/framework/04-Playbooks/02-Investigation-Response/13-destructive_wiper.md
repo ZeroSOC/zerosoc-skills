@@ -19,7 +19,7 @@ required_data_sources:
   - Netflow
 status: draft
 ---
-<!-- generated from zerosoc-framework@86a43c8b9167 : 04-Playbooks/02-Investigation-Response/13-destructive_wiper.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@9a3c1d91cb89 : 04-Playbooks/02-Investigation-Response/13-destructive_wiper.md — do not edit; regenerate with tools/build_references.py -->
 
 # 13-Destructive / Wiper Attack Investigation & Response
 
