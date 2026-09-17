@@ -7,16 +7,21 @@ Detection & Analysis §1.1: the same alert type on the same entity counts once. 
 deterministic when the alert type is: this script assigns it from a deployment's map (detector id first,
 then title pattern) and collapses same type + same entity to the strongest alert, listing what it merged.
 
-alerts.json: a list of {"id", "title", "detector_id"?, "entity", "severity"?, "confidence"?, "technique"?}
-(the source's own field names detectorId / detectionSource are accepted). The map is a JSON file shipped
-with the capability binding of the deployment (see the repository's capabilities/ folder):
-{"source": "...", "rules": [{"alert_type": "<framework alert type>", "domain": "<telemetry domain>",
-                             "detector_ids": ["..."], "title_patterns": ["<regex, case-insensitive>"]}]}
-An alert no rule matches keeps its normalized title as its type and is flagged "unmapped": it still
-deduplicates, and the flag tells the maintainer of the map what to add. Output: the "alerts" array of
-ledger.json (format in triage_decide.py), which resolve.py also accepts as seeded findings.
+  alert_types.py alerts.json --bindings zerosoc.capabilities.json   (reads the binding's "alert_type_map")
+
+alerts.json: a list of {"id", "title", "detector_id"?, "entity", "severity"?, "confidence"?, "technique"?}.
+The map is a JSON file placed next to the capability binding of the deployment (see the repository's
+capabilities/ folder):
+{"source": "...", "fields": {"detector_id": "<the source's own field name>", ...},
+ "rules": [{"alert_type": "<framework alert type>", "domain": "<telemetry domain>",
+            "detector_ids": ["..."], "title_patterns": ["<regex, case-insensitive>"]}]}
+"fields" lets the source's records be passed unrenamed; the script itself knows no source. An alert no
+rule matches keeps its normalized title as its type and is flagged "unmapped": it still deduplicates,
+and the flag tells the maintainer of the map what to add. Output: the "alerts" array of ledger.json
+(format in triage_decide.py). Each entry also carries "alert_type" and "side": "Malicious", so the same
+entries seed the findings of resolve.py, where one type on one entity again counts once.
 """
-import argparse, json, re, sys
+import argparse, json, os, re, sys
 
 W = {"Low": 1, "Medium": 2, "High": 3}
 SEV2CONF = {"Informational": "Low", "Low": "Low", "Medium": "Medium", "High": "High", "Critical": "High"}
@@ -44,15 +49,24 @@ def framework_alert_types(markdown):
     return out
 
 
-def _confidence(alert):
-    sev = str(alert.get("severity") or "Medium").capitalize()
-    return alert.get("confidence") or SEV2CONF.get(sev, "Medium")
+def _field(alert, amap, name):
+    """The canonical field, or the source's own name for it as the map declares under "fields"."""
+    value = alert.get(name)
+    alias = (amap.get("fields") or {}).get(name)
+    return value if value not in (None, "") or not alias else alert.get(alias)
+
+
+def _confidence(alert, amap):
+    stated = str(_field(alert, amap, "confidence") or "").capitalize()
+    if stated in W:
+        return stated
+    return SEV2CONF.get(str(_field(alert, amap, "severity") or "Medium").capitalize(), "Medium")
 
 
 def classify(alert, amap):
     """The alert with its framework type: {"type", "domain", "unmapped", "matched_on", ...}."""
-    detector = alert.get("detector_id") or alert.get("detectorId")
-    title = re.sub(r"\s+", " ", str(alert.get("title") or "")).strip()
+    detector = _field(alert, amap, "detector_id")
+    title = re.sub(r"\s+", " ", str(_field(alert, amap, "title") or "")).strip()
     hit, matched_on = None, None
     for rule in amap.get("rules", []):
         if detector and detector in rule.get("detector_ids", []):
@@ -63,12 +77,13 @@ def classify(alert, amap):
             if any(re.search(p, title, re.IGNORECASE) for p in rule.get("title_patterns", [])):
                 hit, matched_on = rule, "title"
                 break
-    out = {"id": alert.get("id"), "type": hit["alert_type"] if hit else title, "domain": hit["domain"] if hit else None,
-           "entity": alert.get("entity", ""), "confidence": _confidence(alert), "source_title": title,
-           "unmapped": hit is None, "matched_on": matched_on}
+    alert_type = hit["alert_type"] if hit else title
+    out = {"id": _field(alert, amap, "id"), "type": alert_type, "alert_type": alert_type, "side": "Malicious",
+           "domain": hit["domain"] if hit else None, "entity": str(_field(alert, amap, "entity") or ""),
+           "confidence": _confidence(alert, amap), "source_title": title, "unmapped": hit is None, "matched_on": matched_on}
     for key in ("severity", "technique"):
-        if alert.get(key):
-            out[key] = alert[key]
+        if _field(alert, amap, key):
+            out[key] = _field(alert, amap, key)
     if detector:
         out["detector_id"] = detector
     return out
@@ -96,10 +111,17 @@ def build_alerts(alerts, amap):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("alerts")
-    ap.add_argument("--map", required=True)
+    ap.add_argument("--map")
+    ap.add_argument("--bindings", help="capability binding whose alert_type_map names the map, next to it")
     ap.add_argument("--json", action="store_true")
     a = ap.parse_args()
-    out = build_alerts(json.load(open(a.alerts, encoding="utf-8")), load_map(a.map))
+    path = a.map
+    if not path and a.bindings:
+        named = json.load(open(a.bindings, encoding="utf-8")).get("alert_type_map")
+        path = os.path.join(os.path.dirname(os.path.abspath(a.bindings)), named) if named else None
+    if not path:
+        ap.error("--map, or --bindings with an alert_type_map, is required")
+    out = build_alerts(json.load(open(a.alerts, encoding="utf-8")), load_map(path))
     if a.json:
         print(json.dumps(out, indent=2, ensure_ascii=False))
         return

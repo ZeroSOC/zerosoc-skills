@@ -101,43 +101,59 @@ class ResolutionRule(unittest.TestCase):
 
 
 class TimeboxFromLedger(unittest.TestCase):
-    # Investigation timebox: 10 minutes at High or Critical severity, 20 otherwise (reference values)
-    F = [{"id": "m", "side": "Malicious", "confidence": "Medium", "at": "2026-09-14T15:00:00Z"},
-         {"id": "b", "side": "Benign", "confidence": "Low", "at": "2026-09-14T15:12:00Z"}]
+    # Guardrails §5: 10 minutes at High or Critical severity, 20 otherwise; an organization may tighten them
+    F = [{"id": "m", "side": "Malicious", "confidence": "Medium", "at": "2026-09-14T15:04:00Z"},
+         {"id": "b", "side": "Benign", "confidence": "Low", "at": "2026-09-14T15:09:00Z"}]
+    START, AT_12 = "2026-09-14T15:00:00Z", "2026-09-14T15:12:00Z"
 
     def test_high_severity_expires_after_ten_minutes(self):
-        r = inv.resolve({"findings": self.F, "started_at": "2026-09-14T15:00:00Z", "severity": "High"})
+        r = inv.resolve({"findings": self.F, "started_at": self.START, "severity": "High"}, now=self.AT_12)
         self.assertEqual(r["timebox"], {"minutes": 10, "elapsed_minutes": 12.0, "expired": True, "source": "computed"})
         self.assertEqual(r["verdict_id"], 7)
 
     def test_medium_severity_has_twenty_minutes(self):
-        r = inv.resolve({"findings": self.F, "started_at": "2026-09-14T15:00:00Z", "severity_id": 3})
+        r = inv.resolve({"findings": self.F, "started_at": self.START, "severity_id": 3}, now=self.AT_12)
         self.assertFalse(r["timebox"]["expired"]); self.assertEqual(r["timebox"]["minutes"], 20)
         self.assertIsNone(r["verdict_id"])
 
-    def test_explicit_end_beats_the_last_finding(self):
-        ledger = {"findings": self.F, "started_at": "2026-09-14T15:00:00Z", "severity": "Low", "resolved_at": "2026-09-14T15:25:00Z"}
+    def test_the_end_is_now_then_resolved_at_then_the_clock_never_the_last_finding(self):
+        ledger = {"findings": self.F, "started_at": self.START, "severity": "Low", "resolved_at": "2026-09-14T15:25:00Z"}
         self.assertTrue(inv.resolve(ledger)["timebox"]["expired"])
         self.assertFalse(inv.resolve(ledger, now="2026-09-14T15:05:00Z")["timebox"]["expired"])
+        del ledger["resolved_at"]  # a stalled run: the last finding is at +9 minutes, the clock is years later
+        self.assertTrue(inv.resolve(ledger)["timebox"]["expired"])
 
     def test_computed_value_overrides_a_self_reported_flag(self):
-        r = inv.resolve({"findings": self.F, "started_at": "2026-09-14T15:00:00Z", "severity": "Critical", "timebox_expired": False})
+        r = inv.resolve({"findings": self.F, "started_at": self.START, "severity": "Critical", "timebox_expired": False}, now=self.AT_12)
         self.assertTrue(r["timebox"]["expired"]); self.assertIn("self-reported", r["timebox_note"])
 
     def test_without_a_start_the_flag_is_used_and_marked_self_reported(self):
         r = inv.resolve({"findings": self.F, "timebox_expired": True})
         self.assertEqual(r["timebox"]["source"], "self-reported"); self.assertEqual(r["verdict_id"], 7)
 
-    def test_organization_override_of_the_reference_value(self):
-        r = inv.resolve({"findings": self.F, "started_at": "2026-09-14T15:00:00Z", "severity": "High", "timebox_minutes": 30})
-        self.assertFalse(r["timebox"]["expired"])
+    def test_an_organization_may_tighten_the_reference_value_not_extend_it(self):
+        base = {"findings": self.F, "started_at": self.START, "severity": "High"}
+        tight = inv.resolve(dict(base, timebox_minutes=5), now="2026-09-14T15:06:00Z")
+        self.assertEqual(tight["timebox"]["minutes"], 5); self.assertTrue(tight["timebox"]["expired"])
+        loose = inv.resolve(dict(base, timebox_minutes=30), now=self.AT_12)
+        self.assertEqual(loose["timebox"]["minutes"], 10); self.assertTrue(loose["timebox"]["expired"])
+        self.assertIn("ignored", loose["timebox_note"])
+
+    def test_timestamps_out_of_order_are_reported(self):
+        r = inv.resolve({"findings": self.F, "started_at": "2026-09-14T15:05:00Z", "severity": "High"}, now="2026-09-14T15:00:00Z")
+        self.assertEqual(r["timebox"]["elapsed_minutes"], 0.0)
+        self.assertIn("precedes started_at", r["timebox_note"]); self.assertIn("m", r["timebox_note"])
+
+    def test_a_malformed_timestamp_is_a_value_error(self):
+        with self.assertRaises(ValueError):
+            inv.resolve({"findings": [], "started_at": "yesterday"})
 
 
 class LedgerDedup(unittest.TestCase):
     def test_same_alert_type_on_the_same_entity_counts_once_in_resolution(self):
         # Detection & Analysis §1.1: same type on the same entity counts once
-        f = [{"id": "a1", "side": "Malicious", "confidence": "Medium", "alert_type": "Credential dumping", "entity": "ws-04"},
-             {"id": "a2", "side": "Malicious", "confidence": "High", "alert_type": "credential dumping", "entity": "WS-04"},
+        f = [{"id": "a1", "side": "Malicious", "confidence": "Medium", "alert_type": "Credential dumping", "entity": "ws-04", "artifact": "alert:1"},
+             {"id": "a2", "side": "Malicious", "confidence": "High", "alert_type": "credential dumping", "entity": "WS-04", "artifact": "alert:2"},
              {"id": "a3", "side": "Malicious", "confidence": "Medium", "alert_type": "Credential dumping", "entity": "ws-09"}]
         r = inv.resolve({"findings": f})
         self.assertEqual(r["malicious_score"], 5)  # High (3) for ws-04 once, Medium (2) for ws-09
@@ -158,10 +174,28 @@ class AlertTypeMapping(unittest.TestCase):
             ("Suspicious PowerShell command line", "Suspicious script / interpreter execution"),
             ("Email reported by user as malware or phish", "User-reported phishing"),
             ("Impossible travel activity", "Impossible-travel / anomalous sign-in"),
+            # rule order: the specific before the general
+            ("Malicious file detected", "Malware / loader execution"),
+            ("Malware detected in a zip archive file delivered by email", "Malicious attachment / URL delivered"),
+            ("Email messages containing malicious file removed after delivery", "Malicious attachment / URL delivered"),
+            ("Attempt to tamper with shadow copies", "Mass file destruction / disk wipe"),
+            ("Suspicious connection to a malicious IP address blocked by network protection", "C2 beaconing / known-bad destination"),
+            ("Data exfiltration over PowerShell", "Outbound data spike"),
+            ("'Locky' ransomware was prevented", "Malware / loader execution"),
+            ("Suspicious service registration", "Persistence mechanism created"),
+            ("Event log was cleared", "Security-tool / AMSI tampering"),
+            ("Creation of forwarding/redirect rule", "Inbox forwarding / redirect or hide rule"),
+            ("Suspicious credential dump from NTDS.dit", "Credential dumping"),
         ]:
             with self.subTest(title=title):
                 m = alert_types.classify({"id": "x", "title": title}, self.map)
                 self.assertEqual(m["type"], expected); self.assertFalse(m["unmapped"])
+
+    def test_a_title_that_names_no_behaviour_stays_unmapped(self):
+        for title in ("Ransomware-linked emerging threat activity group detected", "Suspicious bootloader modification",
+                      "Unusual impersonated activity (by user)", "Mass delete"):
+            with self.subTest(title=title):
+                self.assertTrue(alert_types.classify({"id": "x", "title": title}, self.map)["unmapped"])
 
     def test_detector_id_wins_over_the_title(self):
         custom = {"rules": [{"alert_type": "Credential dumping", "domain": "Endpoint", "detector_ids": ["det-1"], "title_patterns": []},
@@ -183,9 +217,33 @@ class AlertTypeMapping(unittest.TestCase):
         # the triage rule sees the same thing it would after its own dedup
         self.assertEqual(len(triage.dedupe_alerts(out)), 2)
 
-    def test_vendor_field_names_are_accepted(self):
-        m = alert_types.classify({"id": "x", "title": "y", "detectorId": "det-9"}, {"rules": [{"alert_type": "Credential dumping", "domain": "Endpoint", "detector_ids": ["det-9"], "title_patterns": []}]})
-        self.assertEqual(m["type"], "Credential dumping")
+    def test_the_map_declares_the_source_field_names_not_the_script(self):
+        rules = [{"alert_type": "Credential dumping", "domain": "Endpoint", "detector_ids": ["det-9"], "title_patterns": []}]
+        record = {"id": "x", "title": "y", "sourceDetector": "det-9"}
+        self.assertTrue(alert_types.classify(record, {"rules": rules})["unmapped"])
+        self.assertEqual(alert_types.classify(record, {"fields": {"detector_id": "sourceDetector"}, "rules": rules})["type"], "Credential dumping")
+        self.assertIn("detector_id", self.map["fields"])
+
+    def test_levels_are_case_insensitive_and_a_missing_entity_is_empty(self):
+        m = alert_types.classify({"id": "x", "title": "t", "confidence": "high", "entity": None}, self.map)
+        self.assertEqual((m["confidence"], m["entity"]), ("High", ""))
+        self.assertEqual(alert_types.classify({"id": "x", "title": "t", "severity": "critical"}, self.map)["confidence"], "High")
+
+    def test_the_output_seeds_the_resolution_ledger_and_counts_once_there_too(self):
+        alerts = [{"id": "A1", "title": "Sensitive credential memory read", "entity": "ws-04", "severity": "Medium"},
+                  {"id": "A2", "title": "Possible credential dumping (LSASS)", "entity": "ws-04", "severity": "Medium"}]
+        raw = [alert_types.classify(a, self.map) for a in alerts]  # not yet collapsed
+        self.assertEqual(inv.resolve({"findings": raw})["malicious_score"], 2)
+        self.assertEqual(inv.resolve({"findings": alert_types.build_alerts(alerts, self.map)})["malicious_score"], 2)
+
+    def test_the_binding_names_its_map(self):
+        import subprocess, sys, tempfile, json as j
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+            j.dump([{"id": "A", "title": "Suspicious inbox forwarding rule", "entity": "u"}], f)
+        out = subprocess.run([sys.executable, os.path.join(ROOT, "tools/shared/alert_types.py"), f.name, "--bindings", DFB_PROFILE, "--json"],
+                             capture_output=True, text=True, check=True).stdout
+        os.unlink(f.name)
+        self.assertEqual(j.loads(out)[0]["type"], "Inbox forwarding / redirect or hide rule")
 
     def test_every_mapped_alert_type_exists_in_the_framework_taxonomy(self):
         with open(os.path.join(ROOT, "framework/02-Taxonomy/alert_types.md"), encoding="utf-8") as f:
@@ -225,9 +283,21 @@ class EvidenceInventory(unittest.TestCase):
 
     def test_completeness_is_recorded_not_assumed(self):
         inv_ = evidence.build(self.ROWS, alert_devices={"A1": "ws-04", "A2": "ws-04"})
-        self.assertEqual(evidence.completeness(inv_, 4), {"extracted": 4, "source_count": 4, "complete": True})
-        self.assertEqual(evidence.completeness(inv_, 31), {"extracted": 4, "source_count": 31, "complete": False})
-        self.assertEqual(evidence.completeness(inv_, None), {"extracted": 4, "source_count": None, "complete": None})
+        self.assertEqual(evidence.completeness(inv_, 4), {"extracted": 4, "rows_read": 5, "source_count": 4, "complete": True})
+        self.assertFalse(evidence.completeness(inv_, 31)["complete"])
+        self.assertIsNone(evidence.completeness(inv_, None)["complete"])
+        self.assertIn("4 of 31", evidence.note(evidence.completeness(inv_, 31)))
+        self.assertIn("listed twice", evidence.note(evidence.completeness(inv_, 3)))
+
+    def test_rows_are_read_leniently(self):
+        rows = [{"type": "Process", "name": "cmd.exe", "pid": 1, "device": "HOST1", "alert_ids": "A"},
+                {"type": "process", "name": "cmd.exe", "pid": 1, "device": "HOST2", "alert_ids": ["B"]},
+                {"type": "ip", "value": "198.51.100.23", "alert_ids": ["A"]},
+                {"type": "ip", "name": "198.51.100.23", "alert_ids": ["B"]}]
+        built = evidence.build(rows)
+        self.assertEqual(built["count"], 3)  # two processes (two devices), one address
+        self.assertEqual(built["entities"][0]["alert_ids"], ["A"])  # a string id is one id, not its characters
+        self.assertEqual(built["entities"][2]["alert_ids"], ["A", "B"])
 
     def test_decisions_surface_a_missing_or_incomplete_inventory(self):
         ledger = {"alerts": [{"id": "A", "type": "x", "entity": "e", "confidence": "High"}], "findings": []}

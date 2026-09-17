@@ -5,7 +5,7 @@ status: draft
 last_updated: 2026-09-10
 license: Apache-2.0
 ---
-<!-- generated from zerosoc-framework@bba85278b26a : 07-Governance/agentic_supervision.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@b9c29f01b7e7 : 07-Governance/agentic_supervision.md — do not edit; regenerate with tools/build_references.py -->
 
 # Agentic Supervision Process
 

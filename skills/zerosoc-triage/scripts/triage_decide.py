@@ -104,8 +104,9 @@ def _decide(ledger):
 def decide(ledger):
     """The §1.5 decision, plus a note when the evidence inventory is missing, unverified or incomplete."""
     r = _decide(ledger)
-    if inventory_note and inventory_note(ledger.get("evidence_inventory")):
-        r["evidence_inventory_note"] = inventory_note(ledger.get("evidence_inventory"))
+    inventory = inventory_note(ledger.get("evidence_inventory")) if inventory_note else None
+    if inventory:
+        r["evidence_inventory_note"] = inventory
     return r
 
 

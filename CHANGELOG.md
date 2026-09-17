@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.2.0 (2026-09-17) — conforms to zerosoc-framework@bba8527
+## v0.2.0 (2026-09-17) — conforms to zerosoc-framework@b9c29f0
 
 Fixes found running the three skills end to end against a live Incident.
 
@@ -15,9 +15,12 @@ Fixes found running the three skills end to end against a live Incident.
 - **Deterministic alert types.** `scripts/alert_types.py` maps source alerts to framework alert types
   from a deployment map (`capabilities/alert_types.defender-xdr.json`) and collapses the same type on the
   same entity; `resolve.py` counts alert findings of one type on one entity once.
-- **Measured timebox.** `resolve.py` computes the investigation timebox from `started_at` and the
-  ledger's timestamps against the severity-scaled reference value (`--now`, `resolved_at`,
-  `timebox_minutes`); a self-reported `timebox_expired` is a fallback and is labelled as such.
+- **Measured timebox.** `resolve.py` computes the investigation timebox from `started_at` to `--now`,
+  `resolved_at` or the current time, against the severity-scaled reference value, which
+  `timebox_minutes` may tighten and never extend; a self-reported `timebox_expired` is a labelled
+  fallback; timestamps out of order are reported.
+- **Re-pinned** to the framework's head (`b9c29f0`; no change in the mirrored documents since
+  `bba8527`).
 - **Retrospective sweep through the case store.** Investigation binds the 90-day sweep to `cases.store`,
   never to telemetry with a shorter retention.
 

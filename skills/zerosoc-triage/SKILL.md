@@ -4,7 +4,7 @@ description: Triage a security alert under the ZeroSOC Framework (Phase 2.a). Se
 license: Apache-2.0
 metadata:
   version: "0.2.0"
-  framework: "zerosoc-framework@bba8527 (main, 2026-09-16)"
+  framework: "zerosoc-framework@b9c29f0 (main, 2026-09-16)"
   status: draft
   author: ZeroSOC
 ---
@@ -49,9 +49,9 @@ Read per alert: the playbook section the script prints.
    addresses, URLs, registry keys, mailboxes), paging through every alert, as `evidence.json`. Run
    `python3 scripts/evidence_inventory.py evidence.json --source-count N`, where N is the number of
    evidence items the source itself shows for the Case. The script removes duplicates, joins each row to
-   its device and prints the `evidence_inventory` object to record in the ledger. **A mismatch means the
-   extraction is incomplete: extract the rest before going on.** When the source shows no count, record it
-   as unverified. The Note's Actions Taken states the figures ("31 of 31 entities extracted").
+   its device and prints the `evidence_inventory` object to record in the ledger. A mismatch is recorded and
+   visible in every later script output: extract the rest, or state in the Note why it cannot be. When
+   the source shows no count, record it as unverified. The Note's Actions Taken states the figures ("31 of 31 entities extracted").
 3. **Select the playbook and check visibility.** Identify the telemetry domain (Endpoint, Identity,
    Network, Cloud, Email, Data, Application, OT/ICS) and the alert type, then run:
    `python3 scripts/select_playbook.py --domain Endpoint --alert-type "Malware / loader execution" --bindings zerosoc.capabilities.json`.
@@ -61,7 +61,7 @@ Read per alert: the playbook section the script prints.
    [alert_types.md](references/framework/02-Taxonomy/alert_types.md) and apply §1.2–§1.5 directly.
 4. **Start the ledger.** Create `ledger.json` (format in `scripts/triage_decide.py`) with the
    `evidence_inventory` object of step 2. When the deployment ships an alert-type map (the binding's
-   `alert_type_map`), build the alerts with `python3 scripts/alert_types.py alerts.json --map <map> --json`:
+   `alert_type_map`), build the alerts with `python3 scripts/alert_types.py alerts.json --bindings zerosoc.capabilities.json --json`:
    it gives each alert its framework alert type (detector id first, then title) and collapses the same
    type on the same entity to the strongest alert, so the rule below is applied the same way every time;
    an alert it reports as unmapped keeps its title as type. Each independent

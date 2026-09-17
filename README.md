@@ -62,7 +62,7 @@ submodule, regenerate, rerun the checks, bump `metadata.version` in the three sk
 
 ## Scope and status
 
-The skills cover what the framework at the pinned commit publishes: at `bba8527` that is the eight domain
+The skills cover what the framework at the pinned commit publishes: at `b9c29f0` that is the eight domain
 triage playbooks, the fifteen Incident Category playbooks plus the catch-all, and the five shared
 enrichment sub-playbooks, all `draft`. Where a future pin lacks a playbook, the skill says so and applies
 the method directly. Status `draft`, like the framework documents they execute.

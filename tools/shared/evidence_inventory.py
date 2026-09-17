@@ -5,8 +5,9 @@
 
 Extraction is a step, not a side effect of reading: before the ledger is started, every entity the
 source attaches to the Case's alerts is listed once, joined to its device, with the alerts that cite it,
-and the count is compared with what the source itself shows (N). A mismatch is printed and recorded, so
-a ledger is never silently built from part of the evidence.
+and the number of distinct entities is compared with the number the source itself shows (N: its list of
+unique evidence items, not the per-alert rows). A mismatch is printed and recorded, so a ledger is never
+silently built from part of the evidence.
 
 evidence.json: a list of rows {"type": "process|file|device|user|ip|url|registry|mailbox|...", "name"|"value",
 "device"?, "alert_ids": [...], ...any attributes (pid, created, sha256, path, command_line, verdict)}.
@@ -16,30 +17,43 @@ Record the printed "evidence_inventory" object in ledger.json; the decision scri
 """
 import argparse, json, sys
 
-IDENTITY = ("sha256", "sha1", "pid", "created", "path", "key", "value", "name")
+IDENTITY = ("sha256", "sha1", "pid", "created", "path", "key")
 
 
 SCOPED = ("process", "file", "registry")  # the same name on two devices is two entities
 
 
+def _type(row):
+    return str(row.get("type", "")).strip().lower()
+
+
+def _label(row):
+    return row.get("name") or row.get("value")
+
+
 def _identity(row):
-    return (str(row.get("type", "")).lower(),) + tuple(str(row.get(k, "")).strip().lower() for k in IDENTITY)
+    return (_type(row), str(_label(row) or "").strip().lower()) + tuple(str(row.get(k, "")).strip().lower() for k in IDENTITY)
 
 
 def _same_place(entity, row, device):
     """Unscoped types match on identity alone; scoped ones unless both devices are known and differ."""
-    if row.get("type") not in SCOPED or not entity.get("device") or not device:
+    if _type(row) not in SCOPED or not entity.get("device") or not device:
         return True
     return str(entity["device"]).lower() == str(device).lower()
+
+
+def _ids(row):
+    ids = row.get("alert_ids") or []
+    return [ids] if isinstance(ids, str) else list(ids)
 
 
 def _devices_by_alert(rows):
     """Alert id -> device, from the device rows themselves; an alert citing several devices joins nothing."""
     seen = {}
     for row in rows:
-        if row.get("type") == "device" and row.get("name"):
-            for alert_id in row.get("alert_ids") or []:
-                seen.setdefault(alert_id, set()).add(row["name"])
+        if _type(row) == "device" and _label(row):
+            for alert_id in _ids(row):
+                seen.setdefault(alert_id, set()).add(_label(row))
     return {alert_id: next(iter(names)) for alert_id, names in seen.items() if len(names) == 1}
 
 
@@ -48,10 +62,10 @@ def build(rows, alert_devices=None):
     alert_devices = dict(_devices_by_alert(rows), **(alert_devices or {}))
     by_identity, entities = {}, []
     for row in rows:
-        ids = list(row.get("alert_ids") or [])
+        ids = _ids(row)
         device = row.get("device") or next((alert_devices[i] for i in ids if i in alert_devices), None)
-        if row.get("type") == "device":
-            device = row.get("name") or device
+        if _type(row) == "device":
+            device = _label(row) or device
         candidates = by_identity.setdefault(_identity(row), [])
         entity = next((e for e in candidates if _same_place(e, row, device)), None)
         if entity is None:
@@ -62,13 +76,13 @@ def build(rows, alert_devices=None):
         entity["alert_ids"] = sorted(set(entity["alert_ids"]) | set(ids))
         for k, v in row.items():
             entity.setdefault(k, v)
-    return {"count": len(entities), "entities": entities}
+    return {"count": len(entities), "rows": len(rows), "entities": entities}
 
 
 def completeness(inventory, source_count):
     """The object to record in the ledger: extracted vs what the source shows."""
     complete = None if source_count is None else inventory["count"] == source_count
-    return {"extracted": inventory["count"], "source_count": source_count, "complete": complete}
+    return {"extracted": inventory["count"], "rows_read": inventory.get("rows"), "source_count": source_count, "complete": complete}
 
 
 def note(record):
@@ -78,7 +92,10 @@ def note(record):
     if record.get("complete") is None:
         return f"evidence inventory unverified: {record.get('extracted')} entities extracted, the source count was not recorded"
     if not record.get("complete"):
-        return f"evidence inventory incomplete: {record.get('extracted')} of {record.get('source_count')} entities extracted; extract the rest before deciding"
+        extracted, shown = record.get("extracted"), record.get("source_count")
+        if isinstance(extracted, int) and isinstance(shown, int) and extracted > shown:
+            return f"evidence inventory mismatch: {extracted} entities extracted, the source shows {shown}; check for entities listed twice under different names"
+        return f"evidence inventory incomplete: {extracted} of {shown} entities extracted; extract the rest before deciding"
     return None
 
 
@@ -96,7 +113,8 @@ def main():
         print(json.dumps({"evidence_inventory": record, **inventory}, indent=2, ensure_ascii=False))
     else:
         for e in inventory["entities"]:
-            print(f"{e.get('type')}\t{e.get('name') or e.get('value')}\t{e.get('device') or '-'}\t{','.join(e['alert_ids'])}")
+            attrs = " ".join(f"{k}={e[k]}" for k in ("pid", "parent_pid", "created", "sha256", "sha1", "path", "command_line", "verdict", "remediation_status") if e.get(k) not in (None, ""))
+            print(f"{e.get('type')}\t{_label(e)}\t{e.get('device') or '-'}\t{','.join(e['alert_ids'])}\t{attrs}")
         print(f"evidence_inventory: {json.dumps(record)}")
         if note(record):
             print(note(record).upper() if record.get("complete") is False else note(record))

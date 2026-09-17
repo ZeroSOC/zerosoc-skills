@@ -4,7 +4,7 @@
   "capabilities": {
     "asset.cmdb": {
       "tool": "mcp:defender-xdr/defender_get_machine_by_id",
-      "notes": "device role, OS, exposure and tags; business criticality comes from the SOC Knowledge Base"
+      "notes": "device role, OS, exposure and tags (defender_get_software for the software inventory); business criticality comes from the SOC Knowledge Base"
     },
     "identity.directory": {
       "tool": "mcp:defender-xdr/defender_get_user_machines",
@@ -72,8 +72,8 @@
     "Data Loss Prevention (DLP)": false,
     "Data classification labels": false,
     "Database audit logs": false,
-    "Directory / identity-provider audit logs": true,
-    "Directory audit logs": true,
+    "Directory / identity-provider audit logs": false,
+    "Directory audit logs": false,
     "EDR": false,
     "EDR / endpoint process telemetry": false,
     "EDR on web servers": false,
@@ -93,10 +93,10 @@
     "HR context (joiner-mover-leaver)": false,
     "Host-application logs for AI features": false,
     "Hypervisor management-plane audit logs": false,
-    "Identity Provider / directory audit logs": true,
-    "Identity provider sign-in logs": true,
+    "Identity Provider / directory audit logs": false,
+    "Identity provider sign-in logs": false,
     "LLM / inference API logs (prompts + completions)": false,
-    "MFA logs": true,
+    "MFA logs": false,
     "Mailbox audit logs": false,
     "Mailbox audit logs (pivot)": false,
     "Model registry & ML-pipeline audit logs": false,
@@ -132,21 +132,24 @@
     "EDR": "no raw process telemetry at this licence level (no hunting tables); the process, file, registry and network entities cited by the alerts are available as alert evidence",
     "EDR / endpoint process telemetry": "no raw process telemetry at this licence level (no hunting tables); the process, file, registry and network entities cited by the alerts are available as alert evidence",
     "EDR on web servers": "no raw process telemetry at this licence level (no hunting tables); the process, file, registry and network entities cited by the alerts are available as alert evidence",
-    "Email detonation / sandbox": "no analyzed-email data at this licence level; email detections do not reach the incident queue",
-    "Email gateway / attachment sandbox logs": "no analyzed-email data at this licence level; email detections do not reach the incident queue",
-    "Email gateway / sandbox": "no analyzed-email data at this licence level; email detections do not reach the incident queue",
-    "Email gateway / secure email gateway": "no analyzed-email data at this licence level; email detections do not reach the incident queue",
-    "Email gateway logs": "no analyzed-email data at this licence level; email detections do not reach the incident queue",
+    "Email detonation / sandbox": "no analyzed-email data (message events, detonation results) at this licence level; alert-policy alerts such as the user-report alert still arrive as alerts",
+    "Email gateway / attachment sandbox logs": "no analyzed-email data (message events, detonation results) at this licence level; alert-policy alerts such as the user-report alert still arrive as alerts",
+    "Email gateway / sandbox": "no analyzed-email data (message events, detonation results) at this licence level; alert-policy alerts such as the user-report alert still arrive as alerts",
+    "Email gateway / secure email gateway": "no analyzed-email data (message events, detonation results) at this licence level; alert-policy alerts such as the user-report alert still arrive as alerts",
+    "Email gateway logs": "no analyzed-email data (message events, detonation results) at this licence level; alert-policy alerts such as the user-report alert still arrive as alerts",
     "Endpoint telemetry": "no raw process telemetry at this licence level (no hunting tables); the process, file, registry and network entities cited by the alerts are available as alert evidence",
     "Engineering-workstation / HMI endpoint telemetry": "no raw process telemetry at this licence level (no hunting tables); the process, file, registry and network entities cited by the alerts are available as alert evidence",
-    "Identity provider sign-in logs": "sign-in log through the directory's reporting API; risk detections are not included at this licence level",
-    "MFA logs": "sign-in log through the directory's reporting API; risk detections are not included at this licence level",
+    "Identity provider sign-in logs": "the tenant exposes it through the directory reporting API, but no tool bound in this profile reads it: bind telemetry.identity to make it available",
+    "MFA logs": "the tenant exposes it through the directory reporting API, but no tool bound in this profile reads it: bind telemetry.identity to make it available",
     "Mailbox audit logs": "current inbox rules are readable as state through the mail API; the audit trail of who created them is not bound",
     "Mailbox audit logs (pivot)": "current inbox rules are readable as state through the mail API; the audit trail of who created them is not bound",
     "Server EDR": "no raw process telemetry at this licence level (no hunting tables); the process, file, registry and network entities cited by the alerts are available as alert evidence",
     "Software inventory / SBOM": "endpoint software inventory from vulnerability management; no SBOM",
-    "Threat-intel / reputation enrichment (hash, IP, domain)": "bind a reputation service (reputation.multi_engine) to make it available",
+    "Threat-intel / reputation enrichment (hash, IP, domain)": "not bound in this profile: bind a reputation service (reputation.multi_engine) to make it available",
     "User-reported phishing mailbox": "through the platform's native user-report alert",
-    "Vendor advisories / threat intelligence": "bind a reputation service (reputation.multi_engine) to make it available"
+    "Vendor advisories / threat intelligence": "not bound in this profile: bind a reputation service (reputation.multi_engine) to make it available",
+    "Directory / identity-provider audit logs": "the tenant exposes it through the directory reporting API, but no tool bound in this profile reads it: bind telemetry.identity to make it available",
+    "Directory audit logs": "the tenant exposes it through the directory reporting API, but no tool bound in this profile reads it: bind telemetry.identity to make it available",
+    "Identity Provider / directory audit logs": "the tenant exposes it through the directory reporting API, but no tool bound in this profile reads it: bind telemetry.identity to make it available"
   }
 }

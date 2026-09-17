@@ -5,7 +5,7 @@ status: development
 last_updated: 2026-09-10
 license: Apache-2.0
 ---
-<!-- generated from zerosoc-framework@bba85278b26a : 03-Processes/02-detection_and_analysis.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@b9c29f01b7e7 : 03-Processes/02-detection_and_analysis.md — do not edit; regenerate with tools/build_references.py -->
 
 # Phase 2: Detection & Analysis
 

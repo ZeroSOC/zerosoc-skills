@@ -16,13 +16,14 @@ Ledger (JSON):
 "covered" on a Malicious finding means the Benign explanation accounts for it (§2.4 coverage). Findings
 that share an "artifact" on the same side count once, and so do alert findings of the same "alert_type"
 on the same "entity" (§1.1). The timebox is measured, not declared: elapsed time runs from "started_at"
-to --now, else "resolved_at", else the latest finding or step timestamp, against 10 minutes at High or
-Critical severity and 20 otherwise ("timebox_minutes" is the organization's override). Without
-"started_at" the script falls back to the self-reported "timebox_expired" and says so. Prints the score
+to --now, else "resolved_at", else the current time, against 10 minutes at High or Critical severity and
+20 otherwise ("timebox_minutes" may tighten the reference value, never extend it). Finding and step
+timestamps ("at") are checked against "started_at". Without "started_at" the script falls back to the
+self-reported "timebox_expired" and says so. Prints the score
 of each side, which side is proven, the verdict and confidence to record, the residual observations, the
 timebox, and the next step.
 """
-import json, os, sys
+import argparse, json, os, sys
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -39,11 +40,11 @@ SEVERITY = {1: "Informational", 2: "Low", 3: "Medium", 4: "High", 5: "Critical"}
 
 
 def _once_key(f):
-    """What makes two findings the same observation: one artifact, or one alert type on one entity."""
-    if f.get("artifact"):
-        return (f["side"], "artifact", f["artifact"])
+    """What makes two findings the same observation: one alert type on one entity, or one artifact."""
     if f.get("alert_type") and f.get("entity"):
         return (f["side"], "alert", str(f["alert_type"]).strip().lower(), str(f["entity"]).strip().lower())
+    if f.get("artifact"):
+        return (f["side"], "artifact", f["artifact"])
     return None
 
 
@@ -66,21 +67,33 @@ def _utc(stamp):
 
 
 def timebox(ledger, now=None):
-    """The investigation timebox measured from the ledger's timestamps; (record, note)."""
+    """The investigation timebox measured from the ledger's timestamps; (record, notes)."""
     severity = ledger.get("severity") or SEVERITY.get(ledger.get("severity_id"), "Medium")
-    minutes = ledger.get("timebox_minutes") or (10 if str(severity).capitalize() in ("High", "Critical") else 20)
+    reference = 10 if str(severity).capitalize() in ("High", "Critical") else 20
+    minutes, notes = reference, []
+    override = ledger.get("timebox_minutes")
+    if override:
+        if override < reference:
+            minutes = override
+        elif override > reference:
+            notes.append(f"timebox_minutes={override} ignored: an organization may tighten the reference value ({reference}), not extend it")
     reported = ledger.get("timebox_expired")
     if not ledger.get("started_at"):
-        return {"minutes": minutes, "elapsed_minutes": None, "expired": bool(reported), "source": "self-reported"}, (
-            "timebox self-reported: the ledger has no started_at, so elapsed time cannot be checked")
-    stamps = [x["at"] for x in ledger.get("findings", []) + ledger.get("steps", []) if x.get("at")]
-    end = now or ledger.get("resolved_at") or (max(stamps, key=_utc) if stamps else datetime.now(timezone.utc).isoformat())
-    elapsed = round((_utc(end) - _utc(ledger["started_at"])).total_seconds() / 60, 1)
+        notes.append("timebox self-reported: the ledger has no started_at, so elapsed time cannot be checked")
+        return {"minutes": minutes, "elapsed_minutes": None, "expired": bool(reported), "source": "self-reported"}, notes
+    start = _utc(ledger["started_at"])
+    end = _utc(now or ledger.get("resolved_at") or datetime.now(timezone.utc).isoformat())
+    early = [x.get("id", "?") for x in ledger.get("findings", []) + ledger.get("steps", []) if x.get("at") and _utc(x["at"]) < start]
+    if early:
+        notes.append("timestamps precede started_at: " + ", ".join(map(str, early)))
+    elapsed = round((end - start).total_seconds() / 60, 1)
+    if elapsed < 0:
+        notes.append("the end time precedes started_at: elapsed time counted as 0")
+        elapsed = 0.0
     record = {"minutes": minutes, "elapsed_minutes": elapsed, "expired": elapsed >= minutes, "source": "computed"}
-    note = None
     if reported is not None and bool(reported) != record["expired"]:
-        note = f"timebox computed from the ledger timestamps; the self-reported timebox_expired={str(bool(reported)).lower()} was ignored"
-    return record, note
+        notes.append(f"timebox computed from the ledger timestamps; the self-reported timebox_expired={str(bool(reported)).lower()} was ignored")
+    return record, notes
 
 
 def resolve(ledger, now=None):
@@ -97,11 +110,11 @@ def resolve(ledger, now=None):
          "malicious_findings": [f["id"] for f in mal], "benign_findings": [f["id"] for f in ben],
          "retracted": [f["id"] for f in ledger.get("findings", []) if f.get("retracted")],
          "uncovered_medium_high_malicious": [f["id"] for f in uncovered_mh], "residual_low_malicious": [f["id"] for f in residual_low]}
-    box, box_note = timebox(ledger, now)
+    box, box_notes = timebox(ledger, now)
     r["timebox"] = box
-    if box_note: r["timebox_note"] = box_note
-    if inventory_note and inventory_note(ledger.get("evidence_inventory")):
-        r["evidence_inventory_note"] = inventory_note(ledger.get("evidence_inventory"))
+    if box_notes: r["timebox_note"] = "; ".join(box_notes)
+    inventory = inventory_note(ledger.get("evidence_inventory")) if inventory_note else None
+    if inventory: r["evidence_inventory_note"] = inventory
     cap = 2 if ledger.get("visibility_gaps") else 3
     if ledger.get("duplicate_of"):
         r.update(outcome="Duplicate", verdict_id=10, confidence_id=None, master_case_uid=ledger["duplicate_of"], next="close; merge evidence into the master Case")
@@ -128,18 +141,20 @@ def resolve(ledger, now=None):
 
 
 def main():
-    argv = sys.argv[1:]
-    now = argv[argv.index("--now") + 1] if "--now" in argv else None
-    valued = {argv.index(flag) + 1 for flag in ("--now", "--benign-kind") if flag in argv}
-    args = [x for i, x in enumerate(argv) if not x.startswith("--") and i not in valued]
-    if not args:
-        print(__doc__); sys.exit(2)
-    r = resolve(json.load(open(args[0])), now=now)
-    if "--benign-kind" in sys.argv and r.get("outcome") == "Benign proven":
-        kind = sys.argv[sys.argv.index("--benign-kind") + 1].lower()
-        r["verdict_id"], r["verdict"] = (1, "False Positive") if kind == "fp" else (5, "Benign Positive")
-        r["emit"] = "tuning ticket to Phase 1" if kind == "fp" else "SOC Knowledge Base entry if the exception was not recorded"
-    if "--json" in sys.argv:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("ledger")
+    ap.add_argument("--benign-kind", choices=["fp", "benign"], type=str.lower)
+    ap.add_argument("--now", help="UTC time to measure the timebox against (default: resolved_at, else the current time)")
+    ap.add_argument("--json", action="store_true")
+    a = ap.parse_args()
+    try:
+        r = resolve(json.load(open(a.ledger, encoding="utf-8")), now=a.now)
+    except ValueError as exc:
+        sys.exit(f"invalid ledger: {exc}")
+    if a.benign_kind and r.get("outcome") == "Benign proven":
+        r["verdict_id"], r["verdict"] = (1, "False Positive") if a.benign_kind == "fp" else (5, "Benign Positive")
+        r["emit"] = "tuning ticket to Phase 1" if a.benign_kind == "fp" else "SOC Knowledge Base entry if the exception was not recorded"
+    if a.json:
         print(json.dumps(r, indent=2)); return
     print(f"Malicious {r['malicious_score']} ({', '.join(r['malicious_findings']) or '-'})  |  Benign {r['benign_score']} ({', '.join(r['benign_findings']) or '-'})")
     if r["retracted"]: print("Retracted: " + ", ".join(r["retracted"]))

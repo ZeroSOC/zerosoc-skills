@@ -4,7 +4,7 @@ description: Investigate a promoted Case under the ZeroSOC Framework (Phase 2.b)
 license: Apache-2.0
 metadata:
   version: "0.2.0"
-  framework: "zerosoc-framework@bba8527 (main, 2026-09-16)"
+  framework: "zerosoc-framework@b9c29f0 (main, 2026-09-16)"
   status: draft
   author: ZeroSOC
 ---
@@ -57,7 +57,9 @@ per Case: the playbook the script prints.
    tagged Finding with its side, confidence, source artifact and event reference. Record `started_at`
    (UTC) now, the Case `severity`, the `evidence_inventory` object of step 2, and `at` on every finding
    as it is added: the timebox is computed from these, not declared. Alert findings carry their
-   `alert_type` and `entity`, so the same type on the same entity counts once in the score. Refine the two
+   `alert_type` and `entity`, so the same type on the same entity counts once in the score; alerts
+   appended since triage are added with `python3 scripts/alert_types.py alerts.json --bindings zerosoc.capabilities.json --json`,
+   whose entries are ready-made Malicious findings. Refine the two
    hypotheses to the Case (§2.1); competing explanations within a side are sub-hypotheses that score for
    their side.
 4. **Verify or retract** each triage finding, starting from the conflict (§2.2.1). A finding that does
@@ -74,12 +76,12 @@ per Case: the playbook the script prints.
 6. **Mark coverage.** When the Benign explanation accounts for a Medium or High Malicious finding, set
    `covered: true` on it; uncovered Low Malicious findings never block a Benign verdict, they lower its
    confidence and are listed as residual observations.
-7. **Resolve**: `python3 scripts/resolve.py ledger.json`. Malicious is proven at a score of 3 or more;
+7. **Resolve**: set `resolved_at` (UTC) in the ledger and run `python3 scripts/resolve.py ledger.json`. Malicious is proven at a score of 3 or more;
    Benign at 3 or more *and* every Medium or High Malicious finding retracted or covered; the verdict and
    confidence follow the §2.4 table (confidence is the strongest carrying finding, never an average; a
    visibility gap caps it at Medium). If neither side is proven, run the remaining discriminating
-   queries. The script measures the timebox from `started_at` and the ledger's timestamps against the
-   severity-scaled reference value (or the organization's `timebox_minutes`); when it has expired, or the
+   queries. The script measures the timebox from `started_at` to `resolved_at` (the current time when absent)
+   against the severity-scaled reference value, which `timebox_minutes` may tighten, never extend; when it has expired, or the
    budget is exhausted (`budget_exhausted`), it closes as **Insufficient Data** (7) with a monitoring watch (`watch_until`; re-open on recurrence of the
    entities) and emit a visibility or tuning ticket. Never stop for doubt; never "escalate".
 8. **Re-classify on evidence drift** (§2.2.5). If the objective differs from or exceeds the candidate
