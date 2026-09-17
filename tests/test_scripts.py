@@ -513,6 +513,23 @@ class ProcessChainTelemetry(unittest.TestCase):
         whole = json.dumps(chain.as_json(self.with_))
         self.assertIn("EncodedCommand UABvAHcAZQByAFMAaABlAGwAbAAgAC0ATgBvAFAAcgBvAGYAaQBsAGUAIAAtAE4AbwBuAEkAbgB0AGUAcgBhAGMAdABpAHYAZQAg", whole)
 
+    def test_width_controls_where_a_command_is_cut(self):
+        whole = chain.as_text(self.with_, case=True, width=0)
+        self.assertIn("EncodedCommand UABvAHcAZQByAFMAaABlAGwAbAAgAC0ATgBvAFAAcgBvAGYAaQBsAGUAIAAtAE4AbwBuAEkAbgB0AGUAcgBhAGMAdABpAHYAZQAg", whole)
+        self.assertNotIn("…", whole)
+        narrow = chain.as_text(self.with_, case=True, width=60)
+        commands = [line.strip() for line in narrow.splitlines() if line.strip().startswith(("$ ", "decoded:"))]
+        self.assertTrue(commands)
+        self.assertTrue(all(len(line) <= 70 for line in commands), "only the commands answer to --width")
+
+    def test_a_decoded_command_is_read_as_a_script(self):
+        text = chain.as_text(self.with_, case=True)
+        decoded = [line for line in text.splitlines() if "decoded:" in line]
+        self.assertTrue(decoded)
+        body = text[text.index(decoded[0]):].splitlines()
+        self.assertTrue(any(line.strip().startswith("if ($PSVersionTable") for line in body[:8]),
+                        "the decoding keeps its own lines instead of being flattened")
+
     def test_the_json_keeps_the_attributes_a_note_cites(self):
         def walk(nodes):
             for n in nodes:

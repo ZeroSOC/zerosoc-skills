@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Reconstruct the process lineage of a Case from its evidence rows. Standard library only.
 
-  process_chain.py evidence.json [--telemetry telemetry.json] [--case] [--alerts alerts.json] [--json]
+  process_chain.py evidence.json [--telemetry telemetry.json] [--case] [--alerts alerts.json] [--width N] [--json]
 
 One chain per alert, the way a console shows an alert story: the processes the alert cites, each under its
 ancestors, which are marked as context when they come from the Case's other alerts. `--case` prints the
@@ -40,6 +40,7 @@ Process rows carry "pid", "created", "parent_pid", "parent_created", "parent_nam
 import argparse, json, re, sys
 from datetime import datetime
 
+WIDTH = 160  # where a command line is cut in the text view; --width 0 prints it whole
 LABEL = "evidence-only chain"
 LABEL_FULL = "chain from evidence and telemetry"
 ATTRS = ("path", "sha1", "sha256", "account", "upn", "user_sid", "mde_device_id", "remediation_status",
@@ -374,40 +375,45 @@ def as_json(chain):
 def _short(value, limit):
     """One line, cut to length: a chain stays readable, the JSON keeps the whole command."""
     text = " ".join(str(value).split())
-    return text if len(text) <= limit else text[:limit - 1] + "…"
+    return text if not limit or len(text) <= limit else text[:limit - 1] + "…"
 
 
-def _detail(node, depth, out, width=160):
-    """The command line, its decoding and the remediation state: what a chain is read for."""
+def _detail(node, depth, out, width=WIDTH):
+    """The command line, its decoding and the remediation state: what a chain is read for.
+
+    Every printed line is cut to `width` (0: never cut). A decoding keeps its own line structure, so a
+    decoded script is read as a script; a decoding that is itself an encoded command is cut like any other."""
     pad = "  " * (depth + 1)
     for line in node["command_lines"][:2]:
         out.append(f"{pad}$ {_short(line, width)}")
     decoded = node["attrs"].get("decoded_command")
     if decoded:
-        out.append(f"{pad}decoded: {_short(decoded, width)}")
+        lines = [line for line in str(decoded).strip().splitlines() if line.strip()] or [""]
+        out.append(f"{pad}decoded: {_short(lines[0], width)}")
+        out += [f"{pad}         {_short(line, width)}" for line in lines[1:]]
     state = " ".join(str(node["attrs"][k]) for k in ("remediation_status", "detection_status") if node["attrs"].get(k))
     if state:
         out.append(f"{pad}state: {state}")
 
 
-def _lines(node, depth, seen, out, section=None):
+def _lines(node, depth, seen, out, section=None, width=WIDTH):
     seen.add(id(node))
     name = node["names"][0] if node["names"] else "(unnamed)"
     if section is not None and node["in_evidence"] and id(node) not in section["own"]:
         out.append(f"{'  ' * depth}{name} {node['pid']} {node['created']} (context: another alert of the Case)")
-        _detail(node, depth, out)
+        _detail(node, depth, out, width)
     elif node["in_evidence"]:
         also = f" (also {', '.join(node['names'][1:])})" if len(node["names"]) > 1 else ""
         out.append(f"{'  ' * depth}{name}{also} {node['pid']} {node['created']} {'/'.join(node['verdicts']) or '-'} alerts={len(node['alert_ids'])}")
-        _detail(node, depth, out)
+        _detail(node, depth, out, width)
     elif node["source"] == "telemetry":
         out.append(f"{'  ' * depth}[telemetry] {name} {node['pid']} {node['created']} (not cited by any alert)")
-        _detail(node, depth, out)
+        _detail(node, depth, out, width)
     else:
         out.append(f"{'  ' * depth}[gap] {name} {node['pid']} {node['created'] or '-'}: {node['gap']}")
     for child in sorted(node["children"], key=_key):
         if id(child) not in seen and (section is None or id(child) in section["nodes"]):
-            _lines(child, depth + 1, seen, out, section)
+            _lines(child, depth + 1, seen, out, section, width)
 
 
 def _titles(sections, alerts):
@@ -417,7 +423,7 @@ def _titles(sections, alerts):
         yield section, f"alert {section['alert_id']}" + (f": {title}" if title else "")
 
 
-def as_text(chain, alerts=None, case=False):
+def as_text(chain, alerts=None, case=False, width=WIDTH):
     s = summary(chain)
     head = (f"{s['label']}: {s['processes']} processes on {s['devices']} devices "
             f"({s['from_the_evidence']} from {s['process_rows']} evidence rows"
@@ -431,7 +437,7 @@ def as_text(chain, alerts=None, case=False):
             for d in section["devices"]:
                 out.append(f"  {d['device']}")
                 for root in sorted(d["roots"], key=_key):
-                    _lines(root, 2, seen, out, section)
+                    _lines(root, 2, seen, out, section, width)
         out += [f"unplaced: {u.get('name') or '(unnamed)'} {u.get('pid')} missing {', '.join(u['missing'])}" for u in chain["unplaced"]]
         out += [f"anomaly: {a}" for a in chain["anomalies"]]
         return "\n".join(out)
@@ -439,7 +445,7 @@ def as_text(chain, alerts=None, case=False):
     for d in chain["devices"]:
         out.append(d["device"])
         for root in sorted(d["roots"], key=_key):
-            _lines(root, 1, seen, out)
+            _lines(root, 1, seen, out, None, width)
     out += [f"unplaced: {u.get('name') or '(unnamed)'} {u.get('pid')} missing {', '.join(u['missing'])}" for u in chain["unplaced"]]
     out += [f"anomaly: {a}" for a in chain["anomalies"]]
     return "\n".join(out)
@@ -451,12 +457,13 @@ def main():
     ap.add_argument("--case", action="store_true", help="the Case-wide chain instead of one per alert")
     ap.add_argument("--telemetry", help="process-creation rows for the Case's devices, to fill the gaps")
     ap.add_argument("--alerts", help="alert id -> {title, severity}, to title the sections")
+    ap.add_argument("--width", type=int, default=WIDTH, help="where a command line is cut; 0 prints it whole")
     ap.add_argument("--json", action="store_true")
     a = ap.parse_args()
     telemetry = json.load(open(a.telemetry, encoding="utf-8")) if a.telemetry else None
     chain = build(json.load(open(a.evidence, encoding="utf-8")), telemetry)
     alerts = json.load(open(a.alerts, encoding="utf-8")) if a.alerts else None
-    print(json.dumps(as_json(chain), indent=2, ensure_ascii=False) if a.json else as_text(chain, alerts, a.case))
+    print(json.dumps(as_json(chain), indent=2, ensure_ascii=False) if a.json else as_text(chain, alerts, a.case, a.width))
     sys.exit(0)
 
 
