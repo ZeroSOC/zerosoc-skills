@@ -63,6 +63,25 @@ class Report:
         self.ok(name, found) if condition else self.fail(name, expected, found)
 
 
+def concrete(source):
+    """A data source a binding can answer. The generic playbook names its sources by deferral
+    ("Depends on the triggering alert…") and some playbooks carry a bracketed placeholder: neither
+    names a source, so neither is a gap or an unbound binding."""
+    text = str(source).strip()
+    return bool(text) and not text.startswith("Depends on") and not (text.startswith("<") and text.endswith(">"))
+
+
+def playbooks(selector):
+    """Every playbook the skills carry: triage mirrors 01-Triage, investigation mirrors 02-Investigation-Response."""
+    out, seen = [], set()
+    for skill in ("zerosoc-triage", "zerosoc-investigation", "zerosoc-response"):
+        base = os.path.join(ROOT, "skills", skill, "references", "framework")
+        for book in selector.load_playbooks(base) if os.path.isdir(base) else []:
+            if book["rel"] not in seen:
+                seen.add(book["rel"]); out.append(book)
+    return out
+
+
 def read_reference(rel):
     """A generated framework reference, read from the triage skill: the pin the run was given."""
     with open(os.path.join(ROOT, "skills", "zerosoc-triage", "references", "framework", *rel.split("/")),
@@ -205,15 +224,14 @@ def check_visibility_gaps(report, run, ledger, label):
                 for g in ledger.get("visibility_gaps", []) if isinstance(g, dict)}
     if binding and key:
         selector = load("tools/shared/select_playbook.py", "select_playbook")
-        books = os.path.join(ROOT, "skills", "zerosoc-triage", "references", "framework")
-        book = next((b for b in selector.load_playbooks(books)
+        book = next((b for b in playbooks(selector)
                      if key.lower() in (str(b["fields"].get("domain", "")).lower(),
                                         str(b["fields"].get("incident_category", "")).lower())), None)
         if book is None:
             report.skip(f"{label}: gaps match the binding", f"no playbook for {key!r} at this pin")
         else:
             implied = {g["data_source"].strip().lower() for g in selector.gaps(book["fields"], binding)
-                       if g["status"] == "unavailable"}
+                       if g["status"] == "unavailable" and concrete(g["data_source"])}
             missing = sorted(implied - recorded)
             report.check(not missing, f"{label}: every source the binding marks unavailable is a recorded gap",
                          f"{len(implied)} gaps implied by the binding for {book['rel']}",
@@ -243,10 +261,11 @@ def check_binding(report, run):
     if binding is None:
         return report.skip("binding: no data source left unbound", "no zerosoc.capabilities.json in the run")
     selector = load("tools/shared/select_playbook.py", "select_playbook")
-    books = os.path.join(ROOT, "skills", "zerosoc-triage", "references", "framework")
     unbound, checked = [], 0
-    for book in selector.load_playbooks(books):
+    for book in playbooks(selector):
         for gap in selector.gaps(book["fields"], binding):
+            if not concrete(gap["data_source"]):
+                continue
             checked += 1
             if gap["status"] == "unbound":
                 unbound.append(f"{book['rel']}: {gap['data_source']}")
