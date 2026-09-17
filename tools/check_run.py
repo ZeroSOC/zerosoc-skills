@@ -1,0 +1,261 @@
+#!/usr/bin/env python3
+"""Check a live run of the skills against the behaviour the release fixed. Standard library only.
+
+  check_run.py run/ [--map capabilities/alert_types.defender-xdr.json]
+
+A run is a directory holding what the executor produced, one file per artifact:
+
+  evidence.json            the Case's evidence rows, as given to evidence_inventory.py
+  alerts.json              the source alerts, as given to alert_types.py
+  ledger.triage.json       the triage ledger at the decision
+  ledger.investigation.json  the investigation ledger at the resolution   (optional)
+  triage_note.md           the Triage Note                                 (optional)
+  investigation_note.md    the Investigation Note                          (optional)
+  zerosoc.capabilities.json  the binding the run used
+
+The checks are the ones a human cannot do by reading a transcript: every figure the run reported is
+recomputed from the artifacts it produced, so a ledger that states an inventory it never extracted, a
+score built from findings that should have collapsed, or a timebox that was declared instead of measured,
+all fail here. What the checks cannot see — whether the executor followed the procedure, whether a
+finding is true — stays a human judgement, and the run's notes are where that is read.
+
+Each check prints `ok` or `FAIL` with what was expected and what the run holds. Exit 1 on any failure,
+2 when the run is missing an artifact the check needs.
+"""
+import argparse, importlib.util, json, os, sys
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def load(rel, name):
+    spec = importlib.util.spec_from_file_location(name, os.path.join(ROOT, rel))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+evidence_inventory = load("tools/shared/evidence_inventory.py", "evidence_inventory")
+alert_types = load("tools/shared/alert_types.py", "alert_types")
+triage_decide = load("skills/zerosoc-triage/scripts/triage_decide.py", "triage_decide")
+resolve_rule = load("skills/zerosoc-investigation/scripts/resolve.py", "resolve_rule")
+
+
+class Report:
+    def __init__(self):
+        self.failed, self.skipped = 0, 0
+
+    def ok(self, check, detail=""):
+        print(f"ok    {check}" + (f" — {detail}" if detail else ""))
+
+    def fail(self, check, expected, found):
+        self.failed += 1
+        print(f"FAIL  {check}\n        expected: {expected}\n        run has:  {found}")
+
+    def note(self, check, detail):
+        print(f"note  {check} — {detail}")
+
+    def skip(self, check, why):
+        self.skipped += 1
+        print(f"skip  {check} — {why}")
+
+    def check(self, condition, name, expected, found):
+        self.ok(name, found) if condition else self.fail(name, expected, found)
+
+
+def read_reference(rel):
+    """A generated framework reference, read from the triage skill: the pin the run was given."""
+    with open(os.path.join(ROOT, "skills", "zerosoc-triage", "references", "framework", *rel.split("/")),
+              encoding="utf-8") as f:
+        return f.read()
+
+
+def read(run, name):
+    path = os.path.join(run, name)
+    if not os.path.exists(path):
+        return None
+    with open(path, encoding="utf-8") as f:
+        return json.load(f) if name.endswith(".json") else f.read()
+
+
+def check_inventory(report, run, ledger, label):
+    """The inventory in the ledger is the one the evidence produces, not a figure the executor wrote."""
+    rows = read(run, "evidence.json")
+    recorded = (ledger or {}).get("evidence_inventory")
+    if rows is None:
+        return report.skip(f"{label}: evidence inventory recomputed", "no evidence.json in the run")
+    if not recorded:
+        return report.fail(f"{label}: evidence inventory recorded", "an evidence_inventory object in the ledger",
+                           "none: the fix asks for it before the ledger is started")
+    built = evidence_inventory.build(rows)
+    report.check(built["count"] == recorded.get("extracted"), f"{label}: extracted count matches the evidence",
+                 f"{built['count']} entities from {len(rows)} rows", f"extracted={recorded.get('extracted')}")
+    source_count = recorded.get("source_count")
+    if source_count is None:
+        report.skip(f"{label}: completeness verified", "source_count not recorded (the source showed no count)")
+    else:
+        fresh = evidence_inventory.completeness(built, source_count)
+        report.check(fresh["complete"] == recorded.get("complete"), f"{label}: completeness as recomputed",
+                     f"complete={fresh['complete']} against the source's {source_count}",
+                     f"complete={recorded.get('complete')}")
+        if fresh["complete"] is False:
+            report.ok(f"{label}: incompleteness is visible", evidence_inventory.note(fresh))
+
+
+def check_alert_map(report, run, mapping_path):
+    """The source's alerts against the deployment map: what it covers, and what it collapses."""
+    alerts = read(run, "alerts.json")
+    if alerts is None:
+        report.skip("alert types: mapped from the deployment map", "no alerts.json in the run")
+        return None
+    if not mapping_path or not os.path.exists(mapping_path):
+        report.skip("alert types: mapped from the deployment map", "no alert-type map given")
+        return None
+    amap = alert_types.load_map(mapping_path)
+    built = alert_types.build_alerts(alerts, amap)
+    unmapped = sorted({str(a.get("source_title") or a.get("id")) for a in built if a.get("unmapped")})
+    if unmapped:
+        report.note("alert types: source titles the map does not cover",
+                    f"{len(unmapped)} to report on the ticket, with the detector id of each: " + "; ".join(unmapped))
+    else:
+        report.ok("alert types: every source title maps to a framework type")
+    collapsed = len(alerts) - len(built)
+    report.ok("alert types: same type on one entity collapsed",
+              f"{len(alerts)} source alerts → {len(built)} findings ({collapsed} collapsed)")
+    return {str(a.get("source_title") or "").lower() for a in built}
+
+
+def check_alert_ledger(report, ledger, label, source_titles=None):
+    """Alert findings in a ledger: typed, placed on an entity, never the same observation twice, and
+    named as the framework names them — a type the catalog does not hold was invented in the run."""
+    findings = [f for f in (ledger or {}).get("findings", []) if f.get("alert_type")]
+    if not findings:
+        report.skip(f"{label}: alert findings carry type and entity", "no alert findings in the ledger")
+        return []
+    typed = [f for f in findings if f.get("entity")]
+    report.check(len(typed) == len(findings), f"{label}: alert findings carry type and entity",
+                 "every alert finding with alert_type and entity",
+                 f"all {len(findings)} placed on an entity" if len(typed) == len(findings)
+                 else f"{len(findings) - len(typed)} of {len(findings)} without an entity")
+    keys = {(str(f["alert_type"]).lower(), str(f.get("entity", "")).lower()) for f in typed}
+    report.check(len(keys) == len(typed), f"{label}: no alert finding counted twice",
+                 "one finding per (type, entity)", f"{len(typed)} findings for {len(keys)} distinct pairs")
+    catalog = alert_types.framework_alert_types(read_reference("02-Taxonomy/alert_types.md"))
+    invented = sorted({f["alert_type"] for f in findings if f["alert_type"] not in catalog
+                       and str(f["alert_type"]).lower() not in (source_titles or set())})
+    report.check(not invented, f"{label}: alert types come from the framework catalog",
+                 "every alert_type in the framework's alert_types.md, or the source title of an unmapped alert",
+                 f"{len(invented)} from neither: " + "; ".join(invented[:4]) if invented else "none invented")
+    return findings
+
+
+def check_timebox(report, ledger):
+    """The timebox is measured from the ledger's own timestamps, never self-reported."""
+    if not ledger:
+        return report.skip("timebox: measured, not declared", "no investigation ledger in the run")
+    if not ledger.get("started_at"):
+        return report.fail("timebox: measured, not declared", "started_at in the ledger",
+                           "absent: the script falls back to the self-reported timebox_expired")
+    result = resolve_rule.resolve(ledger)
+    box = result.get("timebox", {})
+    report.check(box.get("source") != "self-reported", "timebox: measured from the ledger's timestamps",
+                 "source measured from started_at", f"source={box.get('source')}")
+    report.ok("timebox: elapsed against the reference",
+              f"{box.get('elapsed_minutes')} min elapsed of {box.get('minutes')} (expired={box.get('expired')})")
+    dated = [f for f in ledger.get("findings", []) if f.get("at")]
+    report.check(len(dated) == len(ledger.get("findings", [])), "timebox: findings carry their own timestamps",
+                 "every finding with an 'at'", f"{len(dated)} of {len(ledger.get('findings', []))} dated")
+    return result
+
+
+def check_decision(report, ledger, result, label, decide):
+    """The verdict the run recorded is the one the rule produces from the ledger it recorded."""
+    if not ledger:
+        return report.skip(f"{label}: verdict reproduced from the ledger", "no ledger in the run")
+    fresh = result if result is not None else decide(ledger)
+    recorded = ledger.get("recorded_verdict")
+    printed = fresh.get("verdict") or fresh.get("decision")
+    if recorded is None:
+        report.skip(f"{label}: verdict reproduced from the ledger",
+                    f"the rule gives {printed!r}; add \"recorded_verdict\" to compare it with the Note")
+    else:
+        report.check(str(recorded).lower() in str(printed).lower(), f"{label}: verdict reproduced from the ledger",
+                     f"the rule on this ledger gives {printed!r}", f"the run recorded {recorded!r}")
+    if fresh.get("evidence_inventory_note"):
+        report.ok(f"{label}: the inventory note reaches the decision", fresh["evidence_inventory_note"])
+
+
+def check_sweep(report, run):
+    """Investigation's retrospective sweep runs through the case store, never through telemetry."""
+    note = read(run, "investigation_note.md")
+    if note is None:
+        return report.skip("sweep: run through cases.store", "no investigation_note.md in the run")
+    said = "cases.store" in note or "case store" in note.lower()
+    report.check(said, "sweep: the Note records the retrospective sweep",
+                 "the 90-day sweep named with the cases.store capability class",
+                 "named in the Note" if said else "the Note does not mention it")
+
+
+def check_binding(report, run):
+    """Playbook selection reports a real state for every data source: nothing left unbound."""
+    binding = read(run, "zerosoc.capabilities.json")
+    if binding is None:
+        return report.skip("binding: no data source left unbound", "no zerosoc.capabilities.json in the run")
+    selector = load("tools/shared/select_playbook.py", "select_playbook")
+    books = os.path.join(ROOT, "skills", "zerosoc-triage", "references", "framework")
+    unbound, checked = [], 0
+    for book in selector.load_playbooks(books):
+        for gap in selector.gaps(book["fields"], binding):
+            checked += 1
+            if gap["status"] == "unbound":
+                unbound.append(f"{book['rel']}: {gap['data_source']}")
+    report.check(not unbound, "binding: every data source the playbooks name has a state",
+                 "available or unavailable with a reason",
+                 f"{len(unbound)} unbound, e.g. {unbound[0]}" if unbound else f"{checked} sources across the playbooks, none unbound")
+
+
+def main_for_test(run, mapping=None):
+    """The checks on a run directory, for the repo's own tests: the exit code, output on stdout."""
+    return _run(run, mapping or os.path.join(ROOT, "capabilities", "alert_types.defender-xdr.json"))
+
+
+def _run(run, mapping):
+    report = Report()
+    triage = read(run, "ledger.triage.json")
+    investigation = read(run, "ledger.investigation.json")
+
+    print("# triage")
+    check_inventory(report, run, triage, "triage")
+    titles = check_alert_map(report, run, mapping)
+    check_alert_ledger(report, triage, "triage", titles)
+    check_decision(report, triage, None, "triage", triage_decide.decide)
+
+    print("\n# investigation")
+    check_inventory(report, run, investigation, "investigation")
+    check_alert_ledger(report, investigation, "investigation", titles)
+    result = check_timebox(report, investigation)
+    check_decision(report, investigation, result, "investigation", resolve_rule.resolve)
+    check_sweep(report, run)
+
+    print("\n# deployment")
+    check_binding(report, run)
+
+    print(f"\n{report.failed} failed, {report.skipped} skipped")
+    if report.skipped:
+        print("a skipped check is not a passed one: add the artifact and run it again")
+    return 1 if report.failed else 0
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("run", help="the directory holding the run's artifacts")
+    ap.add_argument("--map", default=os.path.join(ROOT, "capabilities", "alert_types.defender-xdr.json"))
+    a = ap.parse_args()
+    if not os.path.isdir(a.run):
+        print(f"not a directory: {a.run}", file=sys.stderr)
+        return 2
+
+    return _run(a.run, a.map)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

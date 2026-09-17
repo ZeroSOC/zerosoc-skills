@@ -15,6 +15,7 @@ alert_types = load("tools/shared/alert_types.py", "alert_types")
 evidence = load("tools/shared/evidence_inventory.py", "evidence_inventory")
 selector = load("tools/shared/select_playbook.py", "select_playbook")
 chain = load("tools/shared/process_chain.py", "process_chain")
+checker = load("tools/check_run.py", "check_run")
 
 CAPABILITIES = os.path.join(ROOT, "capabilities")
 XDR_MAP = os.path.join(CAPABILITIES, "alert_types.defender-xdr.json")
@@ -552,6 +553,66 @@ class ProcessChainTelemetry(unittest.TestCase):
         self.assertTrue(set().union(*(n["attributes"] for n in alerted)) >= {"sha256", "path", "account"})
         self.assertTrue(any(n["command_lines"] for n in nodes))
         self.assertTrue(any(e["command_line"] for e in document["timeline"]))
+
+
+class RunCheck(unittest.TestCase):
+    """The acceptance harness for a live run: it must catch a ledger that reports what it did not do."""
+
+    def run_dir(self, **overrides):
+        import tempfile
+        base = tempfile.mkdtemp()
+        rows = [{"type": "device", "name": "ws-01", "alert_ids": ["A1"]},
+                {"type": "process", "name": "cmd.exe", "pid": 5120, "created": "2026-09-14T14:55:41Z",
+                 "device": "ws-01", "alert_ids": ["A1"]}]
+        ledger = {"case_uid": "CASE-1", "severity": "High", "started_at": "2026-09-14T15:00:00Z",
+                  "resolved_at": "2026-09-14T15:06:00Z",
+                  "evidence_inventory": {"extracted": 2, "source_count": 2, "complete": True},
+                  "findings": [{"id": "F1", "side": "Malicious", "confidence": "High", "at": "2026-09-14T15:01:00Z",
+                                "alert_type": "Credential dumping", "entity": "ws-01"}]}
+        ledger.update(overrides)
+        for name, document in (("evidence.json", rows), ("ledger.triage.json", ledger),
+                               ("ledger.investigation.json", ledger)):
+            with open(os.path.join(base, name), "w", encoding="utf-8") as f:
+                json.dump(document, f)
+        return base
+
+    def check(self, base):
+        import io, contextlib
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = checker.main_for_test(base)
+        return code, out.getvalue()
+
+    def test_a_faithful_run_passes(self):
+        code, out = self.check(self.run_dir())
+        self.assertEqual(code, 0, out)
+        self.assertIn("ok    triage: extracted count matches the evidence", out)
+
+    def test_an_inventory_the_evidence_does_not_support_fails(self):
+        code, out = self.check(self.run_dir(evidence_inventory={"extracted": 31, "source_count": 31, "complete": True}))
+        self.assertEqual(code, 1)
+        self.assertIn("FAIL  triage: extracted count matches the evidence", out)
+
+    def test_a_declared_timebox_fails(self):
+        base = self.run_dir()
+        with open(os.path.join(base, "ledger.investigation.json"), encoding="utf-8") as f:
+            ledger = json.load(f)
+        del ledger["started_at"]
+        ledger["timebox_expired"] = False
+        with open(os.path.join(base, "ledger.investigation.json"), "w", encoding="utf-8") as f:
+            json.dump(ledger, f)
+        code, out = self.check(base)
+        self.assertEqual(code, 1)
+        self.assertIn("FAIL  timebox: measured, not declared", out)
+
+    def test_one_observation_counted_twice_fails(self):
+        doubled = [{"id": "F1", "side": "Malicious", "confidence": "High", "at": "2026-09-14T15:01:00Z",
+                    "alert_type": "Credential dumping", "entity": "ws-01"},
+                   {"id": "F2", "side": "Malicious", "confidence": "High", "at": "2026-09-14T15:02:00Z",
+                    "alert_type": "credential dumping", "entity": "WS-01"}]
+        code, out = self.check(self.run_dir(findings=doubled))
+        self.assertEqual(code, 1)
+        self.assertIn("FAIL  triage: no alert finding counted twice", out)
 
 
 class BindingProfiles(unittest.TestCase):

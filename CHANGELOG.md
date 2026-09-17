@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Acceptance harness for a live run.** `tools/check_run.py` recomputes what a run reported from the
+  artifacts it produced: the evidence inventory against the evidence, the alert findings against the
+  deployment map and the framework catalog, the timebox against the ledger's timestamps, the verdict
+  against the rule, the sweep against the Note, and the binding against every data source the playbooks
+  name. It lists the source titles the map does not cover, to be reported back. Tested against faithful
+  and unfaithful runs.
+
 - **Process lineage from the evidence.** Triage and investigation rebuild the parent/child process chain
   of a Case with `scripts/process_chain.py`, from the rows of the evidence inventory: one node per
   process (device, PID, creation time) keeping every row's verdict, parents joined on PID and creation
