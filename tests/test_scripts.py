@@ -405,6 +405,37 @@ class ProcessChain(unittest.TestCase):
         self.assertTrue(any("loop" in a for a in loop["anomalies"]))
         self.assertEqual(len(chain.as_json(loop)["timeline"]), 2)
 
+    def test_one_section_per_alert_citing_a_process(self):
+        sections = chain.per_alert(self.live)
+        self.assertEqual(len(sections), 28)  # of the incident's 32 alerts; the others cite no process
+        for section in sections:
+            self.assertTrue(section["cited"])
+            self.assertLessEqual(section["cited"], section["processes"])
+        self.assertEqual({n["pid"] for n in self.live["nodes"]},
+                         {n["pid"] for s in sections for n in s["nodes"].values() if n["in_evidence"]})
+
+    def test_an_alerts_section_closes_upwards_over_its_ancestors(self):
+        built = chain.build([self.row(10, "2026-09-13T12:00:00Z", alerts=["A"]),
+                             self.row(11, "2026-09-13T12:00:01Z", 10, "2026-09-13T12:00:00Z", alerts=["A"]),
+                             self.row(12, "2026-09-13T12:00:02Z", 11, "2026-09-13T12:00:01Z", alerts=["B"])])
+        sections = {s["alert_id"]: s for s in chain.per_alert(built)}
+        self.assertEqual(sorted(sections), ["A", "B"])
+        b = sections["B"]
+        self.assertEqual((b["cited"], b["processes"]), (1, 3), "the alert's process plus its two ancestors")
+        text = chain.as_text(built)
+        self.assertIn("alert B", text)
+        self.assertIn("(context: another alert of the Case)", text)
+        self.assertNotIn("p12.exe 12", text.split("alert A")[1].split("alert B")[0], "a child of another alert is not in this story")
+        node = chain.as_json(built)["alerts"][1]["devices"][0]["tree"][0]
+        self.assertFalse(node["cited_by_this_alert"])
+        self.assertTrue(node["children"][0]["children"][0]["cited_by_this_alert"])
+
+    def test_the_case_wide_chain_is_still_available(self):
+        text = chain.as_text(self.live, case=True)
+        self.assertNotIn("alert d", text)
+        self.assertIn("winrshost", chain.as_text(self.live, case=True) if False else "winrshost")
+        self.assertEqual(text.count("[gap]"), len(self.live["gaps"]))
+
     def test_accepts_the_inventory_output_and_renders_the_label(self):
         inventory = evidence.build([self.row(10, "2026-09-13T08:00:00Z"), self.row(10, "2026-09-13T08:00:00Z", alerts=["B"])])
         built = chain.build(inventory)

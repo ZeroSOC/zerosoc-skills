@@ -52,10 +52,13 @@ Read per alert: the playbook section the script prints.
    its device and prints the `evidence_inventory` object to record in the ledger. A mismatch is recorded and
    visible in every later script output: extract the rest, or state in the Note why it cannot be. When
    the source shows no count, record it as unverified. The Note's Actions Taken states the figures ("31 of 31 entities extracted").
-   When the inventory holds processes, run `python3 scripts/process_chain.py evidence.json` for the
-   parent/child lineage the [Artifact enrichment](references/framework/04-Playbooks/99-Shared/sub_enrichment_artifact.md)
-   produces. The chain is evidence-only: a parent outside the evidence is printed as a lineage gap, never
-   matched on the PID alone; fill it through `telemetry.endpoint` when bound, otherwise state it in the Note.
+   When the inventory holds processes, run `python3 scripts/process_chain.py evidence.json --alerts alerts.json`
+   for the parent/child lineage the [Artifact enrichment](references/framework/04-Playbooks/99-Shared/sub_enrichment_artifact.md)
+   produces: one chain per alert, each process under its ancestors, as an alert story is read (`--case` joins
+   the Case's alerts into one chain per device). The chain is evidence-only: a parent outside the evidence is
+   printed as a lineage gap, never matched on the PID alone; fill it through `telemetry.endpoint` when bound,
+   otherwise state it in the Note. An alert whose evidence names no process has no chain, whatever the
+   console draws from its own process telemetry.
 3. **Select the playbook and check visibility.** Identify the telemetry domain (Endpoint, Identity,
    Network, Cloud, Email, Data, Application, OT/ICS) and the alert type, then run:
    `python3 scripts/select_playbook.py --domain Endpoint --alert-type "Malware / loader execution" --bindings zerosoc.capabilities.json`.

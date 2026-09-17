@@ -53,9 +53,10 @@ per Case: the playbook the script prints.
    `python3 scripts/evidence_inventory.py evidence.json --source-count N` (N: the evidence items the source
    shows). Record the printed `evidence_inventory` object in the ledger; extract what is missing before
    scoring. For a hunt-opened Case the inventory is what the hunt collected, and N is unverified.
-   When it holds processes, rebuild the lineage with `python3 scripts/process_chain.py evidence.json`
-   (evidence-only: a parent outside the evidence is a lineage gap, never matched on the PID alone); aim a
-   `telemetry.endpoint` query at each gap that matters to a hypothesis.
+   When it holds processes, rebuild the lineage with `python3 scripts/process_chain.py evidence.json --alerts alerts.json`
+   (one chain per alert, each process under its ancestors; `--case` joins them into one chain per device, the
+   view to score on). It is evidence-only: a parent outside the evidence is a lineage gap, never matched on
+   the PID alone; aim a `telemetry.endpoint` query at each gap that matters to a hypothesis.
 3. **Start the ledger** `ledger.json` (format in `scripts/resolve.py`) from the Triage Note: every
    tagged Finding with its side, confidence, source artifact and event reference. Record `started_at`
    (UTC) now, the Case `severity`, the `evidence_inventory` object of step 2, and `at` on every finding

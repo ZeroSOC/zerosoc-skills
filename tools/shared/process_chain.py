@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 """Reconstruct the process lineage of a Case from its evidence rows. Standard library only.
 
-  process_chain.py evidence.json [--json]
+  process_chain.py evidence.json [--case] [--alerts alerts.json] [--json]
+
+One chain per alert, the way a console shows an alert story: the processes the alert cites, each under its
+ancestors, which are marked as context when they come from the Case's other alerts. `--case` prints the
+Case-wide chain instead, every alert joined into one tree per device: the view an investigation scores on.
 
 The chain is evidence-only: it holds the processes the source attached to the Case's alerts, never the
 processes around them. A parent outside the evidence is printed as a lineage gap, to be filled from endpoint
-telemetry when it is bound; it is never guessed.
+telemetry when it is bound; it is never guessed. An alert whose evidence names no process has no chain here,
+whatever the console draws from its own process telemetry.
 
 evidence.json: the rows given to evidence_inventory.py (a list, or its --json output with "entities").
+alerts.json (optional): {"<alert id>": {"title": ..., "severity": ...}}, to title the per-alert sections.
 Process rows carry "pid", "created", "parent_pid", "parent_created", "parent_name" and "device", times in UTC.
 
 - One node per process, not per row: rows with the same device, PID and creation time are one process,
@@ -166,8 +172,10 @@ def _key(n):
     return n["_t"][0] if n["_t"] else float("inf")
 
 
-def _tree(node, seen):
+def _tree(node, seen, section=None):
     out = {k: node[k] for k in ("pid", "created", "in_evidence", "alert_ids")}
+    if section is not None and node["in_evidence"]:
+        out["cited_by_this_alert"] = id(node) in section["own"]
     out["name"] = node["names"][0] if node["names"] else None
     if len(node["names"]) > 1:
         out["names"] = node["names"]
@@ -176,7 +184,31 @@ def _tree(node, seen):
     else:
         out["gap"] = node["gap"]
     seen.add(id(node))
-    out["children"] = [_tree(c, seen) for c in sorted(node["children"], key=_key) if id(c) not in seen]
+    out["children"] = [_tree(c, seen, section) for c in sorted(node["children"], key=_key)
+                       if id(c) not in seen and (section is None or id(c) in section["nodes"])]
+    return out
+
+
+def per_alert(chain):
+    """One section per alert citing a process: its processes, closed upwards over their ancestors."""
+    sections = {}
+    for node in chain["nodes"]:
+        for alert in node["alert_ids"]:
+            own, nodes = sections.setdefault(alert, (set(), {}))
+            own.add(id(node))
+            walk = node
+            while walk is not None and id(walk) not in nodes:
+                nodes[id(walk)] = walk
+                walk = walk.get("parent")
+    out = []
+    for alert in sorted(sections, key=lambda a: min(_key(n) for n in sections[a][1].values())):
+        own, nodes = sections[alert]
+        roots = [n for n in nodes.values() if n.get("parent") is None or id(n["parent"]) not in nodes]
+        devices = {}
+        for root in sorted(roots, key=_key):
+            devices.setdefault(root["device"].lower(), {"device": root["device"], "roots": []})["roots"].append(root)
+        out.append({"alert_id": alert, "own": own, "nodes": nodes, "devices": [devices[k] for k in sorted(devices)],
+                    "processes": sum(1 for n in nodes.values() if n["in_evidence"]), "cited": len(own)})
     return out
 
 
@@ -202,30 +234,59 @@ def summary(chain):
 
 def as_json(chain):
     seen = set()
-    return {"process_chain": summary(chain),
+    sections = []
+    for section in per_alert(chain):
+        shown = set()
+        sections.append({"alert_id": section["alert_id"], "processes_cited": section["cited"],
+                         "ancestors_from_the_case": section["processes"] - section["cited"],
+                         "devices": [{"device": d["device"], "tree": [_tree(r, shown, section) for r in sorted(d["roots"], key=_key)]}
+                                     for d in section["devices"]]})
+    return {"process_chain": dict(summary(chain), alerts_citing_a_process=len(sections)),
+            "alerts": sections,
             "devices": [{"device": d["device"], "tree": [_tree(r, seen) for r in sorted(d["roots"], key=_key)]} for d in chain["devices"]],
             "lineage_gaps": [{"device": g["device"], "pid": g["pid"], "created": g["created"], "name": g["names"][0] if g["names"] else None,
                               "reason": g["gap"], "children": [c["pid"] for c in g["children"]]} for g in chain["gaps"]],
             "unplaced": chain["unplaced"], "anomalies": chain["anomalies"], "timeline": timeline(chain)}
 
 
-def _lines(node, depth, seen, out):
+def _lines(node, depth, seen, out, section=None):
     seen.add(id(node))
     name = node["names"][0] if node["names"] else "(unnamed)"
-    if node["in_evidence"]:
+    if section is not None and node["in_evidence"] and id(node) not in section["own"]:
+        out.append(f"{'  ' * depth}{name} {node['pid']} {node['created']} (context: another alert of the Case)")
+    elif node["in_evidence"]:
         also = f" (also {', '.join(node['names'][1:])})" if len(node["names"]) > 1 else ""
         out.append(f"{'  ' * depth}{name}{also} {node['pid']} {node['created']} {'/'.join(node['verdicts']) or '-'} alerts={len(node['alert_ids'])}")
     else:
         out.append(f"{'  ' * depth}[gap] {name} {node['pid']} {node['created'] or '-'}: {node['gap']}")
     for child in sorted(node["children"], key=_key):
-        if id(child) not in seen:
-            _lines(child, depth + 1, seen, out)
+        if id(child) not in seen and (section is None or id(child) in section["nodes"]):
+            _lines(child, depth + 1, seen, out, section)
 
 
-def as_text(chain):
+def _titles(sections, alerts):
+    for section in sections:
+        meta = (alerts or {}).get(section["alert_id"]) or {}
+        title = meta.get("title") or meta.get("displayName")
+        yield section, f"alert {section['alert_id']}" + (f": {title}" if title else "")
+
+
+def as_text(chain, alerts=None, case=False):
     s = summary(chain)
-    out = [f"{LABEL}: {s['processes']} processes from {s['process_rows']} rows on {s['devices']} devices; "
-           f"{s['lineage_gaps']} lineage gaps, {s['unplaced']} unplaced, {s['anomalies']} anomalies"]
+    head = (f"{LABEL}: {s['processes']} processes from {s['process_rows']} rows on {s['devices']} devices; "
+            f"{s['lineage_gaps']} lineage gaps, {s['unplaced']} unplaced, {s['anomalies']} anomalies")
+    out = [head if case else head + f"; {len(per_alert(chain))} of the Case's alerts cite a process"]
+    if not case:
+        for section, title in _titles(per_alert(chain), alerts):
+            out.append(f"{title} — {section['cited']} processes cited, {section['processes'] - section['cited']} ancestors from the Case")
+            seen = set()
+            for d in section["devices"]:
+                out.append(f"  {d['device']}")
+                for root in sorted(d["roots"], key=_key):
+                    _lines(root, 2, seen, out, section)
+        out += [f"unplaced: {u.get('name') or '(unnamed)'} {u.get('pid')} missing {', '.join(u['missing'])}" for u in chain["unplaced"]]
+        out += [f"anomaly: {a}" for a in chain["anomalies"]]
+        return "\n".join(out)
     seen = set()
     for d in chain["devices"]:
         out.append(d["device"])
@@ -239,10 +300,13 @@ def as_text(chain):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("evidence")
+    ap.add_argument("--case", action="store_true", help="the Case-wide chain instead of one per alert")
+    ap.add_argument("--alerts", help="alert id -> {title, severity}, to title the sections")
     ap.add_argument("--json", action="store_true")
     a = ap.parse_args()
     chain = build(json.load(open(a.evidence, encoding="utf-8")))
-    print(json.dumps(as_json(chain), indent=2, ensure_ascii=False) if a.json else as_text(chain))
+    alerts = json.load(open(a.alerts, encoding="utf-8")) if a.alerts else None
+    print(json.dumps(as_json(chain), indent=2, ensure_ascii=False) if a.json else as_text(chain, alerts, a.case))
     sys.exit(0)
 
 

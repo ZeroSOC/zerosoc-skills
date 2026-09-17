@@ -6,7 +6,9 @@
   of a Case with `scripts/process_chain.py`, from the rows of the evidence inventory: one node per
   process (device, PID, creation time) keeping every row's verdict, parents joined on PID and creation
   time with precision-aware times, lineage gaps for parents outside the evidence, anomalies reported, and
-  timeline entries with their alerts as event references for the Case Timeline.
+  timeline entries with their alerts as event references for the Case Timeline. The default view is one
+  chain per alert, each process under its ancestors, as an alert story is read; ancestors contributed by the
+  Case's other alerts are marked as context, and `--case` joins every alert into one chain per device.
 
 ## v0.2.0 (2026-09-17) — conforms to zerosoc-framework@b9c29f0
 
