@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## v0.3.0 (2026-09-18) — conforms to zerosoc-framework@5f4ab24
+
+The release the live acceptance run was made on, on two tenants (alert evidence only, and full process
+telemetry).
 
 - **A visibility gap no longer caps the Case's confidence.** The rule was removed from the framework, so
   `triage_decide.py` and `resolve.py` no longer lower the level when the ledger records a gap: confidence
@@ -15,6 +18,10 @@
   name. It also holds the run to the visibility-gap rule: every required source the binding marks
   unavailable must be a recorded gap (Playbook Architecture §7). It lists the source titles the map does not cover, to be reported back.
   Tested against faithful and unfaithful runs.
+
+- **Harness fixes from the acceptance runs.** `check_run.py` reads the triage alerts from either ledger
+  shape, sees every playbook a run selected, and no longer counts a data source that a playbook names only
+  to defer it; both ledgers record the selected playbook (`playbook`, `playbook_version`).
 
 - **Process lineage from the evidence.** Triage and investigation rebuild the parent/child process chain
   of a Case with `scripts/process_chain.py`, from the rows of the evidence inventory: one node per

@@ -22,8 +22,8 @@ The binding file has two maps:
   the classes it invoked, never the tool names.
 - `data_sources`: the `required_data_sources` names used by the playbooks' frontmatter → `true` when the
   source is available to the executor, `false` otherwise. `scripts/select_playbook.py` compares a
-  playbook's requirements with this map and emits the **visibility gaps** that the Notes must record and
-  that cap the Case confidence at Medium.
+  playbook's requirements with this map and emits the **visibility gaps** that the Notes must record,
+  each with the check it prevented. A gap does not change the Case's confidence.
 
 Two optional keys: `data_source_notes` (data source → why it is unavailable or limited; printed with the
 gap) and `alert_type_map` (the file name of the deployment's alert-type map).

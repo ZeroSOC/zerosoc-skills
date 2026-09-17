@@ -3,7 +3,7 @@ name: zerosoc-response
 description: Respond to a confirmed Incident under the ZeroSOC Framework (Phase 3). Confirms scope and category from the Investigation to Response contract, selects containment actions from the Incident Category playbook, classifies each under the autonomy matrix (pre-authorized or requires approval, with the presentation payload for approvals), then eradicates, recovers, handles NIS2 and DORA notification deadlines and hands over to post-incident activity. Use when a Case has verdict True Positive and an Investigation Note.
 license: Apache-2.0
 metadata:
-  version: "0.2.0"
+  version: "0.3.0"
   framework: "zerosoc-framework@5f4ab24 (main, 2026-09-18)"
   status: draft
   author: ZeroSOC
