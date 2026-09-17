@@ -1,0 +1,21 @@
+First seen,Process name,Verdict,Remediation status,Process ID,Device
+2026-09-13T20:09:37.801Z,lsass.exe,Suspicious,,660,enea
+2026-09-13T20:09:37.801Z,rundll32.exe,Suspicious,,4940,enea
+2026-09-13T20:08:45.975Z,services.exe,Suspicious,,640,enea
+2026-09-13T20:08:43.058Z,services.exe,Suspicious,,640,enea
+2026-09-13T20:08:43.058Z,svchost.exe,Suspicious,,1072,enea
+2026-09-13T20:08:43.058Z,ntoskrnl.exe,Suspicious,,4,enea
+2026-09-13T20:08:39.078Z,WmiPrvSE.exe,Suspicious,,3616,enea
+2026-09-13T20:08:39.078Z,cmd.exe,Suspicious,,1376,enea
+2026-09-13T20:08:30.157Z,powershell.exe,Suspicious,,3308,enea
+2026-09-13T20:08:30.157Z,schtasks.exe,Suspicious,,1892,enea
+2026-09-13T20:08:22.367Z,cmd.exe,Suspicious,,3972,enea
+2026-09-13T19:16:16.628Z,sshd.exe,Suspicious,,4184,enea
+2026-09-13T16:36:11.151Z,WmiPrvSE.exe,Suspicious,,6852,ettore
+2026-09-13T16:36:11.113Z,svchost.exe,Suspicious,,2304,ettore
+2026-09-13T16:36:10.628Z,WmiPrvSE.exe,Suspicious,,10208,achille
+2026-09-13T16:36:10.535Z,svchost.exe,Suspicious,,1816,achille
+2026-09-13T16:35:29.089Z,WmiPrvSE.exe,Suspicious,,1372,perseo
+2026-09-13T16:34:35.008Z,WmiPrvSE.exe,Suspicious,,3132,ulisse
+2026-09-13T16:34:35.008Z,,Malicious,Blocked,3132,ulisse
+2026-09-13T16:04:10.586Z,WmiPrvSE.exe,Suspicious,,4944,enea

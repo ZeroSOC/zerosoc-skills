@@ -1,4 +1,4 @@
-import importlib.util, os, unittest
+import csv, importlib.util, json, os, unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -14,11 +14,13 @@ auto = load("skills/zerosoc-response/scripts/autonomy.py", "autonomy")
 alert_types = load("tools/shared/alert_types.py", "alert_types")
 evidence = load("tools/shared/evidence_inventory.py", "evidence_inventory")
 selector = load("tools/shared/select_playbook.py", "select_playbook")
+chain = load("tools/shared/process_chain.py", "process_chain")
 
 CAPABILITIES = os.path.join(ROOT, "capabilities")
 XDR_MAP = os.path.join(CAPABILITIES, "alert_types.defender-xdr.json")
 DFB_PROFILE = os.path.join(CAPABILITIES, "zerosoc.capabilities.defender-for-business.json")
 PLACEHOLDER_SOURCES = {"<telemetry source>"}
+FIXTURES = os.path.join(ROOT, "tests", "fixtures")
 
 
 class TriageRule(unittest.TestCase):
@@ -309,6 +311,108 @@ class EvidenceInventory(unittest.TestCase):
         self.assertNotIn("evidence_inventory_note", triage.decide(ledger))
 
 
+class ProcessChain(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        with open(os.path.join(FIXTURES, "incident14_evidence.json"), encoding="utf-8") as f:
+            cls.live = chain.build(json.load(f))
+
+    def node(self, built, device, pid):
+        return next(n for n in built["nodes"] + built["gaps"] if n["device"].lower().startswith(device) and n["pid"] == pid)
+
+    def path(self, node):
+        out = [node["pid"]]
+        while node.get("parent"):
+            node = node["parent"]; out.append(node["pid"])
+        return out
+
+    def test_live_incident_builds_one_node_per_process(self):
+        s = chain.summary(self.live)
+        self.assertEqual((s["process_rows"], s["processes"], s["devices"], s["anomalies"], s["unplaced"]), (20, 18, 5, 0, 0))
+
+    def test_live_chain_links_parents_on_pid_and_creation_time(self):
+        self.assertEqual(self.path(self.node(self.live, "enea", 4940)), [4940, 3972, 3308, 5064])
+        self.assertEqual(self.path(self.node(self.live, "enea", 1892)), [1892, 3308, 5064])
+        top = self.node(self.live, "enea", 5064)
+        self.assertFalse(top["in_evidence"]); self.assertEqual(top["names"], ["cmd.exe"])
+        # the parent's creation time is reported with a trailing zero dropped (…51.74649Z) and still joins
+        self.assertEqual(self.path(self.node(self.live, "enea", 4184)), [4184, 640, 528])
+
+    def test_children_of_one_missing_parent_share_one_gap(self):
+        wininit = self.node(self.live, "enea", 528)
+        self.assertFalse(wininit["in_evidence"])
+        self.assertEqual(sorted(c["pid"] for c in wininit["children"]), [640, 660])
+
+    def test_rows_of_one_process_keep_every_verdict(self):
+        wmi = self.node(self.live, "ulisse", 3132)
+        self.assertEqual((wmi["rows"], wmi["names"], sorted(wmi["verdicts"])), (2, ["WmiPrvSE.exe"], ["malicious", "suspicious"]))
+        self.assertEqual(len(wmi["alert_ids"]), 2)
+
+    def test_every_process_in_the_portal_export_is_a_node(self):
+        with open(os.path.join(FIXTURES, "incident14_portal_processes.csv"), encoding="utf-8") as f:
+            portal = {(r["Device"].lower(), int(r["Process ID"])) for r in csv.DictReader(f)}
+        built = {(n["device"].lower().split(".")[0], n["pid"]) for n in self.live["nodes"]}
+        self.assertEqual(built, portal)
+
+    def test_timeline_cites_the_alerts_oldest_first(self):
+        entries = chain.timeline(self.live)
+        self.assertEqual(len(entries), 18)
+        self.assertEqual([e["time"] for e in entries], sorted(e["time"] for e in entries))
+        rundll = next(e for e in entries if e["pid"] == 4940)
+        self.assertEqual((rundll["parent"], rundll["parent_in_evidence"]), ("cmd.exe", True))
+        self.assertTrue(rundll["event_refs"])
+
+    def row(self, pid, created, parent=None, parent_created=None, device="WS-01", **kw):
+        return dict(type="process", name=kw.pop("name", f"p{pid}.exe"), pid=pid, created=created, device=device,
+                    parent_pid=parent, parent_created=parent_created, alert_ids=kw.pop("alerts", ["A"]), **kw)
+
+    def test_times_match_at_the_coarser_precision(self):
+        built = chain.build([self.row(10, "2026-09-13T12:00:00.254123Z"),
+                             self.row(11, "2026-09-13T12:00:01Z", 10, "2026-09-13T12:00:00.254Z", device="ws-01")])
+        self.assertEqual(self.path(self.node(built, "ws-01", 11)), [11, 10])
+        self.assertTrue(self.node(built, "ws-01", 10)["in_evidence"], "device names are compared without case")
+        self.assertFalse(chain.same_time(chain.parse_time("2026-09-13T12:00:00.254Z"), chain.parse_time("2026-09-13T12:00:00.255001Z")))
+        self.assertTrue(chain.same_time(chain.parse_time("2026-09-13T14:00:00+02:00"), chain.parse_time("2026-09-13T12:00:00Z")))
+
+    def test_a_reused_pid_is_not_the_parent(self):
+        built = chain.build([self.row(10, "2026-09-13T08:00:00Z"),  # earlier process with the same PID
+                             self.row(11, "2026-09-13T12:00:01Z", 10, "2026-09-13T11:59:59Z")])
+        parent = self.node(built, "ws-01", 11)["parent"]
+        self.assertFalse(parent["in_evidence"]); self.assertEqual(parent["gap"], "outside the evidence")
+
+    def test_a_parent_without_creation_time_is_a_gap_not_a_pid_match(self):
+        built = chain.build([self.row(10, "2026-09-13T08:00:00Z"), self.row(11, "2026-09-13T12:00:01Z", 10)])
+        self.assertEqual(self.node(built, "ws-01", 11)["parent"]["gap"], "parent creation time not reported")
+
+    def test_the_same_pid_and_time_on_two_devices_are_two_processes(self):
+        built = chain.build([self.row(10, "2026-09-13T08:00:00Z"), self.row(10, "2026-09-13T08:00:00Z", device="WS-02")])
+        self.assertEqual(chain.summary(built)["processes"], 2)
+
+    def test_rows_without_device_pid_or_time_are_unplaced(self):
+        built = chain.build([self.row(10, "2026-09-13T08:00:00Z", device="?"), self.row(None, "2026-09-13T08:00:00Z"),
+                             self.row(12, None)])
+        self.assertEqual([u["missing"] for u in built["unplaced"]], [["device"], ["pid"], ["created"]])
+        self.assertEqual(built["nodes"], [])
+
+    def test_anomalies_are_reported(self):
+        conflict = chain.build([self.row(11, "2026-09-13T12:00:01Z", 10, "2026-09-13T12:00:00Z"),
+                                self.row(11, "2026-09-13T12:00:01Z", 9, "2026-09-13T12:00:00Z")])
+        self.assertIn("different parents", conflict["anomalies"][0])
+        early = chain.build([self.row(10, "2026-09-13T12:00:05Z"), self.row(11, "2026-09-13T12:00:01Z", 10, "2026-09-13T12:00:05Z")])
+        self.assertIn("created before its parent", early["anomalies"][0])
+        loop = chain.build([self.row(10, "2026-09-13T12:00:00Z", 11, "2026-09-13T12:00:00Z"),
+                            self.row(11, "2026-09-13T12:00:00Z", 10, "2026-09-13T12:00:00Z")])
+        self.assertTrue(any("loop" in a for a in loop["anomalies"]))
+        self.assertEqual(len(chain.as_json(loop)["timeline"]), 2)
+
+    def test_accepts_the_inventory_output_and_renders_the_label(self):
+        inventory = evidence.build([self.row(10, "2026-09-13T08:00:00Z"), self.row(10, "2026-09-13T08:00:00Z", alerts=["B"])])
+        built = chain.build(inventory)
+        self.assertEqual(chain.summary(built)["processes"], 1)
+        self.assertTrue(chain.as_text(built).startswith("evidence-only chain: 1 processes"))
+        self.assertEqual(chain.as_json(self.live)["process_chain"]["label"], "evidence-only chain")
+
+
 class BindingProfiles(unittest.TestCase):
     def setUp(self):
         import json
@@ -352,6 +456,13 @@ class Procedures(unittest.TestCase):
             text = self.read(skill)
             self.assertIn("scripts/evidence_inventory.py", text, skill)
             self.assertLess(text.index("evidence_inventory.py"), text.index("Start the ledger"), skill)
+
+    def test_both_skills_build_the_process_chain_after_the_inventory(self):
+        for skill in ("zerosoc-triage", "zerosoc-investigation"):
+            text = self.read(skill)
+            self.assertIn("scripts/process_chain.py", text, skill)
+            self.assertLess(text.index("evidence_inventory.py"), text.index("process_chain.py"), skill)
+            self.assertLess(text.index("process_chain.py"), text.index("Start the ledger"), skill)
 
     def test_the_retrospective_sweep_runs_through_the_case_store(self):
         text = self.read("zerosoc-investigation")

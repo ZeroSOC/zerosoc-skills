@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **Process lineage from the evidence.** Triage and investigation rebuild the parent/child process chain
+  of a Case with `scripts/process_chain.py`, from the rows of the evidence inventory: one node per
+  process (device, PID, creation time) keeping every row's verdict, parents joined on PID and creation
+  time with precision-aware times, lineage gaps for parents outside the evidence, anomalies reported, and
+  timeline entries with their alerts as event references for the Case Timeline.
+
 ## v0.2.0 (2026-09-17) — conforms to zerosoc-framework@b9c29f0
 
 Fixes found running the three skills end to end against a live Incident.

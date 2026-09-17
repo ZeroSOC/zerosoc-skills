@@ -24,7 +24,8 @@
       "shared_scripts": [
         "select_playbook.py",
         "alert_types.py",
-        "evidence_inventory.py"
+        "evidence_inventory.py",
+        "process_chain.py"
       ]
     },
     "zerosoc-investigation": {
@@ -41,7 +42,8 @@
       "shared_scripts": [
         "select_playbook.py",
         "alert_types.py",
-        "evidence_inventory.py"
+        "evidence_inventory.py",
+        "process_chain.py"
       ]
     },
     "zerosoc-response": {
