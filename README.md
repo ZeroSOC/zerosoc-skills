@@ -39,7 +39,8 @@ skills/<name>/SKILL.md            the skill (Agent Skills spec)
 skills/<name>/references/         generated from framework/ — do not edit
 skills/<name>/scripts/            deterministic helpers, Python 3 standard library
 framework/                        the ZeroSOC Framework, git submodule pinned to a commit
-capabilities/                     capability classes, binding schema and example
+capabilities/                     capability classes, binding schema, example and reference bindings,
+                                  alert-type maps
 tools/                            build (references generation) and checks
 tests/                            unit tests for the scripts, built from the framework's worked examples
 ```
@@ -56,7 +57,8 @@ python3 tools/package.py                     # rebuild skills/<name>.zip for hos
 ```
 
 Versioning: a skills release conforms to one framework commit, recorded in `metadata.framework`. Bump the
-submodule, regenerate, rerun the checks, tag.
+submodule, regenerate, rerun the checks, bump `metadata.version` in the three skills, add the entry to
+[CHANGELOG.md](CHANGELOG.md), tag `v<version>`. Implementations pin a tag.
 
 ## Scope and status
 

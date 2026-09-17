@@ -1,0 +1,321 @@
+{
+  "source": "Microsoft Defender XDR (Graph security alerts)",
+  "version": "2026-09-17",
+  "description": "Alert titles of the source mapped to the framework's alert types. Rules are evaluated in order: a detector id match wins over any title match, then the first rule with a matching title pattern. Detector ids are tenant-observable GUIDs: add them under detector_ids as they are seen, they make the mapping exact where a title is ambiguous or localized. An alert no rule matches is reported as unmapped by scripts/alert_types.py.",
+  "rules": [
+    {
+      "alert_type": "Ransomware mass-encryption",
+      "domain": "Endpoint",
+      "detector_ids": [],
+      "title_patterns": [
+        "ransomware behaviou?r",
+        "ransomware.*(detected|activity)",
+        "file was encrypted",
+        "mass (file )?encryption"
+      ]
+    },
+    {
+      "alert_type": "Mass file destruction / disk wipe",
+      "domain": "Endpoint",
+      "detector_ids": [],
+      "title_patterns": [
+        "shadow cop(y|ies).*(delet|tamper)",
+        "file backups? (were|was) deleted",
+        "inhibit system recovery",
+        "disk wip",
+        "mass file delet"
+      ]
+    },
+    {
+      "alert_type": "Credential dumping",
+      "domain": "Endpoint",
+      "detector_ids": [],
+      "title_patterns": [
+        "credential dumping",
+        "credential memory read",
+        "lsass",
+        "credential theft",
+        "sam (database|registry) .*(dump|access)",
+        "mimikatz"
+      ]
+    },
+    {
+      "alert_type": "Security-tool / AMSI tampering",
+      "domain": "Endpoint",
+      "detector_ids": [],
+      "title_patterns": [
+        "tamper",
+        "attempt to turn off .*(antivirus|protection)",
+        "amsi",
+        "(antivirus|real-time protection|security (tool|software)) .*(disabled|turned off|stopped)",
+        "security log was cleared"
+      ]
+    },
+    {
+      "alert_type": "Persistence mechanism created",
+      "domain": "Endpoint",
+      "detector_ids": [],
+      "title_patterns": [
+        "scheduled task",
+        "suspicious service (registered|creat|install)",
+        "(registry )?run key",
+        "autostart",
+        "anomaly detected in asep",
+        "persistence"
+      ]
+    },
+    {
+      "alert_type": "Suspicious script / interpreter execution",
+      "domain": "Endpoint",
+      "detector_ids": [],
+      "title_patterns": [
+        "powershell",
+        "suspicious (script|command ?line|wscript|cscript|mshta|rundll32|regsvr32)",
+        "living[- ]off[- ]the[- ]land",
+        "encoded command",
+        "remote (shell|command|powershell)",
+        "suspicious remote activity"
+      ]
+    },
+    {
+      "alert_type": "Trusted software / updater anomalous behaviour",
+      "domain": "Endpoint",
+      "detector_ids": [],
+      "title_patterns": [
+        "dll (side|search)[- ]?(load|order)",
+        "signed (binary|executable).*(unusual|suspicious)",
+        "updater .*(anomal|suspicious)"
+      ]
+    },
+    {
+      "alert_type": "Ingress tool transfer to host",
+      "domain": "Endpoint",
+      "detector_ids": [],
+      "title_patterns": [
+        "tool transfer",
+        "(hack|attack) ?tool .*(download|drop|written)",
+        "suspicious (file )?download",
+        "certutil"
+      ]
+    },
+    {
+      "alert_type": "Malware / loader execution",
+      "domain": "Endpoint",
+      "detector_ids": [],
+      "title_patterns": [
+        "malware (was )?(detected|prevented|blocked|found)",
+        "an active .* (malware|hacktool|backdoor|trojan)",
+        "trojan",
+        "backdoor",
+        "hacktool",
+        "loader",
+        "suspicious (file|binary|executable|process)",
+        "process injection",
+        "unwanted software"
+      ]
+    },
+    {
+      "alert_type": "Impossible-travel / anomalous sign-in",
+      "domain": "Identity",
+      "detector_ids": [],
+      "title_patterns": [
+        "impossible travel",
+        "atypical travel",
+        "unfamiliar sign-?in",
+        "anonymous ip",
+        "anomalous (sign-?in|token)",
+        "malicious ip address",
+        "risky sign-?in"
+      ]
+    },
+    {
+      "alert_type": "Brute force / password spray",
+      "domain": "Identity",
+      "detector_ids": [],
+      "title_patterns": [
+        "password spray",
+        "brute[- ]?force",
+        "multiple failed (logon|login|sign-?in)",
+        "credential stuffing"
+      ]
+    },
+    {
+      "alert_type": "MFA fatigue / push bombing",
+      "domain": "Identity",
+      "detector_ids": [],
+      "title_patterns": [
+        "mfa (fatigue|bomb|spam)",
+        "push bomb",
+        "repeated mfa",
+        "suspicious mfa"
+      ]
+    },
+    {
+      "alert_type": "Legacy-auth sign-in",
+      "domain": "Identity",
+      "detector_ids": [],
+      "title_patterns": [
+        "legacy auth",
+        "basic auth"
+      ]
+    },
+    {
+      "alert_type": "OAuth app consent / token-session theft",
+      "domain": "Identity",
+      "detector_ids": [],
+      "title_patterns": [
+        "oauth",
+        "app(lication)? consent",
+        "consent grant",
+        "token (theft|replay|stolen)",
+        "session cookie",
+        "adversary[- ]in[- ]the[- ]middle|aitm"
+      ]
+    },
+    {
+      "alert_type": "Privileged role / group grant",
+      "domain": "Identity",
+      "detector_ids": [],
+      "title_patterns": [
+        "(privileged|admin(istrator)?) (role|group)",
+        "added to (a )?(privileged|admin)",
+        "role assignment",
+        "elevation of privilege"
+      ]
+    },
+    {
+      "alert_type": "User-reported phishing",
+      "domain": "Email",
+      "detector_ids": [],
+      "title_patterns": [
+        "reported by user",
+        "user[- ]reported"
+      ]
+    },
+    {
+      "alert_type": "Inbox forwarding / redirect or hide rule",
+      "domain": "Email",
+      "detector_ids": [],
+      "title_patterns": [
+        "inbox (forwarding|manipulation|rule)",
+        "forwarding rule",
+        "new-inboxrule",
+        "suspicious email forwarding",
+        "mail(box)? (redirect|forward)"
+      ]
+    },
+    {
+      "alert_type": "BEC impersonation / display-name spoof",
+      "domain": "Email",
+      "detector_ids": [],
+      "title_patterns": [
+        "impersonat",
+        "display[- ]name spoof",
+        "business email compromise|\\bbec\\b"
+      ]
+    },
+    {
+      "alert_type": "Malicious attachment / URL delivered",
+      "domain": "Email",
+      "detector_ids": [],
+      "title_patterns": [
+        "malicious (url|file|attachment)",
+        "(phish|malware) (url|campaign|email|message)",
+        "email messages? containing",
+        "potentially malicious url click",
+        "removed after delivery",
+        "phish(ing)? delivered"
+      ]
+    },
+    {
+      "alert_type": "C2 beaconing / known-bad destination",
+      "domain": "Network",
+      "detector_ids": [],
+      "title_patterns": [
+        "command[- ]and[- ]control|\\bc2\\b",
+        "beacon",
+        "connection to (a )?(malicious|known[- ]bad|suspicious) (domain|ip|url|destination)",
+        "network connection to a malicious"
+      ]
+    },
+    {
+      "alert_type": "Internal scan / lateral movement",
+      "domain": "Network",
+      "detector_ids": [],
+      "title_patterns": [
+        "lateral movement",
+        "(network|port|internal) scan",
+        "network (service )?discovery",
+        "remote service",
+        "pass[- ]the[- ](hash|ticket)",
+        "smb .*(enumeration|scan)",
+        "anomalous account lookups"
+      ]
+    },
+    {
+      "alert_type": "DNS tunneling / suspicious DNS",
+      "domain": "Network",
+      "detector_ids": [],
+      "title_patterns": [
+        "dns tunnel",
+        "suspicious dns"
+      ]
+    },
+    {
+      "alert_type": "Outbound data spike",
+      "domain": "Network",
+      "detector_ids": [],
+      "title_patterns": [
+        "exfiltrat",
+        "unusual (outbound|upload|data transfer)",
+        "data (upload|transfer) (to|volume)"
+      ]
+    },
+    {
+      "alert_type": "Unsanctioned SaaS app usage (Shadow IT / Shadow AI discovery)",
+      "domain": "Cloud",
+      "detector_ids": [],
+      "title_patterns": [
+        "unsanctioned (app|saas)",
+        "shadow (it|ai)",
+        "discovered app"
+      ]
+    },
+    {
+      "alert_type": "DLP violation (regulated data)",
+      "domain": "Data",
+      "detector_ids": [],
+      "title_patterns": [
+        "\\bdlp\\b",
+        "data loss prevention",
+        "sensitive (info|data).*(shared|sent|upload)"
+      ]
+    },
+    {
+      "alert_type": "Mass sensitive-file access by one principal",
+      "domain": "Data",
+      "detector_ids": [],
+      "title_patterns": [
+        "mass (download|file access|access)",
+        "unusual (volume of )?file (access|download)",
+        "mass delet"
+      ]
+    },
+    {
+      "alert_type": "Ransom-note file dropped",
+      "domain": "Data",
+      "detector_ids": [],
+      "title_patterns": [
+        "ransom[- ]?note"
+      ]
+    },
+    {
+      "alert_type": "Web shell upload",
+      "domain": "Application",
+      "detector_ids": [],
+      "title_patterns": [
+        "web ?shell"
+      ]
+    }
+  ]
+}

@@ -3,7 +3,7 @@ name: zerosoc-triage
 description: Triage a security alert under the ZeroSOC Framework (Phase 2.a). Selects the domain triage playbook, enriches the entities, tags every finding Malicious or Benign with a confidence, applies the coverage rule to decide Close (False Positive, Benign, Duplicate) or Promote, and produces a conformant Triage Note plus the Triage to Investigation contract. Use when an alert, a detection, a user report or any suspected-incident intake needs a disposition.
 license: Apache-2.0
 metadata:
-  version: "0.1.0"
+  version: "0.2.0"
   framework: "zerosoc-framework@bba8527 (main, 2026-09-16)"
   status: draft
   author: ZeroSOC
@@ -44,23 +44,36 @@ Read per alert: the playbook section the script prints.
    alerts**: detection logic, key fields, the relationships between aggregated alerts and entities. Form a
    first impression that directs the enrichment. Re-read the Case before every later step: tools append
    alerts and change severity while you work.
-2. **Select the playbook and check visibility.** Identify the telemetry domain (Endpoint, Identity,
+2. **Extract the evidence inventory.** Before any enrichment, list every entity the source attaches to
+   the Case's alerts (devices, identities, processes with PID and creation time, files with hashes,
+   addresses, URLs, registry keys, mailboxes), paging through every alert, as `evidence.json`. Run
+   `python3 scripts/evidence_inventory.py evidence.json --source-count N`, where N is the number of
+   evidence items the source itself shows for the Case. The script removes duplicates, joins each row to
+   its device and prints the `evidence_inventory` object to record in the ledger. **A mismatch means the
+   extraction is incomplete: extract the rest before going on.** When the source shows no count, record it
+   as unverified. The Note's Actions Taken states the figures ("31 of 31 entities extracted").
+3. **Select the playbook and check visibility.** Identify the telemetry domain (Endpoint, Identity,
    Network, Cloud, Email, Data, Application, OT/ICS) and the alert type, then run:
    `python3 scripts/select_playbook.py --domain Endpoint --alert-type "Malware / loader execution" --bindings zerosoc.capabilities.json`.
    It prints the playbook version, the required data sources with their availability, the **visibility
    gaps** to record, and only the per-alert section you need. When no playbook exists for the domain at
    this framework pin, use the domain's alert catalog in
    [alert_types.md](references/framework/02-Taxonomy/alert_types.md) and apply §1.2–§1.5 directly.
-3. **Start the ledger.** Create `ledger.json` (format in `scripts/triage_decide.py`). Each independent
+4. **Start the ledger.** Create `ledger.json` (format in `scripts/triage_decide.py`) with the
+   `evidence_inventory` object of step 2. When the deployment ships an alert-type map (the binding's
+   `alert_type_map`), build the alerts with `python3 scripts/alert_types.py alerts.json --map <map> --json`:
+   it gives each alert its framework alert type (detector id first, then title) and collapses the same
+   type on the same entity to the strongest alert, so the rule below is applied the same way every time;
+   an alert it reports as unmapped keeps its title as type. Each independent
    alert is the first Malicious finding at the tool's confidence, or at the level its severity maps to
    (Informational/Low → Low, Medium → Medium, High/Critical → High). Same type on the same entity counts
    once.
-4. **Enrich** (§1.2–§1.3) through the playbook's *Enrich entities* links (the `99-Shared` sub-playbooks;
+5. **Enrich** (§1.2–§1.3) through the playbook's *Enrich entities* links (the `99-Shared` sub-playbooks;
    carry back their **Produces** outputs by name) and its numbered **Checks**. Query threat intelligence,
    the asset inventory, the directory, the SOC Knowledge Base, prior Cases, the 30-day history, lateral
    scope and the campaign check. **Egress rule**: only hashes and already-public IPs and domains leave the
    environment; never files, full URLs or message bodies; detonation only in an isolated sandbox.
-5. **Tag every result** as the playbook prescribes: `Malicious` or `Benign` at Low, Medium or High
+6. **Tag every result** as the playbook prescribes: `Malicious` or `Benign` at Low, Medium or High
    (Definitions §7: High establishes the side alone, Medium is a strong signal needing a second, Low is
    consistent but common in normal operation). A result that bears on neither side is context, untagged.
    A `Benign (High)` finding is one that **explains** an alert: an approved exception or documented
@@ -70,9 +83,9 @@ Read per alert: the playbook section the script prints.
    one applies, because they lead to different verdicts. A prior Case's verdict is context, never a
    verdict: verify its reasoning applies to *this* Case. A campaign firing across many entities becomes one
    campaign-level Case with severity for the campaign scope.
-6. **Classify** (§1.4). Validate or override the source `severity_id` from asset criticality, identity
+7. **Classify** (§1.4). Validate or override the source `severity_id` from asset criticality, identity
    privilege and blast radius, and state why. Record `impact_id` only when already known; never guess.
-7. **Decide** by the coverage rule: `python3 scripts/triage_decide.py ledger.json`. The script closes
+8. **Decide** by the coverage rule: `python3 scripts/triage_decide.py ledger.json`. The script closes
    only when no Malicious finding exists beyond the alerts *and* the Benign findings cover every alert
    (a High alert only by a `Benign (High)` finding; a Low or Medium alert by Benign weights summing above
    its own); otherwise it promotes, including when there is no finding at all. It also computes the
@@ -81,21 +94,21 @@ Read per alert: the playbook section the script prints.
    merged), set `duplicate_of` in the ledger, and never treat the same alert on a different entity as a
    duplicate. Checklist before promoting or closing: can you say in one sentence, with evidence, why
    the activity is or is not suspicious? If not, gather more.
-8. **Write the Triage Note** using the template and worked example in
+9. **Write the Triage Note** using the template and worked example in
    [triage_note.md](references/framework/06-Deliverables/triage_note.md): Summary; Actions Taken; Findings
    (a table, alerts first, each with its tag and event reference); Decision & Justification (the coverage
    rule applied in one or two sentences); References (every event cited resolves to an OCSF finding or
    event identifier); Visibility Gaps (or "None."); Provenance (playbook path and version, executor
    classes, capability classes invoked, Case id). Name it `triage_note_<case-id>_<YYYYMMDD-HHMM>`.
    Technique codes are always `ID (Name)`. Summarize evidence; never paste raw logs.
-9. **Emit.** On Close: `verdict_id` 1 (False Positive; also a tuning ticket to Phase 1), 5 (Benign; also a
-   Knowledge Base entry if the exception was unrecorded) or 10 (Duplicate, with `master_case_uid`). On
-   Promote: `verdict_id` stays 0 and the Case carries the **Triage → Investigation contract** of
-   [Playbook Architecture §5](references/framework/04-Playbooks/playbook_architecture.md): `uid`,
-   `status_id`, `severity_id`, `confidence_id`, `impact_id` when known, `observables`,
-   `finding_info_list`, `attacks`, `candidate_incident_categories`, `entry_path`, `master_case_uid`
-   when correlated, `visibility_gaps`, `provenance`, and a reference to the Note. Then invoke the
-   `zerosoc-investigation` skill.
+10. **Emit.** On Close: `verdict_id` 1 (False Positive; also a tuning ticket to Phase 1), 5 (Benign; also a
+    Knowledge Base entry if the exception was unrecorded) or 10 (Duplicate, with `master_case_uid`). On
+    Promote: `verdict_id` stays 0 and the Case carries the **Triage → Investigation contract** of
+    [Playbook Architecture §5](references/framework/04-Playbooks/playbook_architecture.md): `uid`,
+    `status_id`, `severity_id`, `confidence_id`, `impact_id` when known, `observables`,
+    `finding_info_list`, `attacks`, `candidate_incident_categories`, `entry_path`, `master_case_uid`
+    when correlated, `visibility_gaps`, `provenance`, and a reference to the Note. Then invoke the
+    `zerosoc-investigation` skill.
 
 ## Governance
 

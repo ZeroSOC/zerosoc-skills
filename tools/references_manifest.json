@@ -22,7 +22,9 @@
         "04-Playbooks/99-Shared/*.md"
       ],
       "shared_scripts": [
-        "select_playbook.py"
+        "select_playbook.py",
+        "alert_types.py",
+        "evidence_inventory.py"
       ]
     },
     "zerosoc-investigation": {
@@ -37,7 +39,9 @@
         "04-Playbooks/99-Shared/*.md"
       ],
       "shared_scripts": [
-        "select_playbook.py"
+        "select_playbook.py",
+        "alert_types.py",
+        "evidence_inventory.py"
       ]
     },
     "zerosoc-response": {

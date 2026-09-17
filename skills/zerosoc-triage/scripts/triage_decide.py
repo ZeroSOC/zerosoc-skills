@@ -10,6 +10,7 @@ Ledger (JSON):
                 "severity": "High", "technique": "T1003"}],
   "findings": [{"id": "F1", "desc": "...", "side": "Malicious"|"Benign"|null, "confidence": "Low|Medium|High",
                 "covers": ["DF-1"], "artifact": "hash:...", "retracted": false}],
+  "evidence_inventory": {"extracted": 31, "source_count": 31, "complete": true},
   "visibility_gaps": [{"data_source": "...", "check_prevented": "..."}],
   "duplicate_of": null | "CASE-0"
 }
@@ -17,7 +18,13 @@ Alerts are the first Malicious findings at the tool's confidence, or at the leve
 Findings with side null are context and do not score. A Benign finding with no "covers" covers every alert.
 Prints the decision, the coverage per alert, the confidence leaving triage and the verdict to record.
 """
-import json, sys
+import json, os, sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    from evidence_inventory import note as inventory_note
+except ImportError:  # the shared script is copied next to this one by tools/build_references.py
+    inventory_note = None
 
 W = {"Low": 1, "Medium": 2, "High": 3}
 LEVELS = ["Low", "Medium", "High"]
@@ -38,7 +45,7 @@ def dedupe_alerts(alerts):
     return list(best.values())
 
 
-def decide(ledger):
+def _decide(ledger):
     alerts = dedupe_alerts(ledger.get("alerts", []))
     active = [f for f in ledger.get("findings", []) if not f.get("retracted") and f.get("side") in ("Malicious", "Benign")]
     mal = [f for f in active if f["side"] == "Malicious"]
@@ -94,6 +101,14 @@ def decide(ledger):
     return result
 
 
+def decide(ledger):
+    """The §1.5 decision, plus a note when the evidence inventory is missing, unverified or incomplete."""
+    r = _decide(ledger)
+    if inventory_note and inventory_note(ledger.get("evidence_inventory")):
+        r["evidence_inventory_note"] = inventory_note(ledger.get("evidence_inventory"))
+    return r
+
+
 def main():
     args = [x for x in sys.argv[1:] if not x.startswith("--")]
     if not args:
@@ -115,6 +130,7 @@ def main():
         print(f"Confidence leaving triage: {r['confidence']} ({r['confidence_id']})" + (" — " + "; ".join(r["confidence_notes"]) if r["confidence_notes"] else ""))
     if r.get("emit"): print("Emit: " + r["emit"])
     if r.get("reminder"): print(r["reminder"])
+    if r.get("evidence_inventory_note"): print("Note: " + r["evidence_inventory_note"])
 
 
 if __name__ == "__main__":

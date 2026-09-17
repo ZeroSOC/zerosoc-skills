@@ -1,0 +1,152 @@
+{
+  "deployment": "reference shape: Microsoft 365 Business Premium tenant (Defender for Business, Defender for Office 365 Plan 1, Entra ID P1) reached through the defender-xdr MCP server; no advanced hunting, polling only. A capability probe run against the tenant supersedes this file.",
+  "alert_type_map": "alert_types.defender-xdr.json",
+  "capabilities": {
+    "asset.cmdb": {
+      "tool": "mcp:defender-xdr/defender_get_machine_by_id",
+      "notes": "device role, OS, exposure and tags; business criticality comes from the SOC Knowledge Base"
+    },
+    "identity.directory": {
+      "tool": "mcp:defender-xdr/defender_get_user_machines",
+      "notes": "logon relationships only; role and privilege need a directory tool bound here"
+    },
+    "soc.knowledge_base": {
+      "tool": "file:./soc-kb/"
+    },
+    "cases.store": {
+      "tool": "mcp:defender-xdr/defender_list_incidents",
+      "notes": "closed incidents and their entities; the 90-day retrospective sweep runs here, never through telemetry"
+    },
+    "malware.repository": {
+      "tool": "mcp:defender-xdr/defender_get_file_info",
+      "notes": "prevalence and first-seen by hash; hashes only leave the environment"
+    },
+    "telemetry.endpoint": {
+      "tool": "mcp:defender-xdr/defender_get_incident_alerts",
+      "notes": "alert evidence only: there is no query language to translate playbook questions into; every unanswered question is a visibility gap"
+    },
+    "containment.isolate_host": {
+      "tool": "mcp:defender-xdr/defender_isolate_machine",
+      "notes": "reversed by defender_unisolate_machine"
+    },
+    "containment.quarantine_file": {
+      "tool": "mcp:defender-xdr/defender_stop_and_quarantine_file"
+    },
+    "containment.block_indicator": {
+      "tool": "mcp:defender-xdr/defender_create_indicator",
+      "notes": "reversed by defender_delete_indicator"
+    },
+    "ticketing": {
+      "tool": "mcp:defender-xdr/defender_add_incident_comment",
+      "notes": "tuning tickets as incident comments until a ticketing tool is bound"
+    }
+  },
+  "data_sources": {
+    "AD/GPO & deployment-infrastructure logs": false,
+    "API gateway logs": false,
+    "Anti-virus / anti-malware": true,
+    "Application & API gateway logs": false,
+    "Application / API logs": false,
+    "Application logs": false,
+    "Backup system logs": false,
+    "Backup-system logs": false,
+    "CASB": false,
+    "CASB / SaaS discovery": false,
+    "CASB / access-policy evaluation logs": false,
+    "CASB / access-policy logs": false,
+    "CDN / WAF logs": false,
+    "Change / maintenance schedule": false,
+    "Cloud & remote-access audit for vendor/MSP accounts": false,
+    "Cloud Security Posture Management (CSPM)": false,
+    "Cloud audit + billing/cost telemetry": false,
+    "Cloud billing / cost telemetry": false,
+    "Cloud control-plane audit logs": false,
+    "Cloud-storage audit logs": false,
+    "Compute/GPU utilization metrics": false,
+    "Configuration-management / backup diffs": false,
+    "Container / Kubernetes logs": false,
+    "Control-network flows": false,
+    "DLP": false,
+    "DLP / file-access audit logs": false,
+    "DNS logs": false,
+    "Data Loss Prevention (DLP)": false,
+    "Data classification labels": false,
+    "Database audit logs": false,
+    "Directory / identity-provider audit logs": true,
+    "Directory audit logs": true,
+    "EDR": false,
+    "EDR / endpoint process telemetry": false,
+    "EDR on web servers": false,
+    "Email detonation / sandbox": false,
+    "Email gateway / attachment sandbox logs": false,
+    "Email gateway / sandbox": false,
+    "Email gateway / secure email gateway": false,
+    "Email gateway logs": false,
+    "Endpoint telemetry": false,
+    "Engineering-workstation / HMI endpoint telemetry": false,
+    "File / object access audit logs": false,
+    "File audit + classification labels": false,
+    "File system / storage audit logs": false,
+    "File-integrity monitoring": false,
+    "Firewall logs": false,
+    "GPU / compute telemetry": false,
+    "HR context (joiner-mover-leaver)": false,
+    "Host-application logs for AI features": false,
+    "Hypervisor management-plane audit logs": false,
+    "Identity Provider / directory audit logs": true,
+    "Identity provider sign-in logs": true,
+    "LLM / inference API logs (prompts + completions)": false,
+    "MFA logs": true,
+    "Mailbox audit logs": false,
+    "Mailbox audit logs (pivot)": false,
+    "Model registry & ML-pipeline audit logs": false,
+    "Model-API usage logs": false,
+    "Netflow": false,
+    "Netflow (mining-pool destinations)": false,
+    "Netflow / DDoS appliance telemetry": false,
+    "Netflow / proxy / CASB egress logs": false,
+    "Netflow to/from the device": false,
+    "Network / CASB / firewall logs": false,
+    "Network flow / NDR": false,
+    "Network-device AAA / admin logs": false,
+    "OT / ICS intrusion detection (IDS)": false,
+    "OT IDS": false,
+    "Process historian": false,
+    "Proxy / DNS / firewall egress logs": false,
+    "Proxy / DNS logs": false,
+    "Proxy / web gateway logs": false,
+    "Server EDR": false,
+    "Software inventory / SBOM": true,
+    "Storage / hypervisor audit logs": false,
+    "Threat-intel / reputation enrichment (hash, IP, domain)": false,
+    "Training-data lineage": false,
+    "Update-infrastructure logs": false,
+    "Upstream ISP / scrubbing-provider telemetry": false,
+    "User-reported phishing mailbox": true,
+    "VPN logs": false,
+    "Vendor advisories / threat intelligence": false,
+    "WAF logs": false,
+    "Web Application Firewall (WAF)": false
+  },
+  "data_source_notes": {
+    "EDR": "no raw process telemetry at this licence level (no hunting tables); the process, file, registry and network entities cited by the alerts are available as alert evidence",
+    "EDR / endpoint process telemetry": "no raw process telemetry at this licence level (no hunting tables); the process, file, registry and network entities cited by the alerts are available as alert evidence",
+    "EDR on web servers": "no raw process telemetry at this licence level (no hunting tables); the process, file, registry and network entities cited by the alerts are available as alert evidence",
+    "Email detonation / sandbox": "no analyzed-email data at this licence level; email detections do not reach the incident queue",
+    "Email gateway / attachment sandbox logs": "no analyzed-email data at this licence level; email detections do not reach the incident queue",
+    "Email gateway / sandbox": "no analyzed-email data at this licence level; email detections do not reach the incident queue",
+    "Email gateway / secure email gateway": "no analyzed-email data at this licence level; email detections do not reach the incident queue",
+    "Email gateway logs": "no analyzed-email data at this licence level; email detections do not reach the incident queue",
+    "Endpoint telemetry": "no raw process telemetry at this licence level (no hunting tables); the process, file, registry and network entities cited by the alerts are available as alert evidence",
+    "Engineering-workstation / HMI endpoint telemetry": "no raw process telemetry at this licence level (no hunting tables); the process, file, registry and network entities cited by the alerts are available as alert evidence",
+    "Identity provider sign-in logs": "sign-in log through the directory's reporting API; risk detections are not included at this licence level",
+    "MFA logs": "sign-in log through the directory's reporting API; risk detections are not included at this licence level",
+    "Mailbox audit logs": "current inbox rules are readable as state through the mail API; the audit trail of who created them is not bound",
+    "Mailbox audit logs (pivot)": "current inbox rules are readable as state through the mail API; the audit trail of who created them is not bound",
+    "Server EDR": "no raw process telemetry at this licence level (no hunting tables); the process, file, registry and network entities cited by the alerts are available as alert evidence",
+    "Software inventory / SBOM": "endpoint software inventory from vulnerability management; no SBOM",
+    "Threat-intel / reputation enrichment (hash, IP, domain)": "bind a reputation service (reputation.multi_engine) to make it available",
+    "User-reported phishing mailbox": "through the platform's native user-report alert",
+    "Vendor advisories / threat intelligence": "bind a reputation service (reputation.multi_engine) to make it available"
+  }
+}

@@ -8,6 +8,13 @@ tool in a **binding file**, `zerosoc.capabilities.json`, placed in the working d
 scripts with `--bindings`. The schema is [zerosoc.capabilities.schema.json](zerosoc.capabilities.schema.json);
 a starting point is [zerosoc.capabilities.example.json](zerosoc.capabilities.example.json).
 
+Two bindings ship as starting points: the generic example above, and
+[zerosoc.capabilities.defender-for-business.json](zerosoc.capabilities.defender-for-business.json), the
+reference shape of a licensing-limited deployment (alert evidence but no raw endpoint telemetry, no
+query language). It answers `true` or `false` for every data source the playbooks name, so
+`select_playbook.py` reports real visibility gaps, each with its reason, instead of `unbound`. A
+capability probe run against the tenant supersedes it.
+
 The binding file has two maps:
 
 - `capabilities`: capability class → `{ "tool": "...", "notes": "..." }`. The `tool` is whatever the host
@@ -17,6 +24,19 @@ The binding file has two maps:
   source is available to the executor, `false` otherwise. `scripts/select_playbook.py` compares a
   playbook's requirements with this map and emits the **visibility gaps** that the Notes must record and
   that cap the Case confidence at Medium.
+
+Two optional keys: `data_source_notes` (data source → why it is unavailable or limited; printed with the
+gap) and `alert_type_map` (the file name of the deployment's alert-type map).
+
+## Alert-type maps
+
+The framework counts the same alert type on the same entity once. An alert-type map makes that
+deterministic for one alert source: ordered rules from the source's detector id and alert title to a
+framework alert type and its telemetry domain. `scripts/alert_types.py` applies it when the ledger is
+built and reports the alerts no rule matches. [alert_types.defender-xdr.json](alert_types.defender-xdr.json)
+is the map for the XDR source of the profile above; every `alert_type` in a map must exist in the
+framework's `02-Taxonomy/alert_types.md` (the tests check it). Detector ids are added as they are
+observed: they make a rule exact where a title is ambiguous or localized.
 
 ## Capability classes
 

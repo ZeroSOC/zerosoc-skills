@@ -75,10 +75,14 @@ def gaps(fields, bindings):
     if isinstance(req, str):
         req = [req]
     ds = (bindings or {}).get("data_sources", {})
+    why = (bindings or {}).get("data_source_notes", {})
     out = []
     for r in req:
         state = ds.get(r)
-        out.append({"data_source": r, "available": state, "status": "available" if state else ("unavailable" if state is False else "unbound")})
+        item = {"data_source": r, "available": state, "status": "available" if state else ("unavailable" if state is False else "unbound")}
+        if r in why:
+            item["reason"] = why[r]
+        out.append(item)
     return out
 
 
@@ -135,7 +139,7 @@ def main():
     print(f"# {chosen['rel']} (version {result['version']}, status {result['status']})")
     print("required_data_sources:")
     for x in g:
-        print(f"  - {x['data_source']}: {x['status']}")
+        print(f"  - {x['data_source']}: {x['status']}" + (f" ({x['reason']})" if x.get("reason") else ""))
     if bindings and result["visibility_gaps"]:
         print("VISIBILITY GAPS: record each in the Note with the check it prevented; the Case confidence is capped at Medium.")
     print()
