@@ -1,11 +1,11 @@
 ---
 title: Artifact Entity Enrichment
 type: reference
-last_updated: 2026-09-10
+last_updated: 2026-09-17
 license: Apache-2.0
 status: draft
 ---
-<!-- generated from zerosoc-framework@b9c29f01b7e7 : 04-Playbooks/99-Shared/sub_enrichment_artifact.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@5f4ab248e4e0 : 04-Playbooks/99-Shared/sub_enrichment_artifact.md — do not edit; regenerate with tools/build_references.py -->
 
 # Artifact Entity Enrichment
 
@@ -15,8 +15,8 @@ Sibling references: [Identity](sub_enrichment_identity.md) · [Asset](sub_enrich
 
 ## Process
 
-- Reconstruct parent/child lineage.
-- Resolve signer/publisher; flag unsigned or anomalously-parented processes.
+- Reconstruct the process lineage in both directions: the ancestors show how the process was started, the child processes show what it went on to do. Intent is read from both, never from the parent alone.
+- Resolve signer/publisher; flag unsigned or anomalously-parented processes, and child processes the binary has no reason to run.
 - Decode/deobfuscate encoded command lines to reveal the underlying action.
 
 ## File
@@ -27,6 +27,6 @@ Sibling references: [Identity](sub_enrichment_identity.md) · [Asset](sub_enrich
 
 ## Produces
 
-- **Process lineage and signer assessment** — reconstructed parent/child lineage plus signer/publisher status, flagging unsigned or anomalously-parented processes.
+- **Process lineage and signer assessment** — reconstructed lineage, ancestors and child processes, plus signer/publisher status, flagging unsigned or anomalously-parented processes and child processes the binary has no reason to run.
 - **Hash reputation and family attribution** — multi-engine reputation verdict and malware family attribution for the file hash.
 - **Path legitimacy assessment** — whether the file resides in a sanctioned install location or a world-writable/anomalous path.

@@ -5,7 +5,7 @@ status: draft
 last_updated: 2026-09-10
 license: Apache-2.0
 ---
-<!-- generated from zerosoc-framework@b9c29f01b7e7 : 04-Playbooks/playbook_architecture.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@5f4ab248e4e0 : 04-Playbooks/playbook_architecture.md — do not edit; regenerate with tools/build_references.py -->
 
 # Playbook Architecture
 
@@ -112,9 +112,9 @@ The playbooks cover the eight telemetry domains and the fifteen Incident Categor
 | Investigation & Response | IC-15 AI/ML System Attack | `02-Investigation-Response/15-ai_ml_system.md` | draft |
 | Investigation & Response | Catch-all (any category) | `02-Investigation-Response/00-generic.md` | draft |
 
-## 7. Execution by Any Executor
+## 7. Execution
 
-The playbooks are Markdown read by whoever executes them: a human analyst opens them, automation and agents load them at runtime. The triage playbook classifies the alert and proposes the candidate categories; the front matter of the Investigation & Response playbook (`incident_category`, `mitre_ttps`) is the deterministic selection key; `required_data_sources` lets the executor detect a **visibility gap** before running. When a required data source is unavailable, the executor MUST record the gap in the Note's Visibility Gaps element ([Detection & Analysis §1.6](../03-Processes/02-detection_and_analysis.md#16-triage-note), [§2.5](../03-Processes/02-detection_and_analysis.md#25-investigation-note-verdict-evidence-record)) and MUST cap `confidence_id` at Medium (2): a verdict reached without the telemetry the playbook requires is never High. Queries are stated as questions; the executor translates them to the query language of its tools, so no playbook carries product-specific query code. Response actions run under the autonomy matrix and the [Agentic Guardrails](../07-Governance/agentic_guardrails.md).
+The playbooks are Markdown read by whoever executes them: a human analyst opens them, automation and agents load them at runtime. The triage playbook classifies the alert and proposes the candidate categories; the front matter of the Investigation & Response playbook (`incident_category`, `mitre_ttps`) is the deterministic selection key; `required_data_sources` lets the executor detect a **visibility gap** before running. When a required data source is unavailable, the executor MUST record the gap in the Note's Visibility Gaps element ([Detection & Analysis §1.6](../03-Processes/02-detection_and_analysis.md#16-triage-note), [§2.5](../03-Processes/02-detection_and_analysis.md#25-investigation-note-verdict-evidence-record)). Queries are stated as questions; the executor translates them to the query language of its tools, so no playbook carries product-specific query code. Response actions run under the autonomy matrix and the [Agentic Guardrails](../07-Governance/agentic_guardrails.md).
 
 ## 8. References
 
