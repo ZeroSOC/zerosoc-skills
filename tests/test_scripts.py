@@ -633,7 +633,19 @@ class RunCheck(unittest.TestCase):
                     "alert_type": "credential dumping", "entity": "WS-01"}]
         code, out = self.check(self.run_dir(findings=doubled))
         self.assertEqual(code, 1)
-        self.assertIn("FAIL  triage: no alert finding counted twice", out)
+        self.assertIn("FAIL  investigation: no alert counted twice", out)
+
+    def test_the_two_ledger_shapes_are_both_read(self):
+        """Triage records the Case's alerts in "alerts"; investigation scores them among "findings"."""
+        alerts = [{"id": "A1", "type": "Credential dumping", "entity": "ws-01", "confidence": "High"},
+                  {"id": "A2", "type": "credential dumping", "entity": "WS-01", "confidence": "Low"}]
+        code, out = self.check(self.run_dir(alerts=alerts, findings=[]))
+        self.assertIn("FAIL  triage: no alert counted twice", out)
+        self.assertEqual(code, 1)
+        one = self.run_dir(alerts=alerts[:1], findings=[])
+        code, out = self.check(one)
+        self.assertIn("ok    triage: the Case's alerts carry type and entity", out)
+        self.assertNotIn("skip  triage: the Case's alerts", out)
 
 
 class BindingProfiles(unittest.TestCase):
@@ -686,6 +698,14 @@ class Procedures(unittest.TestCase):
             self.assertIn("scripts/process_chain.py", text, skill)
             self.assertLess(text.index("evidence_inventory.py"), text.index("process_chain.py"), skill)
             self.assertLess(text.index("process_chain.py"), text.index("Start the ledger"), skill)
+
+    def test_both_procedures_record_the_selected_playbook_in_the_ledger(self):
+        for skill, key in (("zerosoc-triage", "domain"), ("zerosoc-investigation", "incident_category")):
+            text = self.read(skill)
+            self.assertIn("`playbook`", text, skill)
+            self.assertIn(f"`{key}`", text, skill)
+            self.assertLess(text.index("`playbook`"), text.index("Start the ledger") if "Start the ledger" in text
+                            else len(text), skill)
 
     def test_the_retrospective_sweep_runs_through_the_case_store(self):
         text = self.read("zerosoc-investigation")

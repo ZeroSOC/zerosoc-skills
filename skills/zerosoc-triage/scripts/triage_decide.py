@@ -6,6 +6,7 @@
 Ledger (JSON):
 {
   "case_uid": "CASE-1",
+  "playbook": "04-Playbooks/01-Triage/endpoint.md", "playbook_version": "2026-09-16", "domain": "Endpoint",
   "alerts":   [{"id": "DF-1", "type": "Credential dumping", "entity": "host-1", "confidence": "High"|null,
                 "severity": "High", "technique": "T1003"}],
   "findings": [{"id": "F1", "desc": "...", "side": "Malicious"|"Benign"|null, "confidence": "Low|Medium|High",

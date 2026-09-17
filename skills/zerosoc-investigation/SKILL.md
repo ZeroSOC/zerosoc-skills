@@ -44,7 +44,9 @@ per Case: the playbook the script prints.
 1. **Select the playbook and check visibility.** Use the candidate `incident_category` from the contract:
    `python3 scripts/select_playbook.py --category IC-01 --section Investigation --bindings zerosoc.capabilities.json`.
    It prints the version, the required data sources, the visibility gaps to record, and the Investigation
-   section (hypotheses, validation queries with their outcome tags, re-classification pivots). If no
+   section (hypotheses, validation queries with their outcome tags, re-classification pivots). Record the
+   selection in the ledger (`playbook`, `playbook_version`, `incident_category`), and again after a
+   re-classification pivot: the Note's Provenance repeats it. If no
    playbook exists for the category at this framework pin, apply §2 directly with the category definition
    in [incident_categories.md](references/framework/02-Taxonomy/incident_categories.md).
 2. **Extract the evidence inventory** for the Case as it is now: alerts are appended after triage, so the

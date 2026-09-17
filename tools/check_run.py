@@ -126,19 +126,25 @@ def check_alert_map(report, run, mapping_path):
 
 
 def check_alert_ledger(report, ledger, label, source_titles=None):
-    """Alert findings in a ledger: typed, placed on an entity, never the same observation twice, and
-    named as the framework names them — a type the catalog does not hold was invented in the run."""
-    findings = [f for f in (ledger or {}).get("findings", []) if f.get("alert_type")]
+    """The Case's alerts in a ledger: typed, placed on an entity, never the same observation twice, and
+    named as the framework names them — a type the catalog does not hold was invented in the run.
+
+    Triage holds them in `alerts` (`type`, `entity`), where the decision rule reads them; investigation
+    holds them among the scored `findings` (`alert_type`, `entity`). Both shapes are checked here."""
+    ledger = ledger or {}
+    findings = [dict(a, alert_type=a.get("type")) for a in ledger.get("alerts", []) if a.get("type")]
+    findings += [f for f in ledger.get("findings", []) if f.get("alert_type")]
     if not findings:
-        report.skip(f"{label}: alert findings carry type and entity", "no alert findings in the ledger")
+        report.skip(f"{label}: the Case's alerts carry type and entity",
+                    "no alerts in the ledger: triage records them in \"alerts\", investigation among \"findings\"")
         return []
     typed = [f for f in findings if f.get("entity")]
-    report.check(len(typed) == len(findings), f"{label}: alert findings carry type and entity",
-                 "every alert finding with alert_type and entity",
+    report.check(len(typed) == len(findings), f"{label}: the Case's alerts carry type and entity",
+                 "every alert with a type and the entity it was raised on",
                  f"all {len(findings)} placed on an entity" if len(typed) == len(findings)
                  else f"{len(findings) - len(typed)} of {len(findings)} without an entity")
     keys = {(str(f["alert_type"]).lower(), str(f.get("entity", "")).lower()) for f in typed}
-    report.check(len(keys) == len(typed), f"{label}: no alert finding counted twice",
+    report.check(len(keys) == len(typed), f"{label}: no alert counted twice",
                  "one finding per (type, entity)", f"{len(typed)} findings for {len(keys)} distinct pairs")
     catalog = alert_types.framework_alert_types(read_reference("02-Taxonomy/alert_types.md"))
     invented = sorted({f["alert_type"] for f in findings if f["alert_type"] not in catalog
@@ -193,6 +199,8 @@ def check_visibility_gaps(report, run, ledger, label):
         return report.skip(f"{label}: visibility gaps recorded", "no ledger in the run")
     binding = read(run, "zerosoc.capabilities.json")
     key = ledger.get("domain") or ledger.get("incident_category")
+    if not key and ledger.get("playbook"):
+        key = os.path.splitext(os.path.basename(ledger["playbook"]))[0].split("-", 1)[-1]
     recorded = {str(g.get("data_source", "")).strip().lower()
                 for g in ledger.get("visibility_gaps", []) if isinstance(g, dict)}
     if binding and key:
@@ -213,7 +221,8 @@ def check_visibility_gaps(report, run, ledger, label):
                          else f"all {len(implied)} recorded")
     else:
         report.skip(f"{label}: gaps match the binding",
-                    "record the playbook key as \"domain\" (triage) or \"incident_category\" (investigation)")
+                    "the ledger records no playbook: add \"playbook\" with \"domain\" (triage) or "
+                    "\"incident_category\" (investigation), as the procedure's selection step says")
     report.ok(f"{label}: visibility gaps recorded", f"{len(recorded)} in the ledger" if recorded else "none")
 
 

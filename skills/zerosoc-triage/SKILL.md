@@ -71,7 +71,9 @@ Read per alert: the playbook section the script prints.
    Network, Cloud, Email, Data, Application, OT/ICS) and the alert type, then run:
    `python3 scripts/select_playbook.py --domain Endpoint --alert-type "Malware / loader execution" --bindings zerosoc.capabilities.json`.
    It prints the playbook version, the required data sources with their availability, the **visibility
-   gaps** to record, and only the per-alert section you need. When no playbook exists for the domain at
+   gaps** to record, and only the per-alert section you need. Record the selection in the ledger
+   (`playbook`, `playbook_version`, `domain`): the Note's Provenance repeats it, and a Case whose
+   playbook is not recorded cannot be reproduced. When no playbook exists for the domain at
    this framework pin, use the domain's alert catalog in
    [alert_types.md](references/framework/02-Taxonomy/alert_types.md) and apply §1.2–§1.5 directly.
 4. **Start the ledger.** Create `ledger.json` (format in `scripts/triage_decide.py`) with the
