@@ -87,8 +87,7 @@ per Case: the playbook the script prints.
    confidence and are listed as residual observations.
 7. **Resolve**: set `resolved_at` (UTC) in the ledger and run `python3 scripts/resolve.py ledger.json`. Malicious is proven at a score of 3 or more;
    Benign at 3 or more *and* every Medium or High Malicious finding retracted or covered; the verdict and
-   confidence follow the §2.4 table (confidence is the strongest carrying finding, never an average; a
-   visibility gap caps it at Medium). If neither side is proven, run the remaining discriminating
+   confidence follow the §2.4 table (confidence is the strongest carrying finding, never an average). If neither side is proven, run the remaining discriminating
    queries. The script measures the timebox from `started_at` to `resolved_at` (the current time when absent)
    against the severity-scaled reference value, which `timebox_minutes` may tighten, never extend; when it has expired, or the
    budget is exhausted (`budget_exhausted`), it closes as **Insufficient Data** (7) with a monitoring watch (`watch_until`; re-open on recurrence of the

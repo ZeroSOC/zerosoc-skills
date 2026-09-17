@@ -104,7 +104,7 @@ Read per alert: the playbook section the script prints.
    only when no Malicious finding exists beyond the alerts *and* the Benign findings cover every alert
    (a High alert only by a `Benign (High)` finding; a Low or Medium alert by Benign weights summing above
    its own); otherwise it promotes, including when there is no finding at all. It also computes the
-   confidence leaving triage and applies the visibility-gap cap. For a **Duplicate**, first validate all
+   confidence leaving triage. For a **Duplicate**, first validate all
    four criteria of §1.5 (matching core entities, overlapping timeline, active master Case, evidence
    merged), set `duplicate_of` in the ledger, and never treat the same alert on a different entity as a
    duplicate. Checklist before promoting or closing: can you say in one sentence, with evidence, why

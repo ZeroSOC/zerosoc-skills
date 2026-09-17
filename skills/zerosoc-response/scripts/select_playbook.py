@@ -141,7 +141,7 @@ def main():
     for x in g:
         print(f"  - {x['data_source']}: {x['status']}" + (f" ({x['reason']})" if x.get("reason") else ""))
     if bindings and result["visibility_gaps"]:
-        print("VISIBILITY GAPS: record each in the Note with the check it prevented; the Case confidence is capped at Medium.")
+        print("VISIBILITY GAPS: record each in the Note with the check it prevented.")
     print()
     print(text)
 

@@ -8,7 +8,7 @@ A run is a directory holding what the executor produced, one file per artifact:
   evidence.json            the Case's evidence rows, as given to evidence_inventory.py
   alerts.json              the source alerts, as given to alert_types.py
   ledger.triage.json       the triage ledger at the decision, with "domain" and the Note's
-                           "recorded_verdict" and "recorded_confidence"
+                           "recorded_verdict"
   ledger.investigation.json  the investigation ledger at the resolution   (optional)
   triage_note.md           the Triage Note                                 (optional)
   investigation_note.md    the Investigation Note                          (optional)
@@ -185,15 +185,12 @@ def check_decision(report, ledger, result, label, decide):
         report.ok(f"{label}: the inventory note reaches the decision", fresh["evidence_inventory_note"])
 
 
-CONFIDENCE = {"low": 1, "medium": 2, "high": 3}
-
-
-def check_visibility_cap(report, run, ledger, label):
-    """Playbook Architecture §7: a required data source unavailable is a recorded gap, and it caps
-    confidence at Medium. Both halves are checkable — the gaps the binding implies must be the gaps the
-    ledger records, and a Case that records one cannot leave with High."""
+def check_visibility_gaps(report, run, ledger, label):
+    """Playbook Architecture §7: a required data source unavailable during the Case is recorded in the
+    Note with the check it prevented. So the gaps the binding implies must be the gaps the ledger records
+    — a run cannot pass over a source its own binding says it did not have."""
     if not ledger:
-        return report.skip(f"{label}: visibility gaps and the confidence cap", "no ledger in the run")
+        return report.skip(f"{label}: visibility gaps recorded", "no ledger in the run")
     binding = read(run, "zerosoc.capabilities.json")
     key = ledger.get("domain") or ledger.get("incident_category")
     recorded = {str(g.get("data_source", "")).strip().lower()
@@ -217,16 +214,7 @@ def check_visibility_cap(report, run, ledger, label):
     else:
         report.skip(f"{label}: gaps match the binding",
                     "record the playbook key as \"domain\" (triage) or \"incident_category\" (investigation)")
-    stated = str(ledger.get("recorded_confidence") or "").strip().lower()
-    if not recorded:
-        return report.ok(f"{label}: no visibility gap recorded, no cap applies")
-    if not stated:
-        return report.skip(f"{label}: confidence capped at Medium",
-                           "add \"recorded_confidence\" from the Note to compare it with the cap")
-    report.check(CONFIDENCE.get(stated, 3) <= 2, f"{label}: confidence capped at Medium",
-                 "Medium or lower: a gap is recorded, and a verdict reached without the telemetry the "
-                 "playbook requires is never High (Playbook Architecture §7)",
-                 f"the Note states {stated.capitalize()}")
+    report.ok(f"{label}: visibility gaps recorded", f"{len(recorded)} in the ledger" if recorded else "none")
 
 
 def check_sweep(report, run):
@@ -272,13 +260,13 @@ def _run(run, mapping):
     check_inventory(report, run, triage, "triage")
     titles = check_alert_map(report, run, mapping)
     check_alert_ledger(report, triage, "triage", titles)
-    check_visibility_cap(report, run, triage, "triage")
+    check_visibility_gaps(report, run, triage, "triage")
     check_decision(report, triage, None, "triage", triage_decide.decide)
 
     print("\n# investigation")
     check_inventory(report, run, investigation, "investigation")
     check_alert_ledger(report, investigation, "investigation", titles)
-    check_visibility_cap(report, run, investigation, "investigation")
+    check_visibility_gaps(report, run, investigation, "investigation")
     result = check_timebox(report, investigation)
     check_decision(report, investigation, result, "investigation", resolve_rule.resolve)
     check_sweep(report, run)

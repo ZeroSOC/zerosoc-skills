@@ -2,13 +2,18 @@
 
 ## Unreleased
 
+- **A visibility gap no longer caps the Case's confidence.** The rule was removed from the framework, so
+  `triage_decide.py` and `resolve.py` no longer lower the level when the ledger records a gap: confidence
+  follows the findings that were gathered, and the gap is recorded in the Note and counted by the
+  Visibility-Gap Rate. The playbook selector and both procedures say the same. `check_run.py` still holds a
+  run to recording the gaps its binding implies.
+
 - **Acceptance harness for a live run.** `tools/check_run.py` recomputes what a run reported from the
   artifacts it produced: the evidence inventory against the evidence, the alert findings against the
   deployment map and the framework catalog, the timebox against the ledger's timestamps, the verdict
   against the rule, the sweep against the Note, and the binding against every data source the playbooks
   name. It also holds the run to the visibility-gap rule: every required source the binding marks
-  unavailable must be a recorded gap, and a Case that records one cannot leave with High confidence
-  (Playbook Architecture §7). It lists the source titles the map does not cover, to be reported back.
+  unavailable must be a recorded gap (Playbook Architecture §7). It lists the source titles the map does not cover, to be reported back.
   Tested against faithful and unfaithful runs.
 
 - **Process lineage from the evidence.** Triage and investigation rebuild the parent/child process chain

@@ -115,18 +115,17 @@ def resolve(ledger, now=None):
     if box_notes: r["timebox_note"] = "; ".join(box_notes)
     inventory = inventory_note(ledger.get("evidence_inventory")) if inventory_note else None
     if inventory: r["evidence_inventory_note"] = inventory
-    cap = 2 if ledger.get("visibility_gaps") else 3
     if ledger.get("duplicate_of"):
         r.update(outcome="Duplicate", verdict_id=10, confidence_id=None, master_case_uid=ledger["duplicate_of"], next="close; merge evidence into the master Case")
     elif benign_proven:
         conf = max(W[f["confidence"]] for f in ben)
         if residual_low: conf -= 1
-        conf = max(1, min(conf, cap))
+        conf = max(1, conf)
         r.update(outcome="Benign proven", verdict_id=None, confidence_id=conf, confidence=LEVELS[conf - 1],
                  verdict="False Positive (1) if the detection was wrong, Benign Positive (5) if the activity was authorized (use --benign-kind)",
                  next="close" + ("; Low-confidence close carries a monitoring watch and is flagged for QA sampling" if conf == 1 else ""))
     elif malicious_proven:
-        conf = min(max(W[f["confidence"]] for f in mal), cap)
+        conf = max(W[f["confidence"]] for f in mal)
         r.update(outcome="Malicious proven", verdict_id=2, verdict="True Positive", confidence_id=conf, confidence=LEVELS[conf - 1],
                  next="promote to Incident (§3.1): definitive category, T0 from the timeline, retrospective entity sweep, Investigation → Response contract" + ("; at Low confidence every containment action requires approval" if conf == 1 else ""))
     else:
@@ -135,8 +134,6 @@ def resolve(ledger, now=None):
                      next="close as Insufficient Data with a monitoring watch (re-open on recurrence of the entities); emit a visibility or tuning ticket; record the state reached")
         else:
             r.update(outcome="Neither proven", verdict_id=None, next="run the remaining discriminating queries (listed or added); seek evidence against the favoured side")
-    if r.get("confidence_id") and cap == 2 and r["confidence_id"] == 2 and ledger.get("visibility_gaps"):
-        r["confidence_note"] = "capped at Medium: visibility gap(s) recorded"
     return r
 
 

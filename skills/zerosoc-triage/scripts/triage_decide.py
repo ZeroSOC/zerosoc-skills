@@ -80,8 +80,6 @@ def _decide(ledger):
     if alerts and close_ok and not ledger.get("duplicate_of"):
         level = max(W[b["confidence"]] for b in ben)
         notes = ["close: the highest confidence on the Benign side"]
-        if ledger.get("visibility_gaps"):
-            level = min(level, 2); notes.append("capped at Medium: visibility gap(s) recorded")
         result.update(confidence_id=level, confidence=LEVELS[level - 1], confidence_notes=notes)
     elif alerts:
         level = max(W[a["confidence"]] for a in alerts)
@@ -95,8 +93,6 @@ def _decide(ledger):
         notes = []
         if raised: notes.append("+1: independent alerts of different types/techniques or two or more independent Malicious findings")
         if lowered: notes.append("-1: Benign findings exist but do not close the Case")
-        if ledger.get("visibility_gaps"):
-            level = min(level, 2); notes.append("capped at Medium: visibility gap(s) recorded")
         result.update(confidence_id=level, confidence=LEVELS[level - 1], confidence_notes=notes)
     return result
 

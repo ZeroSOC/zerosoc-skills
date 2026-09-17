@@ -47,10 +47,12 @@ class TriageRule(unittest.TestCase):
                   "findings": [{"id": "B1", "side": "Benign", "confidence": "Medium"}, {"id": "B2", "side": "Benign", "confidence": "Medium"}]}
         self.assertEqual(triage.decide(ledger)["decision"], "Promote")
 
-    def test_no_finding_promotes_and_gap_caps(self):
+    def test_no_finding_promotes_and_a_gap_leaves_the_confidence_alone(self):
         ledger = {"alerts": [{"id": "A", "type": "x", "entity": "e", "confidence": "High"}], "findings": [], "visibility_gaps": [{"data_source": "EDR"}]}
         r = triage.decide(ledger)
-        self.assertEqual(r["decision"], "Promote"); self.assertEqual(r["confidence_id"], 2)
+        self.assertEqual(r["decision"], "Promote")
+        self.assertEqual(r["confidence_id"], 3, "confidence follows the findings; the gap is recorded, not weighed in")
+        self.assertEqual(triage.decide(dict(ledger, visibility_gaps=[]))["confidence_id"], 3)
 
     def test_same_type_same_entity_counts_once(self):
         ledger = {"alerts": [{"id": "A1", "type": "x", "entity": "e", "confidence": "Low"}, {"id": "A2", "type": "x", "entity": "e", "confidence": "Low"}],
@@ -618,14 +620,11 @@ class RunCheck(unittest.TestCase):
         self.assertIn("FAIL  triage: every source the binding marks unavailable is a recorded gap", out)
         self.assertIn("file-integrity monitoring", out.lower())
 
-    def test_high_confidence_beside_a_visibility_gap_fails(self):
-        # Playbook Architecture §7: a verdict reached without the telemetry the playbook requires is never High
+    def test_a_visibility_gap_does_not_touch_the_confidence(self):
         gaps = [{"data_source": "EDR / endpoint process telemetry", "check_prevented": "process lineage"}]
-        code, out = self.check(self.run_dir(visibility_gaps=gaps, recorded_confidence="High"))
-        self.assertEqual(code, 1)
-        self.assertIn("FAIL  triage: confidence capped at Medium", out)
-        code, out = self.check(self.run_dir(visibility_gaps=gaps, recorded_confidence="Medium"))
-        self.assertIn("ok    triage: confidence capped at Medium", out)
+        code, out = self.check(self.run_dir(visibility_gaps=gaps))
+        self.assertEqual(code, 0, out)
+        self.assertIn("ok    triage: visibility gaps recorded — 1 in the ledger", out)
 
     def test_one_observation_counted_twice_fails(self):
         doubled = [{"id": "F1", "side": "Malicious", "confidence": "High", "at": "2026-09-14T15:01:00Z",
