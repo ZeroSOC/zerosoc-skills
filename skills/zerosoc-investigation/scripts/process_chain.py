@@ -44,7 +44,7 @@ WIDTH = 160  # where a command line is cut in the text view; --width 0 prints it
 LABEL = "evidence-only chain"
 LABEL_FULL = "chain from evidence and telemetry"
 ATTRS = ("path", "sha1", "sha256", "account", "upn", "user_sid", "mde_device_id", "remediation_status",
-         "detection_status", "decoded_command", "elevation_token")
+         "detection_status", "decoded_command", "decode_rounds", "decode_capped", "elevation_token")
 ALIASES = {"devicename": "device", "processid": "pid", "processcreationtime": "created", "filename": "name",
            "processcommandline": "command_line", "initiatingprocessid": "parent_pid",
            "initiatingprocesscreationtime": "parent_created", "initiatingprocessfilename": "parent_name",
@@ -388,8 +388,10 @@ def _detail(node, depth, out, width=WIDTH):
         out.append(f"{pad}$ {_short(line, width)}")
     decoded = node["attrs"].get("decoded_command")
     if decoded:
+        rounds = node["attrs"].get("decode_rounds")
+        layers = f" ({rounds} layers of encoding{', still encoded' if node['attrs'].get('decode_capped') else ''})" if rounds else ""
         lines = [line for line in str(decoded).strip().splitlines() if line.strip()] or [""]
-        out.append(f"{pad}decoded: {_short(lines[0], width)}")
+        out.append(f"{pad}decoded{layers}: {_short(lines[0], width)}")
         out += [f"{pad}         {_short(line, width)}" for line in lines[1:]]
     state = " ".join(str(node["attrs"][k]) for k in ("remediation_status", "detection_status") if node["attrs"].get(k))
     if state:

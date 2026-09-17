@@ -13,7 +13,9 @@
   reconstructed up to the retention window and marked as coming from telemetry, so a Note can tell what the
   alerts asserted from what the chain reconstructed. Without it the chain stays evidence-only and the gaps are
   recorded as gaps. Nodes carry their command lines, decodings, remediation state, hashes, paths and accounts,
-  cut to length in the text view and whole in the JSON.
+  cut to length in the text view and whole in the JSON. `--width` sets where a command is cut (0: whole).
+  A decoding keeps its own lines, and the number of layers a command was encoded in is named in the chain
+  when the source reports it.
 
 ## v0.2.0 (2026-09-17) — conforms to zerosoc-framework@b9c29f0
 

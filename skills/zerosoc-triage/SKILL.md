@@ -56,7 +56,9 @@ Read per alert: the playbook section the script prints.
    for the parent/child lineage the [Artifact enrichment](references/framework/04-Playbooks/99-Shared/sub_enrichment_artifact.md)
    produces: one chain per alert, each process under its ancestors, as an alert story is read (`--case` joins
    the Case's alerts into one chain per device). Read the command lines, not only the names: they carry the
-   objective. Two deployments, told apart by the binding, not by assumption:
+   objective, and the layers of encoding over them are part of the finding: a command hidden behind one
+   layer is read for its intent, each further layer is a deliberate choice, and decoding stops at five.
+   Two deployments, told apart by the binding, not by assumption:
    - **The endpoint class carries process telemetry.** Query the Case's devices and window for process
      creations (`device`, `pid`, `created`, `name`, `command_line`, `parent_pid`, `parent_created`) and pass
      them with `--telemetry telemetry.json`: the ancestors the alerts never cited are reconstructed and marked

@@ -530,6 +530,15 @@ class ProcessChainTelemetry(unittest.TestCase):
         self.assertTrue(any(line.strip().startswith("if ($PSVersionTable") for line in body[:8]),
                         "the decoding keeps its own lines instead of being flattened")
 
+    def test_layers_of_encoding_are_named_in_the_chain(self):
+        rows = [{"type": "process", "name": "powershell.exe", "pid": 10, "created": "2026-09-13T12:00:00Z",
+                 "device": "ws-01", "alert_ids": ["A"], "command_line": "powershell -enc AAAA",
+                 "decoded_command": "whoami", "decode_rounds": 3, "decode_capped": True}]
+        text = chain.as_text(chain.build(rows), case=True)
+        self.assertIn("decoded (3 layers of encoding, still encoded): whoami", text)
+        plain = [dict(rows[0], decode_rounds=None, decode_capped=None)]
+        self.assertIn("decoded: whoami", chain.as_text(chain.build(plain), case=True))
+
     def test_the_json_keeps_the_attributes_a_note_cites(self):
         def walk(nodes):
             for n in nodes:
