@@ -9,6 +9,11 @@
   timeline entries with their alerts as event references for the Case Timeline. The default view is one
   chain per alert, each process under its ancestors, as an alert story is read; ancestors contributed by the
   Case's other alerts are marked as context, and `--case` joins every alert into one chain per device.
+  `--telemetry` fills the gaps where the deployment has process telemetry: the ancestors no alert cited are
+  reconstructed up to the retention window and marked as coming from telemetry, so a Note can tell what the
+  alerts asserted from what the chain reconstructed. Without it the chain stays evidence-only and the gaps are
+  recorded as gaps. Nodes carry their command lines, decodings, remediation state, hashes, paths and accounts,
+  cut to length in the text view and whole in the JSON.
 
 ## v0.2.0 (2026-09-17) — conforms to zerosoc-framework@b9c29f0
 

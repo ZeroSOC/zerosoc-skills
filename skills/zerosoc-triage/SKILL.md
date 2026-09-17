@@ -55,10 +55,16 @@ Read per alert: the playbook section the script prints.
    When the inventory holds processes, run `python3 scripts/process_chain.py evidence.json --alerts alerts.json`
    for the parent/child lineage the [Artifact enrichment](references/framework/04-Playbooks/99-Shared/sub_enrichment_artifact.md)
    produces: one chain per alert, each process under its ancestors, as an alert story is read (`--case` joins
-   the Case's alerts into one chain per device). The chain is evidence-only: a parent outside the evidence is
-   printed as a lineage gap, never matched on the PID alone; fill it through `telemetry.endpoint` when bound,
-   otherwise state it in the Note. An alert whose evidence names no process has no chain, whatever the
-   console draws from its own process telemetry.
+   the Case's alerts into one chain per device). Read the command lines, not only the names: they carry the
+   objective. Two deployments, told apart by the binding, not by assumption:
+   - **The endpoint class carries process telemetry.** Query the Case's devices and window for process
+     creations (`device`, `pid`, `created`, `name`, `command_line`, `parent_pid`, `parent_created`) and pass
+     them with `--telemetry telemetry.json`: the ancestors the alerts never cited are reconstructed and marked
+     as coming from telemetry, and the chain is complete up to the retention window.
+   - **It carries alert evidence only.** The chain holds what the alerts cited; a parent outside it is a
+     **lineage gap**, never matched on the PID alone and never guessed. Gaps are normal here, not a failure:
+     record them, and never argue from a lineage the evidence does not support. An alert whose evidence names
+     no process has no chain, whatever the console draws from its own telemetry.
 3. **Select the playbook and check visibility.** Identify the telemetry domain (Endpoint, Identity,
    Network, Cloud, Email, Data, Application, OT/ICS) and the alert type, then run:
    `python3 scripts/select_playbook.py --domain Endpoint --alert-type "Malware / loader execution" --bindings zerosoc.capabilities.json`.
