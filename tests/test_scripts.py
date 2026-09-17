@@ -605,6 +605,28 @@ class RunCheck(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("FAIL  timebox: measured, not declared", out)
 
+    def test_a_gap_the_binding_implies_but_the_run_does_not_record_fails(self):
+        base = self.run_dir(domain="Endpoint", visibility_gaps=[
+            {"data_source": "EDR / endpoint process telemetry", "check_prevented": "process lineage"}])
+        with open(os.path.join(ROOT, "capabilities", "zerosoc.capabilities.defender-for-business.json"),
+                  encoding="utf-8") as f:
+            binding = json.load(f)
+        with open(os.path.join(base, "zerosoc.capabilities.json"), "w", encoding="utf-8") as f:
+            json.dump(binding, f)
+        code, out = self.check(base)
+        self.assertEqual(code, 1)
+        self.assertIn("FAIL  triage: every source the binding marks unavailable is a recorded gap", out)
+        self.assertIn("file-integrity monitoring", out.lower())
+
+    def test_high_confidence_beside_a_visibility_gap_fails(self):
+        # Playbook Architecture §7: a verdict reached without the telemetry the playbook requires is never High
+        gaps = [{"data_source": "EDR / endpoint process telemetry", "check_prevented": "process lineage"}]
+        code, out = self.check(self.run_dir(visibility_gaps=gaps, recorded_confidence="High"))
+        self.assertEqual(code, 1)
+        self.assertIn("FAIL  triage: confidence capped at Medium", out)
+        code, out = self.check(self.run_dir(visibility_gaps=gaps, recorded_confidence="Medium"))
+        self.assertIn("ok    triage: confidence capped at Medium", out)
+
     def test_one_observation_counted_twice_fails(self):
         doubled = [{"id": "F1", "side": "Malicious", "confidence": "High", "at": "2026-09-14T15:01:00Z",
                     "alert_type": "Credential dumping", "entity": "ws-01"},
