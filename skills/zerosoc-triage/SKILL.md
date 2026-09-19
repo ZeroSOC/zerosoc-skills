@@ -51,7 +51,7 @@ Read per alert: the playbook section the script prints.
    evidence items the source itself shows for the Case. The script removes duplicates, joins each row to
    its device and prints the `evidence_inventory` object to record in the ledger. A mismatch is recorded and
    visible in every later script output: extract the rest, or state in the Note why it cannot be. When
-   the source shows no count, record it as unverified. The Note's Actions Taken states the figures ("31 of 31 entities extracted").
+   the source shows no count, record it as unverified. The Note's Summary states the figures ("31 of 31 entities extracted").
    When the inventory holds processes, run `python3 scripts/process_chain.py evidence.json --alerts alerts.json`
    for the parent/child lineage the [Artifact enrichment](references/framework/04-Playbooks/99-Shared/sub_enrichment_artifact.md)
    produces: one chain per alert, each process under its ancestors, as an alert story is read (`--case` joins
@@ -111,21 +111,31 @@ Read per alert: the playbook section the script prints.
    merged), set `duplicate_of` in the ledger, and never treat the same alert on a different entity as a
    duplicate. Checklist before promoting or closing: can you say in one sentence, with evidence, why
    the activity is or is not suspicious? If not, gather more.
-9. **Write the Triage Note** using the template and worked example in
-   [triage_note.md](references/framework/06-Deliverables/triage_note.md): Summary; Actions Taken; Findings
-   (a table, alerts first, each with its tag and event reference); Decision & Justification (the coverage
-   rule applied in one or two sentences); References (every event cited resolves to an OCSF finding or
-   event identifier); Visibility Gaps (or "None."); Provenance (playbook path and version, executor
-   classes, capability classes invoked, Case id). Name it `triage_note_<case-id>_<YYYYMMDD-HHMM>`.
+9. **Write the Triage Note.** The Note renders the Case and holds no state of its own: everything it
+   shows is already on the Case, sampled at this gate. The canonical element list is
+   [Detection & Analysis §1.6](references/framework/03-Processes/02-detection_and_analysis.md), and the
+   order is part of it — **Classification** (severity, confidence, impact when known, the candidate
+   categories, and the decision: Close or Promote, with `verdict_id` on a Close and the master Case id
+   on a Duplicate); **Summary** (what happened and when, which entities were involved and who acted on
+   whom, and the root cause where found — how it is known and how sure you are, in prose, which is not
+   `confidence_id`); **Findings** (a table, alerts first, each with its tag, **what produced it** — the
+   check is the Finding's `analytic` — and the events it rests on by OCSF identifier); **Rationale**
+   (the coverage rule applied in one or two sentences); **Case Timeline** (only the Findings flagged for
+   it, which at triage is usually none — write "None."); **Visibility Gaps** (or "None."); **Provenance**
+   (playbook path and version, executor classes, capability classes invoked, Case id).
+   There is no Actions Taken element and no References element: the check that produced a Finding is
+   rendered beside that Finding, and so are the events it cites.
+   Name it `triage_note_<case-id>_<YYYYMMDD-HHMM>`.
    Technique codes are always `ID (Name)`. Summarize evidence; never paste raw logs.
 10. **Emit.** On Close: `verdict_id` 1 (False Positive; also a tuning ticket to Phase 1), 5 (Benign; also a
     Knowledge Base entry if the exception was unrecorded) or 10 (Duplicate, with `master_case_uid`). On
     Promote: `verdict_id` stays 0 and the Case carries the **Triage → Investigation contract** of
     [Playbook Architecture §5](references/framework/04-Playbooks/playbook_architecture.md): `uid`,
-    `status_id`, `severity_id`, `confidence_id`, `impact_id` when known, `observables`,
+    `status_id`, `severity_id`, `confidence_id`, `impact_id` when known, `start_time`, `observables`,
     `finding_info_list`, `attacks`, `candidate_incident_categories`, `entry_path`, `master_case_uid`
-    when correlated, `visibility_gaps`, `provenance`, and a reference to the Note. Then invoke the
-    `zerosoc-investigation` skill.
+    when correlated, `visibility_gaps`, `provenance`, `desc`, and `notes` carrying the Triage Note.
+    The contract states which fields must be populated at the boundary; one Case object crosses every
+    phase, so nothing is copied. Then invoke the `zerosoc-investigation` skill.
 
 ## Governance
 
