@@ -101,10 +101,13 @@ per Case: the playbook the script prints.
 9. **Assign correctly.** The moment a Crown Jewel asset or a privileged identity enters the scope, the
    assignee becomes a human (`handover_reason`); keep running queries and proposing, the human decides.
 10. **On Malicious proven** (§3.1): set `verdict_id = 2`; assign the definitive Incident Category and the
-    observed techniques as `ID (Name)`; build the **Case Timeline** (course of action interleaved with
-    detection and response actions, each entry timestamped in UTC with its event reference; the `timeline`
-    of `process_chain.py --json` gives the process entries with their alerts as references) and record
-    **T0**, the earliest confirmed malicious event; confirm or assess `impact_id`, and whether the
+    observed techniques as `ID (Name)`; build the **Case Timeline** (the course of the attack interleaved
+    with detection and response actions, each entry timestamped in UTC with its event reference; the
+    `timeline` of `process_chain.py --json` gives the process entries with their alerts as references).
+    The timeline is not a field the Case stores: it is the Findings flagged `zerosoc:timeline`, rendered
+    in `first_seen_time` order. The Case's `start_time` opens at the earliest Alert and moves earlier
+    whenever a Malicious Finding cites an earlier event; on a confirmed Incident it is **T0**, the
+    earliest confirmed malicious event. Confirm or assess `impact_id`, and whether the
     Incident is **significant** under NIS2 Article 23(3) and **cross-border**; run the **retrospective
     entity sweep** through the `cases.store` capability class (Cases closed as False Positive or Benign
     in the last 90 days sharing the Incident's entities; never through `telemetry.*`, whose retention is
@@ -114,18 +117,29 @@ per Case: the playbook the script prints.
 11. **On Benign proven**: `verdict_id` 1 (False Positive, plus a tuning ticket to Phase 1) or 5 (Benign,
     plus a Knowledge Base entry if the exception was unrecorded). A Low-confidence close carries a
     monitoring watch and is flagged for QA sampling.
-12. **Write the Investigation Note** with the template and worked example in
-    [investigation_note.md](references/framework/06-Deliverables/investigation_note.md): Classification &
-    Assessment; Executed Queries (each with outcome and tag); Resolution Rationale (score of each side,
-    the findings that carry it, the retractions and why, the resulting confidence); Re-classification
-    Pivots; Case Timeline with T0; Evidence References (OCSF identifiers for every material finding);
-    Visibility Gaps (or "None."); Provenance. Preserve evidence per §3.3.
+12. **Write the Investigation Note.** It renders the Case at this gate and holds no state of its own,
+    on the **same element structure as the Triage Note** — it extends and updates that Note rather than
+    mirroring it. The canonical list is
+    [Detection & Analysis §2.5](references/framework/03-Processes/02-detection_and_analysis.md), in this
+    order: **Classification** (confirmed or last candidate category, severity, confidence, impact,
+    significance and cross-border on a confirmed Incident, and the decision: the `verdict_id` the
+    resolution produced, with the master Case id on a Duplicate); **Summary** (as the Triage Note, at
+    this gate); **Findings** (the Alerts; the triage Findings, each now verified or **retracted** with
+    the reason; and the result of each validation query — every one rendered with its tag, with what
+    produced it, and with the events it rests on by OCSF identifier); **Rationale** (the score of each
+    side, the Findings that carry the verdict, the retractions and why — how the confidence was reached,
+    not a restatement of it); **Re-classification Pivots**; **Case Timeline**; **Visibility Gaps** (or
+    "None."); **Provenance**, with the preserved-evidence pointer once §3.3 preservation has happened.
+    There is no Executed Queries element and no Evidence References element: a query that produced a
+    Finding is that Finding's `analytic`, and the identifiers are cited with each Finding.
+    Preserve evidence per §3.3.
 13. **Emit.** On a Confirmed Incident, the **Investigation → Response contract** of
     [Playbook Architecture §5](references/framework/04-Playbooks/playbook_architecture.md): the triage
-    contract fields refined, plus `verdict_id`, `incident_category`, `t0`, `timeline`, `impact_id`,
-    `significant`, `cross_border`, `is_suspected_breach`, `handover_reason` when a handover occurred,
-    the recommended containment, eradication and recovery actions from the playbook, and a reference to
-    the Note. Then invoke the `zerosoc-response` skill. Stakeholder notification (§3.2) is the SOC
+    contract fields refined, plus `verdict_id`, `incident_category`, `reclassification_pivots` when the
+    category changed, `impact_id`, `significant`, `cross_border`, `is_suspected_breach`,
+    `handover_reason` when a handover occurred, the recommended containment, eradication and recovery
+    actions from the playbook, and `notes` carrying the Investigation Note. `start_time` is already on
+    the Case and carries T0. Then invoke the `zerosoc-response` skill. Stakeholder notification (§3.2) is the SOC
     Manager's responsibility and starts after confirmation.
 
 ## Governance

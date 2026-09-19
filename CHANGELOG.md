@@ -1,5 +1,36 @@
 # Changelog
 
+## Unreleased — conforms to zerosoc-framework@f740364
+
+The framework pin moves 34 commits, from before the Case Schema was mapped natively to OCSF. The three
+skills were instructing an agent to produce Notes whose elements the framework no longer defines, and to
+hand on two fields the Case Schema now rejects.
+
+- **Both Notes render the Case, in one element structure.** Classification first, and it carries the
+  decision: Close or Promote at triage, the verdict at investigation, beside severity, confidence, impact
+  and the category. Then Summary, Findings, Rationale, Case Timeline, Visibility Gaps, Provenance. The
+  Investigation Note gains a Summary. `zerosoc-triage` and `zerosoc-investigation` write to this
+  structure and no longer point at the deliverable templates, which are being rebuilt.
+
+- **Three elements dissolved.** *Actions Taken* — the check that produced a Finding is that Finding's
+  `analytic`, rendered beside it. *Executed Queries* — a query that produced a Finding is the same
+  `analytic`. *References* and *Evidence References* — the events are cited with each Finding, and the
+  preserved-evidence pointer moved to Provenance.
+
+- **`t0` and `timeline` are gone from the contracts.** T0 is the Case's `start_time`, which every Case
+  carries: it opens at the earliest Alert and moves earlier whenever a Malicious Finding cites an earlier
+  event. The Case Timeline is the Findings flagged `zerosoc:timeline`, rendered in `first_seen_time`
+  order, not a field. `resolve.py` says so where it named the timeline as T0's source.
+
+- **Response actions are entries on the Case.** `zerosoc-response` records each action as its own
+  `finding_info_list` entry typed `action`, carrying the Remediation Activity event — against the Case,
+  not against the Finding that prompted it, because the reasoning may be retracted and the action still
+  happened. The skill now reads the entries on arrival, so a tool-initiated action that fired before any
+  executor opened the Case is not done twice. `autonomy.py` follows.
+
+- **Course of Action is the executor's.** The framework defines it that way, and the adversary's sequence
+  is the course of the attack.
+
 ## v0.3.0 (2026-09-18) — conforms to zerosoc-framework@5f4ab24
 
 The release the live acceptance run was made on, on two tenants (alert evidence only, and full process

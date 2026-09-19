@@ -13,7 +13,10 @@ metadata:
 
 The Case arrives confirmed (`verdict_id = 2`) with its Investigation → Response contract. The assignee
 carries it through containment, eradication and recovery; there is no separate incident commander. Every
-action is recorded in the Case timeline with its timestamp, entity and rollback. Paths are relative to this
+action is its own entry in the Case's `finding_info_list`, typed `action`, carrying the Remediation
+Activity event in `related_events` with its timestamp, entity and rollback. An action is recorded against
+the Case and not against the Finding that prompted it: the reasoning may be retracted, and the action
+still happened. Paths are relative to this
 skill's directory.
 
 Read once per session: [Incident Response](references/framework/03-Processes/03-response.md) (the method
@@ -27,9 +30,11 @@ and the autonomy matrix, §2.1) and [Guardrails §2–§3](references/framework/
 
 ## Inputs
 
-- The contract: confirmed `incident_category`, scope (`observables`), `timeline` with `t0`,
-  `severity_id`, `confidence_id`, `impact_id`, `significant`, `cross_border`, `handover_reason`, the
-  recommended actions.
+- The contract: confirmed `incident_category`, scope (`observables`), `finding_info_list` (the Alerts,
+  the Findings and any action already taken), `start_time` (the Incident's T0), `severity_id`,
+  `confidence_id`, `impact_id`, `significant`, `cross_border`, `handover_reason`, `notes` carrying the
+  Investigation Note, the recommended actions. A tool-initiated action that fired before any executor
+  opened the Case is already an entry: read them before acting, so nothing is done twice.
 - The capability binding `zerosoc.capabilities.json` with the `containment.*` classes, `ticketing` and
   `notification`; the telemetry classes to verify containment and eradication.
 
@@ -39,7 +44,7 @@ and the autonomy matrix, §2.1) and [Guardrails §2–§3](references/framework/
    confidence and severity Investigation resolved (they set what may run without approval), and check
    whether any entity is a Crown Jewel asset or a privileged identity: if so and the assignee is not
    human, the handover happens now and does not delay pre-authorized containment. Scope that expands
-   during the response is recorded in the timeline and the actions re-selected for the new entities.
+   during the response is recorded on the Case and the actions re-selected for the new entities.
 2. **Regulatory clock** (§6, and Detection & Analysis §3.2). If the Incident is `significant`, the
    deadlines run from awareness: NIS2 early warning within 24 hours, notification within 72 hours, final
    report within one month; DORA initial, intermediate and final reports on the regulation's deadlines.
@@ -67,7 +72,7 @@ and the autonomy matrix, §2.1) and [Guardrails §2–§3](references/framework/
    severity, confidence, why Malicious was proven with score and findings), Evidence (findings with tags,
    event references, queries), the action and its matrix entry, Blast radius, Rollback. The same payload
    whoever the executor is; the SOC Manager is the default approver. Record the decision (approved,
-   modified, rejected) in the timeline; a rejection is a review event. While pending, apply the
+   modified, rejected) on the action's entry; a rejection is a review event. While pending, apply the
    pre-authorized actions and continue investigating residual findings. Waiting time is HITL dwell, never
    containment time.
 6. **Apply and record** each containment action: entity, timestamp, how it is reversed. Verify from
@@ -96,5 +101,5 @@ critical failure of the run, as is any playbook-specific critical failure.
 ## Completion criteria
 
 Containment verified, eradication complete, recovery verified and containment lifted; every action and
-approval in the Case timeline with its rollback; regulatory notifications recorded when the Incident is
+approval an `action` entry on the Case with its rollback; regulatory notifications recorded when the Incident is
 significant; the transition to Phase 4 made.

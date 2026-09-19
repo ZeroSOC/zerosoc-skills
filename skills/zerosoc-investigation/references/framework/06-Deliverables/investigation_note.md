@@ -1,15 +1,17 @@
 ---
 title: Investigation Note Template
 type: template
-last_updated: 2026-09-10
+last_updated: 2026-09-20
 license: Apache-2.0
-status: development
+status: draft
 ---
-<!-- generated from zerosoc-framework@5f4ab248e4e0 : 06-Deliverables/investigation_note.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@f740364d664a : 06-Deliverables/investigation_note.md — do not edit; regenerate with tools/build_references.py -->
 
 # Investigation Note
 
 Fill-in template and worked example for the **Investigation Note**, the verdict evidence record produced when Investigation closes a Case or confirms an Incident. The canonical element list is [Detection & Analysis §2.5](../03-Processes/02-detection_and_analysis.md#25-investigation-note-verdict-evidence-record); this page is the practitioner-facing form. Naming convention: `investigation_note_<case-id>_<YYYYMMDD-HHMM>`.
+
+> **Being rebuilt.** The canonical element list was revised — one structure for both Notes, Classification first and carrying the decision, Rationale separate, and *Actions Taken*, *Executed Queries* and the reference lists dissolved into Findings and Provenance. This template still shows the previous structure. Follow the canonical section above where the two disagree.
 
 ## Template
 
