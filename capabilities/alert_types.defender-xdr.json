@@ -322,5 +322,146 @@
   ],
   "fields": {
     "detector_id": "detectorId"
+  },
+  "detection_metadata": {
+    "description": "Where each assertion of Detection & Analysis §1.1 lives in this source's records, read by scripts/alert_metadata.py. \"fields\" names them on the alert, \"entity_fields\" on an evidence item. The analytic types are the OCSF analytic type_id a detection source maps onto; a source not listed here is Other (99). The remediation states say what the source did and whether it completed; a state not listed here is recorded as reported and is never treated as neutralized.",
+    "fields": {
+      "techniques": "mitreTechniques",
+      "threat_name": "threatDisplayName",
+      "threat_family": "threatFamilyName",
+      "detection_source": "detectionSource",
+      "detector_id": "detectorId",
+      "description": "description",
+      "recommended_actions": "recommendedActions"
+    },
+    "entity_fields": {
+      "remediation_state": "remediationStatus",
+      "remediation_details": "remediationStatusDetails"
+    },
+    "analytic_types": {
+      "antivirus": [
+        5,
+        "Fingerprinting"
+      ],
+      "microsoftDefenderForEndpoint": [
+        2,
+        "Behavioral"
+      ],
+      "microsoftDefenderForIdentity": [
+        2,
+        "Behavioral"
+      ],
+      "microsoftDefenderForOffice365": [
+        2,
+        "Behavioral"
+      ],
+      "microsoftDefenderForCloudApps": [
+        2,
+        "Behavioral"
+      ],
+      "microsoftDefenderForCloud": [
+        1,
+        "Rule"
+      ],
+      "microsoft365Defender": [
+        2,
+        "Behavioral"
+      ],
+      "azureAdIdentityProtection": [
+        4,
+        "Learning (ML/DL)"
+      ],
+      "customDetection": [
+        1,
+        "Rule"
+      ],
+      "customTi": [
+        6,
+        "Tagging"
+      ],
+      "microsoftSentinel": [
+        1,
+        "Rule"
+      ],
+      "smartScreen": [
+        5,
+        "Fingerprinting"
+      ],
+      "automatedInvestigation": [
+        99,
+        "Other"
+      ],
+      "manual": [
+        99,
+        "Other"
+      ]
+    },
+    "remediation_states": {
+      "prevented": {
+        "neutralized": true,
+        "status": "Success",
+        "activity": "Evict"
+      },
+      "blocked": {
+        "neutralized": true,
+        "status": "Success",
+        "activity": "Evict"
+      },
+      "remediated": {
+        "neutralized": true,
+        "status": "Success",
+        "activity": "Evict"
+      },
+      "quarantined": {
+        "neutralized": true,
+        "status": "Success",
+        "activity": "Isolate"
+      },
+      "isolated": {
+        "neutralized": true,
+        "status": "Success",
+        "activity": "Isolate"
+      },
+      "suspended": {
+        "neutralized": true,
+        "status": "Success",
+        "activity": "Isolate"
+      },
+      "active": {
+        "neutralized": false,
+        "status": "Unknown",
+        "activity": null
+      },
+      "none": {
+        "neutralized": false,
+        "status": "Unknown",
+        "activity": null
+      },
+      "notRemediated": {
+        "neutralized": false,
+        "status": "Failure",
+        "activity": null
+      },
+      "failed": {
+        "neutralized": false,
+        "status": "Failure",
+        "activity": null
+      },
+      "notFound": {
+        "neutralized": false,
+        "status": "Does Not Exist",
+        "activity": null
+      },
+      "unsupported": {
+        "neutralized": false,
+        "status": "Unsupported",
+        "activity": null
+      },
+      "running": {
+        "neutralized": false,
+        "status": "Unknown",
+        "activity": null
+      }
+    }
   }
 }

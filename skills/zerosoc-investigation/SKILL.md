@@ -30,7 +30,9 @@ per Case: the playbook the script prints.
 ## Inputs
 
 - The promoted Case and contract; the Triage Note with its tagged Findings, which **seed the score** and
-  are verified, not re-collected. The Note also carries the conflict that promoted the Case: the
+  are verified, not re-collected, and with **what each Alert's detection asserted** (§1.1) — its
+  techniques, threat name and family, detection source, per-entity remediation state, description and
+  recommended actions, carried on the Case as `detection_metadata`. The Note also carries the conflict that promoted the Case: the
   Malicious findings beyond the alerts and the Benign findings they were weighed against.
 - The capability binding `zerosoc.capabilities.json`; the telemetry classes (`telemetry.endpoint`,
   `telemetry.identity`, `telemetry.network`, `telemetry.email`, `telemetry.cloud`, `siem.search`), the
@@ -65,14 +67,21 @@ per Case: the playbook the script prints.
    are findings in their own right, not decoration, and so is the number of layers a command was encoded
    in: decoding stops at five rounds, and a command still encoded there is recorded as such.
 3. **Start the ledger** `ledger.json` (format in `scripts/resolve.py`) from the Triage Note: every
-   tagged Finding with its side, confidence, source artifact and event reference. Record `started_at`
+   tagged Finding with its side, confidence, source artifact and event reference. Carry the Case's
+   `detection_metadata` across and **refresh it at this gate**: alerts appended since triage bring their
+   own assertions, and the remediation state changes while a Case is open. Re-run
+   `python3 scripts/alert_metadata.py alerts.json --bindings zerosoc.capabilities.json --evidence evidence.json --json`
+   on the Case as it now is, keeping the dispositions already recorded on the recommended actions. Record `started_at`
    (UTC) now, the Case `severity`, the `evidence_inventory` object of step 2, and `at` on every finding
    as it is added: the timebox is computed from these, not declared. Alert findings carry their
    `alert_type` and `entity`, so the same type on the same entity counts once in the score; alerts
    appended since triage are added with `python3 scripts/alert_types.py alerts.json --bindings zerosoc.capabilities.json --json`,
    whose entries are ready-made Malicious findings. Refine the two
-   hypotheses to the Case (§2.1); competing explanations within a side are sub-hypotheses that score for
-   their side.
+   hypotheses to the Case (§2.1), starting the Malicious one from the **threat or family the detection
+   named**: a named family has documented behaviour, persistence and follow-on activity, so the queries
+   ask whether *those* are present rather than whether the activity is malicious in general. The name is a
+   lead, not a verdict — an attribution the evidence does not support is retracted like any finding.
+   Competing explanations within a side are sub-hypotheses that score for their side.
 4. **Verify or retract** each triage finding, starting from the conflict (§2.2.1). A finding that does
    not hold or does not apply to this Case is marked `retracted` with the reason; the score is
    recomputed. Aim the first discriminating queries at the findings that conflict.
@@ -84,23 +93,28 @@ per Case: the playbook the script prints.
    prescribes (`Malicious (…)` if …, `Benign (…)` if …), or as context; decide by judgment only when a
    result fits neither stated outcome. Findings from the same telemetry artifact count once. Record
    every query run, listed or added, with its outcome and tag. Egress rule as in triage: indicators only.
-6. **Mark coverage.** When the Benign explanation accounts for a Medium or High Malicious finding, set
+6. **What the source already did is not coverage.** An entity the source blocked, quarantined or removed
+   carries no side and no confidence at this gate either: it is an action the Case records, and the
+   questions it leaves open — how the entity arrived, what ran before it was stopped, whether the same
+   thing is elsewhere — are exactly what the validation queries answer. A recommended action still unread
+   is followed or set aside with a stated reason before the Case resolves; `scripts/resolve.py` names both.
+7. **Mark coverage.** When the Benign explanation accounts for a Medium or High Malicious finding, set
    `covered: true` on it; uncovered Low Malicious findings never block a Benign verdict, they lower its
    confidence and are listed as residual observations.
-7. **Resolve**: set `resolved_at` (UTC) in the ledger and run `python3 scripts/resolve.py ledger.json`. Malicious is proven at a score of 3 or more;
+8. **Resolve**: set `resolved_at` (UTC) in the ledger and run `python3 scripts/resolve.py ledger.json`. Malicious is proven at a score of 3 or more;
    Benign at 3 or more *and* every Medium or High Malicious finding retracted or covered; the verdict and
    confidence follow the §2.4 table (confidence is the strongest carrying finding, never an average). If neither side is proven, run the remaining discriminating
    queries. The script measures the timebox from `started_at` to `resolved_at` (the current time when absent)
    against the severity-scaled reference value, which `timebox_minutes` may tighten, never extend; when it has expired, or the
    budget is exhausted (`budget_exhausted`), it closes as **Insufficient Data** (7) with a monitoring watch (`watch_until`; re-open on recurrence of the
    entities) and emit a visibility or tuning ticket. Never stop for doubt; never "escalate".
-8. **Re-classify on evidence drift** (§2.2.5). If the objective differs from or exceeds the candidate
+9. **Re-classify on evidence drift** (§2.2.5). If the objective differs from or exceeds the candidate
    category, change `incident_category`, re-run step 1 for the new playbook, carry every finding
    forward, and record the pivot and its reason in the Note. The classification stays provisional until
    promotion.
-9. **Assign correctly.** The moment a Crown Jewel asset or a privileged identity enters the scope, the
+10. **Assign correctly.** The moment a Crown Jewel asset or a privileged identity enters the scope, the
    assignee becomes a human (`handover_reason`); keep running queries and proposing, the human decides.
-10. **On Malicious proven** (§3.1): set `verdict_id = 2`; assign the definitive Incident Category and the
+11. **On Malicious proven** (§3.1): set `verdict_id = 2`; assign the definitive Incident Category and the
     observed techniques as `ID (Name)`; build the **Case Timeline** (the course of the attack interleaved
     with detection and response actions, each entry timestamped in UTC with its event reference; the
     `timeline` of `process_chain.py --json` gives the process entries with their alerts as references).
@@ -114,10 +128,10 @@ per Case: the playbook the script prints.
     shorter than the window; an unbound `cases.store` is a visibility gap; every match is flagged for QA
     review, never dismissed); pass the scope to response. At Low
     confidence the Incident is still declared; every containment action then requires approval.
-11. **On Benign proven**: `verdict_id` 1 (False Positive, plus a tuning ticket to Phase 1) or 5 (Benign,
+12. **On Benign proven**: `verdict_id` 1 (False Positive, plus a tuning ticket to Phase 1) or 5 (Benign,
     plus a Knowledge Base entry if the exception was unrecorded). A Low-confidence close carries a
     monitoring watch and is flagged for QA sampling.
-12. **Write the Investigation Note.** It renders the Case at this gate and holds no state of its own,
+13. **Write the Investigation Note.** It renders the Case at this gate and holds no state of its own,
     on the **same element structure as the Triage Note** — it extends and updates that Note rather than
     mirroring it. The canonical list is
     [Detection & Analysis §2.5](references/framework/03-Processes/02-detection_and_analysis.md), in this
@@ -126,14 +140,16 @@ per Case: the playbook the script prints.
     resolution produced, with the master Case id on a Duplicate); **Summary** (as the Triage Note, at
     this gate); **Findings** (the Alerts; the triage Findings, each now verified or **retracted** with
     the reason; and the result of each validation query — every one rendered with its tag, with what
-    produced it, and with the events it rests on by OCSF identifier); **Rationale** (the score of each
+    produced it, and with the events it rests on by OCSF identifier; the Alerts also render what their
+    detection asserted, as in the Triage Note, with the remediation state of each entity **as it stands at
+    this gate** and the disposition of the recommended actions); **Rationale** (the score of each
     side, the Findings that carry the verdict, the retractions and why — how the confidence was reached,
     not a restatement of it); **Re-classification Pivots**; **Case Timeline**; **Visibility Gaps** (or
     "None."); **Provenance**, with the preserved-evidence pointer once §3.3 preservation has happened.
     There is no Executed Queries element and no Evidence References element: a query that produced a
     Finding is that Finding's `analytic`, and the identifiers are cited with each Finding.
     Preserve evidence per §3.3.
-13. **Emit.** On a Confirmed Incident, the **Investigation → Response contract** of
+14. **Emit.** On a Confirmed Incident, the **Investigation → Response contract** of
     [Playbook Architecture §5](references/framework/04-Playbooks/playbook_architecture.md): the triage
     contract fields refined, plus `verdict_id`, `incident_category`, `reclassification_pivots` when the
     category changed, `impact_id`, `significant`, `cross_border`, `is_suspected_breach`,

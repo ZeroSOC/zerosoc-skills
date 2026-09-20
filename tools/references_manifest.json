@@ -24,6 +24,7 @@
       "shared_scripts": [
         "select_playbook.py",
         "alert_types.py",
+        "alert_metadata.py",
         "evidence_inventory.py",
         "process_chain.py"
       ]
@@ -42,6 +43,7 @@
       "shared_scripts": [
         "select_playbook.py",
         "alert_types.py",
+        "alert_metadata.py",
         "evidence_inventory.py",
         "process_chain.py"
       ]

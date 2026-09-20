@@ -3,7 +3,14 @@
 
   select_playbook.py --domain Endpoint [--alert-type "Malware / loader execution"] [--bindings zerosoc.capabilities.json] [--json]
   select_playbook.py --category IC-01 [--section Investigation] [--bindings ...] [--json]
+  select_playbook.py --technique T1003 --technique T1021.002 [--json]
   select_playbook.py --list
+
+With --technique, the framework's own tables are read the other way round: the techniques a detection
+named (Detection & Analysis §1.1) are looked up for what the framework calls them and for the Incident
+Categories the alert types carrying them promote to, which is the first input to the candidate categories
+(§1.4). A sub-technique the tables do not hold falls back to its parent; a technique they hold nowhere is
+reported, never dropped, and never renamed.
 
 Paths are relative to the skill directory (references/framework/...). Triage playbooks are matched on the
 frontmatter `domain`; Investigation & Response playbooks on `incident_category`, with the catch-all
@@ -70,6 +77,91 @@ def section(body, heading, level):
     return "\n".join(lines[start:]).strip() if start is not None else ""
 
 
+TECHNIQUE = re.compile(r"\b(T\d{4}(?:\.\d{3})?)\b(?:\s*\(([^)]+)\))?")
+CATEGORY = re.compile(r"\b(IC-\d{2})\b")
+
+
+def technique_index(root=ROOT):
+    """Technique id -> {name, categories, alert_types, domains}, read from the framework's own tables.
+
+    Every table row that names a technique is read: an alert catalog carries the technique and the
+    candidate Incident Categories of an alert type in one row, and an Investigation & Response playbook
+    carries its category in the frontmatter and its techniques under `mitre_ttps`. A name is recorded
+    only where the framework writes one, so a technique it never names is never given a name here.
+    """
+    index = {}
+
+    def entry(tid):
+        return index.setdefault(tid, {"name": None, "categories": set(), "alert_types": set(), "domains": set()})
+
+    for path in sorted(glob.glob(os.path.join(root, "**", "*.md"), recursive=True)):
+        if os.path.basename(path).startswith("_"):
+            continue
+        with open(path, encoding="utf-8") as handle:
+            fields, body = parse_frontmatter(handle.read())
+        book_domain = fields.get("domain")
+        book_category = fields.get("incident_category")
+        heading = None
+        for line in body.splitlines():
+            head = re.match(r"^##\s+(.+?)\s*$", line)
+            if head:
+                heading = head.group(1)
+                continue
+            if not line.lstrip().startswith("|"):
+                continue
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            found = [(m.group(1), m.group(2)) for cell in cells for m in TECHNIQUE.finditer(cell)]
+            if not found:
+                continue
+            categories = {m.group(1) for cell in cells for m in CATEGORY.finditer(cell)}
+            alert_type = cells[0] if cells and cells[0] and not set(cells[0]) <= set("-: ") else None
+            for tid, name in found:
+                item = entry(tid)
+                if name and not item["name"]:
+                    item["name"] = name.strip()
+                item["categories"] |= categories
+                if alert_type:
+                    item["alert_types"].add(alert_type)
+                for domain in (book_domain, heading):
+                    if isinstance(domain, str) and domain:
+                        item["domains"].add(domain)
+        if book_category:
+            for tid in fields.get("mitre_ttps", []) or []:
+                m = TECHNIQUE.match(str(tid))
+                if m:
+                    entry(m.group(1))["categories"].add(str(book_category))
+    for item in index.values():
+        item["categories"] = sorted(item["categories"])
+        item["alert_types"] = sorted(item["alert_types"])
+        item["domains"] = sorted(item["domains"])
+    return index
+
+
+def candidates(technique_ids, index):
+    """What the framework knows of the techniques a detection named, and where they point.
+
+    Each id keeps its own form: it is matched on itself, else on its parent technique, and rendered
+    `ID (Name)` only where the framework names that exact id. An id nothing matches is listed under
+    `unknown` — it widens nothing, and it is the signal that the catalog is incomplete.
+    """
+    out, categories, unknown = [], set(), []
+    for raw in technique_ids:
+        tid = str(raw).strip()
+        matched, item = tid, index.get(tid)
+        if item is None and "." in tid:
+            matched = tid.split(".")[0]
+            item = index.get(matched)
+        if item is None:
+            matched, item = None, {"categories": [], "alert_types": [], "domains": []}
+            unknown.append(tid)
+        name = (index.get(tid) or {}).get("name")
+        categories |= set(item["categories"])
+        out.append({"id": tid, "name": name, "rendered": f"{tid} ({name})" if name else tid, "matched": matched,
+                    "categories": list(item["categories"]), "alert_types": list(item["alert_types"]),
+                    "domains": list(item["domains"])})
+    return {"techniques": out, "categories": sorted(categories), "unknown": unknown}
+
+
 def gaps(fields, bindings):
     req = fields.get("required_data_sources", []) or []
     if isinstance(req, str):
@@ -92,11 +184,25 @@ def main():
     ap.add_argument("--domain")
     ap.add_argument("--category")
     ap.add_argument("--alert-type")
+    ap.add_argument("--technique", action="append", default=[],
+                    help="a technique the detection named; repeatable. Prints what the framework calls it and the categories it points at")
     ap.add_argument("--section")
     ap.add_argument("--bindings")
     ap.add_argument("--list", action="store_true")
     ap.add_argument("--json", action="store_true")
     a = ap.parse_args()
+    if a.technique:
+        found = candidates(a.technique, technique_index(a.root))
+        if a.json:
+            print(json.dumps(found, indent=2, ensure_ascii=False))
+            return
+        for t in found["techniques"]:
+            where = ", ".join(t["categories"]) or "no candidate category in the framework's tables"
+            print(f"{t['rendered']}\t{where}" + (f"\t(matched on {t['matched']})" if t["matched"] and t["matched"] != t["id"] else ""))
+        print("candidate_incident_categories: " + (", ".join(found["categories"]) or "none"))
+        if found["unknown"]:
+            print("not in the framework's tables; record them on the Case and name them in the Note: " + ", ".join(found["unknown"]))
+        return
     books = load_playbooks(a.root)
     if a.list:
         for b in books:
@@ -120,7 +226,7 @@ def main():
                 print(f"no playbook for {a.category} and no catch-all at this framework pin; apply Detection & Analysis §2 directly with the category definition in 02-Taxonomy/incident_categories.md", file=sys.stderr)
                 sys.exit(2)
     else:
-        ap.error("one of --domain, --category or --list is required")
+        ap.error("one of --domain, --category, --technique or --list is required")
     text = chosen["body"]
     if a.alert_type:
         text = section(chosen["body"], a.alert_type, 3) or f"(alert type '{a.alert_type}' not found in {chosen['rel']}; see its Alert Catalog)"

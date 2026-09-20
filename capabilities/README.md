@@ -38,6 +38,28 @@ is the map for the XDR source of the profile above; every `alert_type` in a map 
 framework's `02-Taxonomy/alert_types.md` (the tests check it). Detector ids are added as they are
 observed: they make a rule exact where a title is ambiguous or localized.
 
+## Where each assertion of a detection comes from
+
+[Detection & Analysis §1.1](../framework/03-Processes/02-detection_and_analysis.md) makes six things the
+detection asserts required inputs of triage: the technique identifiers, the threat name and family, the
+detection source and detector, the remediation state of each entity, the source's description and its
+recommended actions. Every source names them differently, and the scripts know no source, so the
+deployment's alert-type map declares where each one lives under `detection_metadata`:
+
+- `fields` — assertion → the field on the source's alert that carries it.
+- `entity_fields` — the remediation state and its details on an evidence item.
+- `analytic_types` — the source's detection sources → the OCSF `analytic.type_id` each maps onto (Rule,
+  Behavioral, Statistical, Learning (ML/DL), Fingerprinting). One the map does not list is Other (99);
+  the script never guesses.
+- `remediation_states` — the source's states → whether the entity was **neutralized**, the OCSF
+  Remediation Activity `status_id` and the activity it performed. A state the map does not declare is
+  recorded as reported and counts as **not** neutralized, because a state nobody declared is not evidence
+  that anything was stopped.
+
+`scripts/alert_metadata.py` reads them, records the result in the ledger as `detection_metadata`, and
+names every assertion the source did not supply as a **visibility gap** with the check it prevented — so
+a deployment without them still runs, and degrades on the record instead of silently.
+
 ## Capability classes
 
 | Class | Method reference | Used by |

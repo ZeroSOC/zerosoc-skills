@@ -12,6 +12,9 @@ Ledger (JSON):
                 "at": "2026-09-14T15:03:10Z", "artifact": "hash:...", "alert_type": "...", "entity": "...",
                 "retracted": false, "retraction_reason": "", "covered": false}],
   "evidence_inventory": {"extracted": 31, "source_count": 31, "complete": true},
+  "detection_metadata": {...},  what the detections asserted (§1.1), carried from triage and refreshed at
+                                this gate: the remediation state as it now stands, and the disposition of
+                                the source's recommended actions,
   "visibility_gaps": [], "duplicate_of": null, "budget_exhausted": false,
   "timebox_minutes": null, "resolved_at": null, "timebox_expired": false
 }
@@ -33,6 +36,10 @@ try:
     from evidence_inventory import note as inventory_note
 except ImportError:  # the shared script is copied next to this one by tools/build_references.py
     inventory_note = None
+try:
+    from alert_metadata import dispositions, notes as detection_notes
+except ImportError:
+    dispositions = detection_notes = None
 
 W = {"Low": 1, "Medium": 2, "High": 3}
 LEVELS = ["Low", "Medium", "High"]
@@ -117,6 +124,12 @@ def resolve(ledger, now=None):
     if box_notes: r["timebox_note"] = "; ".join(box_notes)
     inventory = inventory_note(ledger.get("evidence_inventory")) if inventory_note else None
     if inventory: r["evidence_inventory_note"] = inventory
+    record = ledger.get("detection_metadata")
+    if detection_notes: r["detection_notes"] = detection_notes(record, ledger)
+    if record:
+        actions = [a for alert in record.get("alerts", []) for a in alert.get("recommended_actions", [])]
+        if dispositions: r["recommended_actions"] = dispositions(actions)
+        r["neutralized_entities"] = [x["entity"] for x in record.get("remediation", []) if x.get("neutralized")]
     if ledger.get("duplicate_of"):
         r.update(outcome="Duplicate", verdict_id=10, confidence_id=None, master_case_uid=ledger["duplicate_of"], next="close; merge evidence into the master Case")
     elif benign_proven:
@@ -165,6 +178,7 @@ def main():
     print(f"Timebox: {box['minutes']} min, elapsed {box['elapsed_minutes'] if box['elapsed_minutes'] is not None else '?'} min, {'EXPIRED' if box['expired'] else 'running'} ({box['source']})")
     for key in ("timebox_note", "evidence_inventory_note"):
         if r.get(key): print("Note: " + r[key])
+    for note in r.get("detection_notes", []): print("Note: " + note)
     print("Next: " + r["next"])
     if r.get("emit"): print("Emit: " + r["emit"])
 

@@ -6,6 +6,22 @@ The framework pin moves 34 commits, from before the Case Schema was mapped nativ
 skills were instructing an agent to produce Notes whose elements the framework no longer defines, and to
 hand on two fields the Case Schema now rejects.
 
+- **What the detection asserts is read before enrichment.** The skills read the Alerts for their entities
+  and their type and dropped everything the detection said about the threat. The new
+  `scripts/alert_metadata.py` extracts the six required inputs of Detection & Analysis §1.1 — the
+  technique identifiers, the threat name and family, the detection source and detector, the per-entity
+  remediation state, the source's description and its recommended actions — under the field names the
+  deployment's map declares under `detection_metadata`, and records them in the ledger. The techniques
+  resolve against the framework's own tables into candidate Incident Categories, a sub-technique falling
+  back to its parent (`select_playbook.py --technique`), and they now count in the confidence leaving
+  triage, which rises on alerts of different **techniques** and not only of different types. Each
+  recommended action is followed or set aside with a stated reason: `triage_decide.py` refuses to call
+  the decision ready while one is unread, and `check_run.py` fails a run that leaves one. An entity the
+  source already blocked, quarantined or removed is recorded and never weighed — it is an action of the
+  Case, not an explanation of it — and the questions it leaves open are named. An assertion the source
+  does not supply is a visibility gap with the check it prevented, so a deployment carrying none of them
+  still runs and degrades on the record.
+
 - **Both Notes render the Case, in one element structure.** Classification first, and it carries the
   decision: Close or Promote at triage, the verdict at investigation, beside severity, confidence, impact
   and the category. Then Summary, Findings, Rationale, Case Timeline, Visibility Gaps, Provenance. The
