@@ -1,8 +1,9 @@
 # Changelog
 
-## Unreleased — conforms to zerosoc-framework@f740364
+## Unreleased — conforms to zerosoc-framework@c6fb175 (PR #66)
 
-The framework pin moves 34 commits, from before the Case Schema was mapped natively to OCSF. The three
+The framework pin moves 35 commits, from before the Case Schema was mapped natively to OCSF. It is
+ahead of `main` while framework PR #66 is open, and is re-pinned to the merge commit when it lands. The three
 skills were instructing an agent to produce Notes whose elements the framework no longer defines, and to
 hand on two fields the Case Schema now rejects.
 
