@@ -476,11 +476,15 @@ class DetectionMetadata(unittest.TestCase):
     def test_remediation_state_is_read_per_entity(self):
         rows = [{"type": "process", "name": "wmiprvse.exe", "device": "ws-04", "alert_ids": ["A1"],
                  "remediationStatus": "prevented", "remediationStatusDetails": "blocked at execution"},
+                {"type": "process", "name": "rundll32.exe", "device": "ws-04", "alert_ids": ["A1"],
+                 "remediation_status": "prevented"},
                 {"type": "file", "name": "x.exe", "device": "ws-04", "alert_ids": ["A1"], "remediationStatus": "none"},
                 {"type": "device", "name": "ws-04", "alert_ids": ["A1"]}]
         out = metadata.remediation(rows, self.spec)
         self.assertEqual([(r["entity"], r["state"], r["neutralized"]) for r in out],
-                         [("wmiprvse.exe", "prevented", True), ("x.exe", "none", False)])
+                         [("wmiprvse.exe", "prevented", True), ("rundll32.exe", "prevented", True),
+                          ("x.exe", "none", False)],
+                         "a row that already carries the canonical name needs no alias: the inventory's rows do")
         self.assertEqual(out[0]["activity"], "Evict"); self.assertEqual(out[0]["status"], "Success")
         self.assertEqual(out[0]["alert_ids"], ["A1"])
         self.assertIn("blocked at execution", out[0]["details"])

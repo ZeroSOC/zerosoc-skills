@@ -18,7 +18,7 @@ assertion, how its detection sources map onto OCSF analytic types, and what its 
     "fields": {"techniques": "...", "threat_name": "...", "threat_family": "...",
                "detection_source": "...", "detector_id": "...", "description": "...",
                "recommended_actions": "..."},
-    "entity_fields": {"remediation_state": "...", "remediation_details": "..."},
+    "entity_fields": {"remediation_status": "...", "remediation_status_details": "..."},
     "analytic_types": {"<the source's detection source>": [<OCSF analytic type_id>, "<its name>"]},
     "remediation_states": {"<the source's state>": {"neutralized": true, "status": "Success", "activity": "Evict"}}
   }
@@ -168,7 +168,7 @@ def remediation(rows, amap):
     states = spec.get("remediation_states") or {}
     out = []
     for row in rows or []:
-        state = field(row, spec, "remediation_state", group="entity_fields")
+        state = field(row, spec, "remediation_status", group="entity_fields")
         if state in (None, "", "unknown"):
             continue
         known = states.get(str(state)) or {}
@@ -181,7 +181,7 @@ def remediation(rows, amap):
             "neutralized": bool(known.get("neutralized")),
             "status": known.get("status", "Unknown"),
             "activity": known.get("activity"),
-            "details": str(field(row, spec, "remediation_details", group="entity_fields") or "") or None,
+            "details": str(field(row, spec, "remediation_status_details", group="entity_fields") or "") or None,
             "alert_ids": [ids] if isinstance(ids, str) else list(ids),
             "declared": bool(known),
         })
