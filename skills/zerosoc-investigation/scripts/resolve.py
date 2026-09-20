@@ -37,9 +37,9 @@ try:
 except ImportError:  # the shared script is copied next to this one by tools/build_references.py
     inventory_note = None
 try:
-    from alert_metadata import dispositions, notes as detection_notes
+    from alert_metadata import actions_of, decision_notes, dispositions, neutralized
 except ImportError:
-    dispositions = detection_notes = None
+    actions_of = decision_notes = dispositions = neutralized = None
 
 W = {"Low": 1, "Medium": 2, "High": 3}
 LEVELS = ["Low", "Medium", "High"]
@@ -125,11 +125,10 @@ def resolve(ledger, now=None):
     inventory = inventory_note(ledger.get("evidence_inventory")) if inventory_note else None
     if inventory: r["evidence_inventory_note"] = inventory
     record = ledger.get("detection_metadata")
-    if detection_notes: r["detection_notes"] = detection_notes(record, ledger)
+    if decision_notes: r["detection_notes"] = decision_notes(record, ledger)
     if record:
-        actions = [a for alert in record.get("alerts", []) for a in alert.get("recommended_actions", [])]
-        if dispositions: r["recommended_actions"] = dispositions(actions)
-        r["neutralized_entities"] = [x["entity"] for x in record.get("remediation", []) if x.get("neutralized")]
+        if dispositions: r["recommended_actions"] = dispositions(actions_of(record))
+        r["neutralized_entities"] = neutralized(record)
     if ledger.get("duplicate_of"):
         r.update(outcome="Duplicate", verdict_id=10, confidence_id=None, master_case_uid=ledger["duplicate_of"], next="close; merge evidence into the master Case")
     elif benign_proven:

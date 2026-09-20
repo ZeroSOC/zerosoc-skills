@@ -817,7 +817,12 @@ class RunCheck(unittest.TestCase):
                   "findings": [{"id": "F1", "side": "Malicious", "confidence": "High", "at": "2026-09-14T15:01:00Z",
                                 "alert_type": "Credential dumping", "entity": "ws-01"}]}
         ledger.update(overrides)
-        for name, document in (("evidence.json", rows), ("alerts.json", [{"id": "A1", "title": "Possible credential dumping (LSASS)", "entity": "ws-01"}]),
+        alerts = [{"id": "A1", "title": "Possible credential dumping (LSASS)", "entity": "ws-01",
+                   "mitreTechniques": ["T1003"], "threatDisplayName": "HackTool:Win32/Mimikatz",
+                   "threatFamilyName": "Mimikatz", "detectionSource": "antivirus",
+                   "description": "A process read credential material from LSASS.",
+                   "recommendedActions": "Run a full scan"}]
+        for name, document in (("evidence.json", rows), ("alerts.json", alerts),
                                ("ledger.triage.json", ledger), ("ledger.investigation.json", ledger)):
             with open(os.path.join(base, name), "w", encoding="utf-8") as f:
                 json.dump(document, f)
@@ -852,6 +857,31 @@ class RunCheck(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("FAIL  triage: every recommended action followed or set aside with a reason", out)
         self.assertEqual(self.check(run)[0], 0, "the unchanged run still passes")
+
+    def test_a_ledger_claiming_an_assertion_its_alerts_do_not_carry_fails(self):
+        """The assertions are recomputed from the run's own alerts: the ledger does not get to
+        state a technique or a threat name the source never sent."""
+        base = self.run_dir()
+        with open(os.path.join(base, "ledger.triage.json"), encoding="utf-8") as f:
+            ledger = json.load(f)
+        ledger["detection_metadata"]["alerts"][0]["techniques"].append(
+            {"id": "T1486", "rendered": "T1486 (Data Encrypted for Impact)"})
+        with open(os.path.join(base, "ledger.triage.json"), "w", encoding="utf-8") as f:
+            json.dump(ledger, f)
+        code, out = self.check(base)
+        self.assertEqual(code, 1)
+        self.assertIn("FAIL  triage: the assertions are the ones the alerts carry", out)
+        self.assertIn("T1486", out)
+
+    def test_a_deployment_without_an_alert_type_map_degrades_and_is_not_failed(self):
+        """§1.1 runs where the binding declares no field names for the source: the assertions
+        cannot be read at all, and the harness says so instead of failing the run for it."""
+        base = self.run_dir(detection_metadata=None)
+        with open(os.path.join(base, "zerosoc.capabilities.json"), "w", encoding="utf-8") as f:
+            json.dump({"capabilities": {}, "data_sources": {}}, f)
+        code, out = self.check(base)
+        self.assertIn("skip  triage: what the detection asserts is on the ledger", out)
+        self.assertNotIn("FAIL  triage: what the detection asserts is on the ledger", out)
 
     def test_an_assertion_absent_without_a_recorded_gap_fails_the_run(self):
         base = self.run_dir()

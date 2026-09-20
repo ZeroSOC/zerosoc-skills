@@ -48,9 +48,9 @@ deployment's alert-type map declares where each one lives under `detection_metad
 
 - `fields` — assertion → the field on the source's alert that carries it.
 - `entity_fields` — the remediation state and its details on an evidence item.
-- `analytic_types` — the source's detection sources → the OCSF `analytic.type_id` each maps onto (Rule,
-  Behavioral, Statistical, Learning (ML/DL), Fingerprinting). One the map does not list is Other (99);
-  the script never guesses.
+- `analytic_types` — the source's detection sources → the OCSF analytic each maps onto, as
+  `{"type_id": 5, "type": "Fingerprinting"}` (Rule, Behavioral, Statistical, Learning (ML/DL),
+  Fingerprinting). One the map does not list is Other (99); the script never guesses.
 - `remediation_states` — the source's states → whether the entity was **neutralized**, the OCSF
   Remediation Activity `status_id` and the activity it performed. A state the map does not declare is
   recorded as reported and counts as **not** neutralized, because a state nobody declared is not evidence

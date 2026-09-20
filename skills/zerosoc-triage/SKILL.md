@@ -69,34 +69,24 @@ Read per alert: the playbook section the script prints.
      **lineage gap**, never matched on the PID alone and never guessed. Gaps are normal here, not a failure:
      record them, and never argue from a lineage the evidence does not support. An alert whose evidence names
      no process has no chain, whatever the console draws from its own telemetry.
-3. **Read what the detection asserts** (§1.1), before any enrichment. Run
-   `python3 scripts/alert_metadata.py alerts.json --bindings zerosoc.capabilities.json --evidence evidence.json --json`.
-   It reads, per alert, the six required inputs under the field names the deployment's map declares: the
-   **technique identifiers**, the **threat name and family**, the **detection source and detector**, the
-   source's **description**, its **recommended actions**, and the **remediation state** of each entity in
-   the evidence. Record the printed object in the ledger as `detection_metadata`; every later script reads
-   it from there and the Note renders it. Then act on it:
-   - The **techniques** are the first input to the candidate Incident Categories and to the playbook
-     section: the script resolves them against the framework's tables (`scripts/select_playbook.py --technique T1003`
-     does it alone), a sub-technique falling back to its parent. A technique the tables do not hold widens
-     nothing but is recorded on the Case and named in the Note — never dropped, never renamed.
-   - The **threat name and family** direct the enrichment of step 6 and seed the hypotheses: a named
-     family has documented behaviour, persistence and follow-on activity to look for.
-   - The **detection source** weighs the alert — a signature match on a known sample and a first-of-its-kind
-     model score are not the same evidence — and the **detector** is what a tuning ticket has to name.
-   - The **description** says what the detection fires on; the playbook's False Positive conditions are
-     judged against it.
-   - Each **recommended action** is followed, or set aside with a stated reason (it does not apply here,
-     the evidence contradicts it, it is already done, or it is a response action the autonomy matrix
-     reserves). Record the disposition on the action in `detection_metadata`: `"disposition": "followed"`
-     with the finding it produced, or `"disposition": "set aside"` with `"reason"`. `scripts/triage_decide.py`
-     refuses to call the decision ready while one is unread.
-   - The **remediation state** is recorded, never weighed: an entity the source blocked, quarantined or
-     removed is not an explanation of the alert, and it neither retracts a finding nor lowers its
-     confidence (§1.5). It changes what is left to prove — how the entity arrived, what ran before it was
-     stopped, whether the same thing is elsewhere — and an entity the source left **active** is where the
-     checks go first. The remediation is an action of the Case (Case Schema §5), so Response is not asked
-     to contain what is already contained.
+3. **Read what the detection asserts** (§1.1 names the six inputs, what each is for, and what to do
+   with it; this step only sequences them). Before any enrichment, run
+   `python3 scripts/alert_metadata.py alerts.json --bindings zerosoc.capabilities.json --evidence evidence.json --json`:
+   it reads them under the field names the deployment's map declares and records what the source did not
+   supply. Put the printed object in the ledger as `detection_metadata` — every later script reads it
+   from there and the Note renders it — then:
+   - Take the **techniques** to step 4: they are the first input to the candidate Incident Categories and
+     to the playbook section (`scripts/select_playbook.py --technique T1003` resolves one alone, a
+     sub-technique falling back to its parent). One the framework's tables do not hold widens nothing,
+     and is recorded on the Case and named in the Note rather than dropped or renamed.
+   - Take the **threat name and family** to step 6: they direct the enrichment and seed the hypotheses.
+   - **Follow each recommended action, or set it aside with a stated reason**, and record the disposition
+     on the action: `"disposition": "followed"` with the finding it produced, tagged like any other check
+     on the evidence it returned, or `"disposition": "set aside"` with `"reason"`.
+     `scripts/triage_decide.py` refuses to call the decision ready while one is unread.
+   - Aim the checks of step 6 where the **remediation state** leaves them: at the entities the source left
+     **active** first, and at what a block does not answer — how the entity arrived, what ran before it
+     was stopped, whether the same thing is elsewhere. The state is recorded, never weighed (§1.5).
    An assertion the source does not supply is a **visibility gap**: the script names it with the check it
    prevented, and it goes in the ledger's `visibility_gaps` and in the Note. Never infer one from the
    alert title.

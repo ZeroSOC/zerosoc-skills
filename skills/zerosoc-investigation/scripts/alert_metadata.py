@@ -19,7 +19,7 @@ assertion, how its detection sources map onto OCSF analytic types, and what its 
                "detection_source": "...", "detector_id": "...", "description": "...",
                "recommended_actions": "..."},
     "entity_fields": {"remediation_status": "...", "remediation_status_details": "..."},
-    "analytic_types": {"<the source's detection source>": [<OCSF analytic type_id>, "<its name>"]},
+    "analytic_types": {"<the source's detection source>": {"type_id": <OCSF analytic type>, "type": "<its name>"}},
     "remediation_states": {"<the source's state>": {"neutralized": true, "status": "Success", "activity": "Evict"}}
   }
 
@@ -56,7 +56,7 @@ PREVENTS = {
     "recommended actions": "the source's own procedure for this detection, which is followed or set aside on the record",
     "remediation state": "whether the source already blocked, quarantined or removed each entity",
 }
-OTHER = [99, "Other"]
+OTHER = {"type_id": 99, "type": "Other"}
 
 
 def spec_of(amap):
@@ -93,6 +93,16 @@ def _actions(value):
     return out
 
 
+def actions_of(record):
+    """Every recommended action the Case's detections published, across its alerts."""
+    return [a for alert in (record or {}).get("alerts", []) for a in alert.get("recommended_actions", [])]
+
+
+def neutralized(record):
+    """The entities the source reports it blocked, quarantined or removed."""
+    return [r.get("entity") for r in (record or {}).get("remediation", []) if r.get("neutralized")]
+
+
 def dispositions(actions):
     """Which recommended actions were followed, which were set aside with a reason, which are still open.
 
@@ -119,7 +129,7 @@ def assertions(alert, amap, index=None):
     name = field(alert, spec, "threat_name")
     family = field(alert, spec, "threat_family")
     source = field(alert, spec, "detection_source")
-    analytic = (spec.get("analytic_types") or {}).get(str(source), OTHER) if source else OTHER
+    analytic = (spec.get("analytic_types") or {}).get(str(source)) or OTHER if source else OTHER
     actions = _actions(field(alert, spec, "recommended_actions"))
     out = {
         "id": field(alert, {"fields": (amap or {}).get("fields") or {}}, "id"),
@@ -131,7 +141,7 @@ def assertions(alert, amap, index=None):
         "threat": {"name": str(name), "family": str(family) if family else None} if name or family else None,
         "detection": {"source": str(source) if source else None,
                       "detector_id": str(field(alert, spec, "detector_id") or "") or None,
-                      "analytic_type_id": analytic[0], "analytic_type": analytic[1]},
+                      "analytic_type_id": analytic["type_id"], "analytic_type": analytic["type"]},
         "description": str(field(alert, spec, "description") or "") or None,
         "recommended_actions": actions,
     }
@@ -225,8 +235,8 @@ def build(alerts, amap, evidence=None, index=None):
                 techniques.append(t["id"])
     built["techniques"] = techniques
     built["candidate_incident_categories"] = sorted({c for a in built["alerts"] for c in a["candidate_incident_categories"]})
-    built["recommended_actions"] = dispositions([r for a in built["alerts"] for r in a["recommended_actions"]])
-    built["neutralized_entities"] = [r["entity"] for r in built["remediation"] if r["neutralized"]]
+    built["recommended_actions"] = dispositions(actions_of(built))
+    built["neutralized_entities"] = neutralized(built)
     built["visibility_gaps"] = gaps(built, evidence_read=evidence is not None)
     return built
 
@@ -239,7 +249,7 @@ def techniques_of(record):
     return out
 
 
-def notes(record, ledger=None):
+def decision_notes(record, ledger=None):
     """What a decision script says about the assertions: the lines a reader of the run must see.
 
     A Case decided without them is decided on less than the source supplied (§1.1), a recommendation
@@ -258,7 +268,7 @@ def notes(record, ledger=None):
     if missing:
         out.append("the source supplied no " + ", ".join(missing) +
                    ": record each as a visibility gap with the check it prevented, and never infer one from the alert title")
-    open_ = dispositions([r for alert in record.get("alerts", []) for r in alert.get("recommended_actions", [])])["open"]
+    open_ = dispositions(actions_of(record))["open"]
     if open_:
         out.append("recommended actions still unread: " + ", ".join(str(i) for i in open_) +
                    " — follow each, or set it aside with a stated reason, before the Case is decided")
@@ -272,10 +282,6 @@ def notes(record, ledger=None):
         out.append("remediation states the deployment's map does not declare: " + ", ".join(undeclared) +
                    " — add them to detection_metadata.remediation_states; until then they count as not neutralized")
     return out
-
-
-def load_map(path):
-    return json.load(open(path, encoding="utf-8"))
 
 
 def main():
@@ -293,7 +299,8 @@ def main():
         path = os.path.join(os.path.dirname(os.path.abspath(a.bindings)), named) if named else None
     if not path:
         ap.error("--map, or --bindings with an alert_type_map, is required")
-    amap = load_map(path)
+    with open(path, encoding="utf-8") as handle:
+        amap = json.load(handle)
     evidence = json.load(open(a.evidence, encoding="utf-8")) if a.evidence else None
     if isinstance(evidence, dict):  # the output of evidence_inventory.py
         evidence = evidence.get("entities") or evidence.get("rows") or []

@@ -324,7 +324,7 @@
     "detector_id": "detectorId"
   },
   "detection_metadata": {
-    "description": "Where each assertion of Detection & Analysis §1.1 lives in this source's records, read by scripts/alert_metadata.py. \"fields\" names them on the alert, \"entity_fields\" on an evidence item, whose canonical names are the ones scripts/evidence_inventory.py prints (a row that already carries remediation_status needs no alias). The analytic types are the OCSF analytic type_id a detection source maps onto; a source not listed here is Other (99). The remediation states say what the source did and whether it completed; a state not listed here is recorded as reported and is never treated as neutralized.",
+    "description": "Where each assertion of Detection & Analysis §1.1 lives in this source's records, read by scripts/alert_metadata.py. \"fields\" names them on the alert, \"entity_fields\" on an evidence item, whose canonical names are the ones scripts/evidence_inventory.py prints (a row that already carries remediation_status needs no alias). The analytic types are the OCSF analytic type and type_id a detection source maps onto; a source not listed here is Other (99). The remediation states say what the source did and whether it completed; a state not listed here is recorded as reported and is never treated as neutralized.",
     "fields": {
       "techniques": "mitreTechniques",
       "threat_name": "threatDisplayName",
@@ -339,62 +339,62 @@
       "remediation_status_details": "remediationStatusDetails"
     },
     "analytic_types": {
-      "antivirus": [
-        5,
-        "Fingerprinting"
-      ],
-      "microsoftDefenderForEndpoint": [
-        2,
-        "Behavioral"
-      ],
-      "microsoftDefenderForIdentity": [
-        2,
-        "Behavioral"
-      ],
-      "microsoftDefenderForOffice365": [
-        2,
-        "Behavioral"
-      ],
-      "microsoftDefenderForCloudApps": [
-        2,
-        "Behavioral"
-      ],
-      "microsoftDefenderForCloud": [
-        1,
-        "Rule"
-      ],
-      "microsoft365Defender": [
-        2,
-        "Behavioral"
-      ],
-      "azureAdIdentityProtection": [
-        4,
-        "Learning (ML/DL)"
-      ],
-      "customDetection": [
-        1,
-        "Rule"
-      ],
-      "customTi": [
-        6,
-        "Tagging"
-      ],
-      "microsoftSentinel": [
-        1,
-        "Rule"
-      ],
-      "smartScreen": [
-        5,
-        "Fingerprinting"
-      ],
-      "automatedInvestigation": [
-        99,
-        "Other"
-      ],
-      "manual": [
-        99,
-        "Other"
-      ]
+      "customDetection": {
+        "type_id": 1,
+        "type": "Rule"
+      },
+      "microsoftDefenderForCloud": {
+        "type_id": 1,
+        "type": "Rule"
+      },
+      "microsoftSentinel": {
+        "type_id": 1,
+        "type": "Rule"
+      },
+      "microsoft365Defender": {
+        "type_id": 2,
+        "type": "Behavioral"
+      },
+      "microsoftDefenderForCloudApps": {
+        "type_id": 2,
+        "type": "Behavioral"
+      },
+      "microsoftDefenderForEndpoint": {
+        "type_id": 2,
+        "type": "Behavioral"
+      },
+      "microsoftDefenderForIdentity": {
+        "type_id": 2,
+        "type": "Behavioral"
+      },
+      "microsoftDefenderForOffice365": {
+        "type_id": 2,
+        "type": "Behavioral"
+      },
+      "azureAdIdentityProtection": {
+        "type_id": 4,
+        "type": "Learning (ML/DL)"
+      },
+      "antivirus": {
+        "type_id": 5,
+        "type": "Fingerprinting"
+      },
+      "customTi": {
+        "type_id": 5,
+        "type": "Fingerprinting"
+      },
+      "smartScreen": {
+        "type_id": 5,
+        "type": "Fingerprinting"
+      },
+      "automatedInvestigation": {
+        "type_id": 99,
+        "type": "Other"
+      },
+      "manual": {
+        "type_id": 99,
+        "type": "Other"
+      }
     },
     "remediation_states": {
       "prevented": {

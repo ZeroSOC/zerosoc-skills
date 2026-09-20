@@ -20,8 +20,10 @@ Ledger (JSON):
 }
 Alerts are the first Malicious findings at the tool's confidence, or at the level their severity maps to.
 The confidence leaving triage rises on independent alerts of different types **or techniques**, which are
-the techniques the detections named; an entity the source already neutralized never covers an alert, and
-a recommended action the run has neither followed nor set aside with a reason holds the decision.
+the techniques the detections named. The coverage rule itself is unchanged: what the source already
+neutralized is reported with the decision and never weighed into it — a block is a response, not an
+explanation — and a recommended action the run has neither followed nor set aside with a reason leaves
+`decision_ready` false, so the rule is computed but not yet acted on.
 Findings with side null are context and do not score. A Benign finding with no "covers" covers every alert.
 Prints the decision, the coverage per alert, the confidence leaving triage and the verdict to record.
 """
@@ -33,9 +35,9 @@ try:
 except ImportError:  # the shared script is copied next to this one by tools/build_references.py
     inventory_note = None
 try:
-    from alert_metadata import dispositions, notes as detection_notes, techniques_of
+    from alert_metadata import actions_of, decision_notes, dispositions, neutralized, techniques_of
 except ImportError:
-    dispositions = detection_notes = techniques_of = None
+    actions_of = decision_notes = dispositions = neutralized = techniques_of = None
 
 W = {"Low": 1, "Medium": 2, "High": 3}
 LEVELS = ["Low", "Medium", "High"]
@@ -98,8 +100,10 @@ def _decide(ledger):
         kinds = set()
         for a in alerts:
             ids = [i for i in [a["id"], *(a.get("merged_ids") or [])] if named.get(i)]
-            asserted = frozenset(t for i in ids for t in named[i])
-            kinds.add(asserted or (a.get("technique") or a.get("type", "")).strip().lower())
+            asserted = frozenset(str(t).strip().upper() for i in ids for t in named[i])
+            # one shape for a kind, so the same kind named twice counts once: the techniques the
+            # detection named, or, where it named none, the alert type itself
+            kinds.add(asserted or frozenset({(a.get("technique") or a.get("type", "")).strip().lower()}))
         artifacts = {f.get("artifact") or f["id"] for f in mal}
         raised = len(kinds) >= 2 or len(artifacts) >= 2
         if raised: level += 1
@@ -124,12 +128,11 @@ def decide(ledger):
     if inventory:
         r["evidence_inventory_note"] = inventory
     record = ledger.get("detection_metadata")
-    if detection_notes:
-        r["detection_notes"] = detection_notes(record, ledger)
+    if decision_notes:
+        r["detection_notes"] = decision_notes(record, ledger)
     if record:
-        actions = [a for alert in record.get("alerts", []) for a in alert.get("recommended_actions", [])]
-        r["recommended_actions"] = dispositions(actions) if dispositions else {}
-        r["neutralized_entities"] = [x["entity"] for x in record.get("remediation", []) if x.get("neutralized")]
+        r["recommended_actions"] = dispositions(actions_of(record)) if dispositions else {}
+        r["neutralized_entities"] = neutralized(record)
         if record.get("candidate_incident_categories"):
             r["candidate_incident_categories"] = record["candidate_incident_categories"]
     r["decision_ready"] = not r.get("recommended_actions", {}).get("open")
