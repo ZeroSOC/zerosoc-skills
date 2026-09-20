@@ -301,7 +301,7 @@ def main():
     built = build(json.load(open(a.alerts, encoding="utf-8")), amap, evidence, index)
     if a.json:
         print(json.dumps(built, indent=2, ensure_ascii=False))
-        return 3 if built["visibility_gaps"] else 0
+        return 0  # the gaps are in the output; a caller reading JSON is not failed by them
     for alert in built["alerts"]:
         print(f"{alert['id']}")
         print("  techniques: " + (", ".join(t["rendered"] for t in alert["techniques"]) or "none asserted"))
