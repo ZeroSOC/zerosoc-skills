@@ -147,8 +147,18 @@ def _paths(local, where=()):
         return [p for key, value in local.items() for p in _paths(value, where + (key,))]
     named = KEYED.get(where) or FIRST.get(where)
     if named and isinstance(local, list):
-        return [f"{'.'.join(where)}[{entry.get(named) if isinstance(entry, dict) else entry}]" for entry in local]
+        return [f"{'.'.join(where)}[{_names(entry, named)}]" for entry in local]
     return [".".join(where)]
+
+
+def _names(entry, identity):
+    """What to call one entry of a keyed list. An alert-type rule that declares a deliberate
+    non-mapping carries no ``alert_type``, and is named by the reason it gives instead."""
+    if not isinstance(entry, dict):
+        return entry
+    if identity in entry:
+        return entry[identity]
+    return "unmapped: " + str(entry.get("reason", "")) if entry.get("unmapped") else entry.get(identity)
 
 
 def overridden(profile, override_path):

@@ -198,6 +198,59 @@ class AlertTypeMapping(unittest.TestCase):
                 m = alert_types.classify({"id": "x", "title": title}, self.map)
                 self.assertEqual(m["type"], expected); self.assertFalse(m["unmapped"])
 
+    def test_the_titles_the_recordings_raised_map_to_the_types_decided_for_them(self):
+        """The real titles of #8, each to the type its own techniques point at."""
+        for title, expected in [
+            ("Impacket toolkit", "Remote execution / lateral movement"),
+            ("Compromised account conducting hands-on-keyboard attack", "Remote execution / lateral movement"),
+            # the same toolkit, but this one reports commands being run, not the tool being present
+            ("Ongoing hands-on-keyboard attack via Impacket toolkit", "Suspicious script / interpreter execution"),
+            ("Indication of local security authority secrets theft", "Credential dumping"),
+            ("Process memory dump", "Credential dumping"),
+            ("Suspicious Task Scheduler activity", "Persistence mechanism created"),
+            ("Masqueraded task or service", "Persistence mechanism created"),
+            ("Suspicious service launched", "Persistence mechanism created"),
+            ("Meterpreter post-exploitation tool", "Malware / loader execution"),
+            ("PowerSploit post-exploitation tool", "Malware / loader execution"),
+        ]:
+            with self.subTest(title=title):
+                m = alert_types.classify({"id": "x", "title": title}, self.map)
+                self.assertEqual(m["type"], expected); self.assertFalse(m["unmapped"])
+
+    def test_a_correlation_or_containment_record_is_left_unmapped_on_purpose(self):
+        """A source's own conclusion about a Case is not a behaviour, and no alert type is true of
+        it. It keeps its title, exactly as an unrecognized alert does, and says why."""
+        for title in ("Potential human-operated malicious activity",
+                      "Ransomware-linked threat actor detected",
+                      "Compromised device (attack disruption)"):
+            with self.subTest(title=title):
+                m = alert_types.classify({"id": "x", "title": title}, self.map)
+                self.assertTrue(m["unmapped"])
+                self.assertEqual(m["type"], title, "it keeps its own title as its type")
+                self.assertIsNone(m["domain"], "no type, so no domain")
+                self.assertTrue(m["unmapped_reason"].strip(), "the decision says why")
+                self.assertEqual(m["matched_on"], "title")
+
+    def test_a_decided_non_mapping_is_told_apart_from_one_nobody_has_looked_at(self):
+        decided = alert_types.classify({"id": "x", "title": "Potential human-operated malicious activity"}, self.map)
+        never_seen = alert_types.classify({"id": "y", "title": "A title this source has never raised"}, self.map)
+        self.assertTrue(decided["unmapped"] and never_seen["unmapped"], "both keep their title")
+        self.assertIn("unmapped_reason", decided)
+        self.assertNotIn("unmapped_reason", never_seen, "nothing decided it, so there is no reason to give")
+        self.assertIsNone(never_seen["matched_on"])
+
+    def test_a_shared_detector_id_is_matched_by_title_so_it_cannot_retype_its_other_alerts(self):
+        """Two detectors in the recordings carry more than one title, and a detector id wins over
+        any title match — so binding them would decide the other title too."""
+        shared = {"c70789ad-b645-4b13-8b6d-265433babfe6", "d60f5b90-ecd8-4d77-8186-a801597ec762"}
+        bound = {d for rule in self.map["rules"] for d in rule.get("detector_ids", [])}
+        self.assertEqual(shared & bound, set(), "a detector that means two things is matched by title")
+        # the alert that would have been dragged along keeps the type its own title earns
+        prevented = alert_types.classify(
+            {"id": "x", "title": "'RemoteExec' malware was prevented",
+             "detectorId": "d60f5b90-ecd8-4d77-8186-a801597ec762"}, self.map)
+        self.assertEqual(prevented["type"], "Malware / loader execution")
+
     def test_a_title_that_names_no_behaviour_stays_unmapped(self):
         for title in ("Ransomware-linked emerging threat activity group detected", "Suspicious bootloader modification",
                       "Unusual impersonated activity (by user)", "Mass delete"):
@@ -252,12 +305,42 @@ class AlertTypeMapping(unittest.TestCase):
         os.unlink(f.name)
         self.assertEqual(j.loads(out)[0]["type"], "Inbox forwarding / redirect or hide rule")
 
+    def _ran(self, alerts):
+        import subprocess, sys, tempfile, json as j
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+            j.dump(alerts, f)
+        ran = subprocess.run([sys.executable, os.path.join(ROOT, "tools/shared/alert_types.py"),
+                              f.name, "--profile", XDR_PROFILE], capture_output=True, text=True)
+        os.unlink(f.name)
+        return ran
+
+    def test_only_a_gap_nobody_decided_asks_the_maintainer_for_a_rule(self):
+        """Exit 3 is "this profile is missing a rule". A gap the profile decided is not missing
+        anything, so it neither asks for a rule nor fails the run."""
+        decided = self._ran([{"id": "B1", "title": "Potential human-operated malicious activity", "entity": "h"}])
+        self.assertEqual(decided.returncode, 0, decided.stderr)
+        self.assertIn("left unmapped on purpose", decided.stdout)
+        self.assertNotIn("add a rule", decided.stdout)
+
+        unknown = self._ran([{"id": "C1", "title": "A title this source has never raised", "entity": "h"}])
+        self.assertEqual(unknown.returncode, 3)
+        self.assertIn("add a rule", unknown.stdout)
+
+        both = self._ran([{"id": "B1", "title": "Potential human-operated malicious activity", "entity": "h"},
+                          {"id": "C1", "title": "A title this source has never raised", "entity": "h"}])
+        self.assertEqual(both.returncode, 3, "one undecided gap is enough to ask")
+
     def test_every_mapped_alert_type_exists_in_the_framework_taxonomy(self):
         with open(os.path.join(ROOT, "framework/02-Taxonomy/alert_types.md"), encoding="utf-8") as f:
             text = f.read()
         known = alert_types.framework_alert_types(text)
         self.assertGreater(len(known), 40)
         for rule in self.map["rules"]:
+            if rule.get("unmapped"):
+                self.assertTrue(rule.get("reason", "").strip(),
+                                "a rule that maps to no alert type says why it does not")
+                self.assertNotIn("alert_type", rule, "a non-mapping names no type")
+                continue
             self.assertIn(rule["alert_type"], known, rule["alert_type"])
             self.assertEqual(rule["domain"], known[rule["alert_type"]])
 
@@ -414,10 +497,16 @@ class DetectionMetadata(unittest.TestCase):
 
     def test_a_technique_is_rendered_only_with_the_name_the_framework_gives_it(self):
         a = self.one()
-        self.assertEqual(a["techniques"][0]["rendered"], "T1021.002",
-                         "the catalog names T1021, not the sub-technique: the id is not dressed in the parent's name")
-        self.assertEqual(a["techniques"][0]["matched"], "T1021", "the parent is still what the categories come from")
-        self.assertEqual(a["techniques"][1]["rendered"], "T1047", "a technique the framework never names renders bare")
+        self.assertEqual(a["techniques"][0]["rendered"], "T1021.002 (SMB/Windows Admin Shares)",
+                         "a sub-technique the catalog names carries that name")
+        self.assertEqual(a["techniques"][0]["matched"], "T1021.002",
+                         "a sub-technique the catalog holds is matched on its own, not on its parent")
+        self.assertEqual(a["techniques"][1]["rendered"], "T1047 (Windows Management Instrumentation)")
+        bare = self.one({"id": "A2", "title": "t", "mitreTechniques": ["T1003.001"]})
+        self.assertEqual(bare["techniques"][0]["rendered"], "T1003.001",
+                         "the catalog names T1003, not the sub-technique: the id is not dressed in the parent's name")
+        self.assertEqual(bare["techniques"][0]["matched"], "T1003",
+                         "the parent is still what the categories come from")
         named = self.one({"id": "A3", "title": "t", "mitreTechniques": ["T1003"]})
         self.assertEqual(named["techniques"][0]["rendered"], "T1003 (OS Credential Dumping)")
 

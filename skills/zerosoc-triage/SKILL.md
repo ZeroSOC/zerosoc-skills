@@ -4,7 +4,7 @@ description: Triage a security alert under the ZeroSOC Framework (Phase 2.a). Se
 license: Apache-2.0
 metadata:
   version: "0.4.1"
-  framework: "zerosoc-framework@b5f4966 (2026-09-21)"
+  framework: "zerosoc-framework@a5ef27c (2026-09-21)"
   status: draft
   author: ZeroSOC
 ---
@@ -108,7 +108,9 @@ Read per alert: the playbook section the script prints.
    `source_profiles`), build the alerts with `python3 scripts/alert_types.py alerts.json --bindings zerosoc.capabilities.json --json`:
    it gives each alert its framework alert type (detector id first, then title) and collapses the same
    type on the same entity to the strongest alert, so the rule below is applied the same way every time;
-   an alert it reports as unmapped keeps its title as type. `python3 scripts/source_profile.py --bindings zerosoc.capabilities.json --json`
+   an alert it reports as unmapped keeps its title as type. The type is for this counting and for grouping
+   with the same behaviour under another vendor's name — the playbook was chosen in step 4, from the domain
+   you identified and the techniques of step 3, and an unmapped alert does not change that choice. `python3 scripts/source_profile.py --bindings zerosoc.capabilities.json --json`
    prints the ledger's `source_profile` object and the source's entry for the Case's `provenance.products`:
    a **local override** of the shipped profile is recorded there and named in the Note's Provenance. Each independent
    alert is the first Malicious finding at the tool's confidence, or at the level its severity maps to

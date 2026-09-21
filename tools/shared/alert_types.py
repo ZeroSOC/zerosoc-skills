@@ -7,6 +7,11 @@ Detection & Analysis §1.1: the same alert type on the same entity counts once. 
 deterministic when the alert type is: this script assigns it from the source profile (detector id first,
 then title pattern) and collapses same type + same entity to the strongest alert, listing what it merged.
 
+That counting, and an alert type that groups with the same behaviour under another vendor's name, are
+what the type is for. Choosing a playbook is not: the executor identifies the telemetry domain, and
+the techniques the detection asserts point at the candidate alert types (select_playbook.py
+--technique), both before this runs. An alert left unmapped changes neither.
+
   alert_types.py alerts.json --bindings zerosoc.capabilities.json   (reads the binding's "source_profiles")
 
 alerts.json: a list of {"id", "title", "detector_id"?, "entity", "severity"?, "confidence"?, "technique"?}.
@@ -14,10 +19,17 @@ The rules are the `alert_types` block of the technology's **source profile** (on
 what its records mean, validated against capabilities/source_profile.schema.json):
 {"alert_types": {"fields": {"detector_id": "<the source's own field name>", ...},
                  "rules": [{"alert_type": "<framework alert type>", "domain": "<telemetry domain>",
-                            "detector_ids": ["..."], "title_patterns": ["<regex, case-insensitive>"]}]}}
+                            "detector_ids": ["..."], "title_patterns": ["<regex, case-insensitive>"]},
+                           {"unmapped": true, "reason": "<why no framework type is right>",
+                            "title_patterns": ["..."]}]}}
 "fields" lets the source's records be passed unrenamed; the script itself knows no source. An alert no
 rule matches keeps its normalized title as its type and is flagged "unmapped": it still deduplicates,
-and the flag tells the maintainer of the profile what to add. Output: the "alerts" array of ledger.json
+and the flag tells the maintainer of the profile what to add. Some alerts should stay that way — a
+source's correlation, attribution and containment records state a conclusion rather than a behaviour,
+and no behaviour type is true of them. A rule declaring "unmapped" says so, with the reason, and the
+alert is flagged exactly as before: the taxonomy is not bent to cover what it does not describe, and
+the maintainer's list of what to add stops carrying what was already decided. Output: the "alerts"
+array of ledger.json
 (format in triage_decide.py). Each entry also carries "alert_type" and "side": "Malicious", so the same
 entries seed the findings of resolve.py, where one type on one entity again counts once.
 """
@@ -65,7 +77,12 @@ def _confidence(alert, amap):
 
 
 def classify(alert, amap):
-    """The alert with its framework type: {"type", "domain", "unmapped", "matched_on", ...}."""
+    """The alert with its framework type: {"type", "domain", "unmapped", "matched_on", ...}.
+
+    A rule that declares ``unmapped`` leaves the alert its own title, exactly as no rule at all would,
+    and carries the reason on ``unmapped_reason``. The difference is ``matched_on``: a gap somebody
+    decided says which rule decided it, and one nobody has looked at yet says nothing.
+    """
     detector = _field(alert, amap, "detector_id")
     title = re.sub(r"\s+", " ", str(_field(alert, amap, "title") or "")).strip()
     hit, matched_on = None, None
@@ -78,10 +95,15 @@ def classify(alert, amap):
             if any(re.search(p, title, re.IGNORECASE) for p in rule.get("title_patterns", [])):
                 hit, matched_on = rule, "title"
                 break
-    alert_type = hit["alert_type"] if hit else title
+    decided = bool(hit and hit.get("unmapped"))
+    mapped = hit is not None and not decided
+    alert_type = hit["alert_type"] if mapped else title
     out = {"id": _field(alert, amap, "id"), "type": alert_type, "alert_type": alert_type, "side": "Malicious",
-           "domain": hit["domain"] if hit else None, "entity": str(_field(alert, amap, "entity") or ""),
-           "confidence": _confidence(alert, amap), "source_title": title, "unmapped": hit is None, "matched_on": matched_on}
+           "domain": hit["domain"] if mapped else None, "entity": str(_field(alert, amap, "entity") or ""),
+           "confidence": _confidence(alert, amap), "source_title": title, "unmapped": not mapped,
+           "matched_on": matched_on}
+    if decided:
+        out["unmapped_reason"] = hit["reason"]
     for key in ("severity", "technique"):
         if _field(alert, amap, key):
             out[key] = _field(alert, amap, key)
@@ -121,10 +143,15 @@ def main():
         print(json.dumps(out, indent=2, ensure_ascii=False))
         return
     for x in out:
-        flag = "  UNMAPPED: add a rule to the source profile's alert_types" if x["unmapped"] else ""
+        if x.get("unmapped_reason"):        # a gap the profile decided: there is nothing to add
+            flag = f"  left unmapped on purpose: {x['unmapped_reason']}"
+        elif x["unmapped"]:
+            flag = "  UNMAPPED: add a rule to the source profile's alert_types"
+        else:
+            flag = ""
         merged = f"  (counts once for {', '.join(x['merged_ids'])})" if len(x["merged_ids"]) > 1 else ""
         print(f"{x['id']}\t{x['type']}\t{x['entity']}\t{x['confidence']}{merged}{flag}")
-    if any(x["unmapped"] for x in out):
+    if any(x["unmapped"] and not x.get("unmapped_reason") for x in out):
         sys.exit(3)
 
 
