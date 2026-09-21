@@ -22,49 +22,90 @@ note.json: the Note as the executor assembled it —
  "rationale": {"rationale": "..."}, "timeline": [...], "visibility_gaps": [{...}],
  "provenance": {...}, "detection_metadata": {...}}
 """
-import argparse, json, re, sys
+import argparse, json, os, re, sys
 
 TECHNIQUE_BARE = re.compile(r"\b(T\d{4}(?:\.\d{3})?)\b(?!\s*\()")
+HERE = os.path.dirname(os.path.abspath(__file__))
+FRAMEWORK = os.path.normpath(os.path.join(HERE, "..", "references", "framework"))
+METHOD = os.path.join("03-Processes", "02-detection_and_analysis.md")
 
-ELEMENTS = {
-    "triage": [
-        ("classification", "severity, confidence and impact, the candidate Incident Categories, and the decision: Close (with the verdict) or Promote"),
-        ("summary", "a factual account current at this gate: what happened and when, which entities, who acted on whom, the root cause where it was found"),
-        ("findings", "every Finding the Case holds, each with its side and confidence or marked context, with what produced it and the events it rests on"),
-        ("rationale", "one or two sentences citing the Findings: why the decision follows"),
-        ("timeline", "the Findings flagged for the narrative, in first_seen_time order; 'None.' when nothing is flagged"),
-        ("visibility_gaps", "every required source unavailable and every §1.1 input the source did not supply, each with the check it prevented; 'None.' when none"),
-        ("provenance", "the playbooks and their versions, the executor classes, the capability classes, the Case id"),
-    ],
-    "investigation": [
-        ("classification", "severity, confidence, impact, the confirmed Incident Category and the verdict"),
-        ("summary", "the account as it now stands, with what the queries established"),
-        ("findings", "the Alerts, the triage Findings each verified or retracted with the reason, and the result of each validation query"),
-        ("rationale", "why the verdict follows, citing the Findings"),
-        ("reclassification_pivots", "every candidate category change, with the reason and the evidence"),
-        ("timeline", "the Case Timeline, whose earliest confirmed malicious event is T0"),
-        ("visibility_gaps", "the gaps of this phase, each with the check it prevented"),
-        ("provenance", "as the Triage Note, plus the pointer to preserved evidence once there is one"),
-    ],
+SECTIONS = {"triage": "1.6 Triage Note", "investigation": "2.5 Investigation Note"}
+"""Where the framework states the elements of each Note kind. The order and the words are read
+from there — the skills execute the framework's method and never restate it."""
+
+FIELDS = {
+    "classification": "classification",
+    "summary": "summary",
+    "findings": "findings",
+    "rationale": "rationale",
+    "case timeline": "timeline",
+    "re-classification pivots": "reclassification_pivots",
+    "visibility gaps": "visibility_gaps",
+    "provenance": "provenance",
 }
+"""The framework's name for an element, to the field a Note object carries it in. This binding is
+the skill's — the framework writes for a reader, and a Note travels as data."""
+
+OPTIONAL = ("timeline", "visibility_gaps", "reclassification_pivots")
+"""Elements that render "None." when there is nothing: absent and empty are the same statement."""
+
+ELEMENT = re.compile(r"^\s*\d+\.\s+\*\*(.+?)\*\*\s*[—-]\s*(.*)$")
 
 SIDES = ("malicious", "benign", "context")
 
 
-def elements(kind):
-    """The elements of a conformant Note of this kind, in the order the framework renders them."""
-    return [{"element": name, "renders": renders} for name, renders in ELEMENTS[kind]]
+def _method(root):
+    path = os.path.join(root, METHOD)
+    if not os.path.isfile(path):
+        raise SystemExit(f"{path} is missing: this skill's references/framework/ is not generated")
+    with open(path, encoding="utf-8") as handle:
+        return handle.read()
 
 
-def check(note, kind=None):
+def _section(body, heading):
+    """The lines of one numbered subsection of the method, up to the next heading of its level."""
+    out, inside = [], False
+    for line in body.splitlines():
+        if line.startswith("### "):
+            inside = line[4:].strip().startswith(heading)
+            continue
+        if inside and line.startswith("## "):
+            break
+        if inside:
+            out.append(line)
+    return out
+
+
+def elements(kind, root=FRAMEWORK):
+    """The elements of a conformant Note of this kind, in the order the framework renders them.
+
+    Read from the framework itself, so the order and the words are the ones a human analyst reads
+    in the method rather than a copy that has to be kept in step with it.
+    """
+    found = []
+    for line in _section(_method(root), SECTIONS[kind]):
+        matched = ELEMENT.match(line)
+        if not matched:
+            continue
+        name = re.sub(r"[`*]", "", matched.group(1)).strip()
+        field = FIELDS.get(name.lower())
+        if field:
+            found.append({"element": field, "name": name, "renders": matched.group(2).strip()})
+    if not found:
+        raise SystemExit(f"no elements found in the method's section {SECTIONS[kind]!r}")
+    return found
+
+
+def check(note, kind=None, root=FRAMEWORK):
     """What makes this Note non-conformant, in the framework's terms. Empty means conformant."""
     kind = kind or note.get("kind") or "triage"
     failures = []
-    for name, _ in ELEMENTS[kind]:
-        if name in ("timeline", "visibility_gaps", "reclassification_pivots"):
+    for element in elements(kind, root):
+        if element["element"] in OPTIONAL:
             continue  # an empty one renders "None."; absent is the same statement
-        if not note.get(name):
-            failures.append(f"the Note renders no {name}: the framework's {kind} Note requires it")
+        if not note.get(element["element"]):
+            failures.append(
+                f"the Note renders no {element['name']}: the framework's {kind} Note requires it")
 
     for finding in note.get("findings") or []:
         where = f"finding {finding.get('n', '?')}"
@@ -101,19 +142,20 @@ def check(note, kind=None):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--kind", choices=sorted(ELEMENTS), required=True)
+    ap.add_argument("--kind", choices=sorted(SECTIONS), required=True)
     ap.add_argument("--note")
+    ap.add_argument("--root", default=FRAMEWORK)
     ap.add_argument("--json", action="store_true")
     a = ap.parse_args()
-    out = {"kind": a.kind, "elements": elements(a.kind)}
+    out = {"kind": a.kind, "elements": elements(a.kind, a.root)}
     if a.note:
         with open(a.note, encoding="utf-8") as handle:
-            out["failures"] = check(json.load(handle), a.kind)
+            out["failures"] = check(json.load(handle), a.kind, a.root)
     if a.json:
         print(json.dumps(out, indent=2, ensure_ascii=False))
     else:
         for n, element in enumerate(out["elements"], start=1):
-            print(f"{n}. {element['element']} — {element['renders']}")
+            print(f"{n}. {element['name']} ({element['element']}) — {element['renders']}")
         for failure in out.get("failures", []):
             print(f"FAIL: {failure}", file=sys.stderr)
     return 1 if out.get("failures") else 0

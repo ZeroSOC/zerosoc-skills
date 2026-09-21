@@ -1146,50 +1146,60 @@ class TheMethodSurface(unittest.TestCase):
 
         self.assertTrue(any("happens before T0" in f for f in timeline.check(built)))
 
-    def test_the_note_elements_are_the_frameworks_in_its_order(self):
-        names = [e["element"] for e in note_elements.elements("triage")]
+    ELEMENTS_ROOT = os.path.join(ROOT, "skills", "zerosoc-triage", "references", "framework")
+
+    def elements(self, kind):
+        return note_elements.elements(kind, self.ELEMENTS_ROOT)
+
+    def test_the_note_elements_are_read_from_the_framework_in_its_own_order(self):
+        """The order and the words are the framework's: a copy here would need keeping in step
+        with the document it copies, which is the drift the references exist to remove."""
+        found = self.elements("triage")
+        names = [e["element"] for e in found]
 
         self.assertEqual(names[0], "classification", "it comes first: a reader compares it directly")
         self.assertEqual(names[-1], "provenance")
         self.assertIn("findings", names)
-        self.assertEqual(
-            [e["element"] for e in note_elements.elements("investigation")][4],
-            "reclassification_pivots",
-        )
+        self.assertIn("what happened and when", found[1]["renders"], "the framework's own words")
+        self.assertIn("reclassification_pivots", [e["element"] for e in self.elements("investigation")])
+
+    def test_a_missing_reference_tree_is_an_error_not_an_empty_list(self):
+        with self.assertRaises(SystemExit):
+            note_elements.elements("triage", os.path.join(ROOT, "nowhere"))
 
     def test_a_conformant_note_passes(self):
-        self.assertEqual(note_elements.check(self.note()), [])
+        self.assertEqual(note_elements.check(self.note(), root=self.ELEMENTS_ROOT), [])
 
     def test_a_finding_with_a_side_and_no_confidence_fails(self):
         note = self.note()
         note["findings"][0]["tag"] = {"side": "malicious", "confidence_id": None}
 
-        self.assertTrue(any("no confidence" in f for f in note_elements.check(note)))
+        self.assertTrue(any("no confidence" in f for f in note_elements.check(note, root=self.ELEMENTS_ROOT)))
 
     def test_a_finding_that_cites_no_event_fails(self):
         note = self.note()
         note["findings"][0]["event_refs"] = []
 
-        self.assertTrue(any("cites no event" in f for f in note_elements.check(note)))
+        self.assertTrue(any("cites no event" in f for f in note_elements.check(note, root=self.ELEMENTS_ROOT)))
 
     def test_a_bare_technique_code_fails(self):
         note = self.note()
         note["findings"][0]["finding"] = "T1486 was observed"
 
-        self.assertTrue(any("written bare" in f for f in note_elements.check(note)))
+        self.assertTrue(any("written bare" in f for f in note_elements.check(note, root=self.ELEMENTS_ROOT)))
 
     def test_context_that_carries_a_confidence_fails(self):
         note = self.note()
         note["findings"][0]["tag"] = {"side": "context", "confidence_id": 2}
 
-        self.assertTrue(any("context carries a confidence" in f for f in note_elements.check(note)))
+        self.assertTrue(any("context carries a confidence" in f for f in note_elements.check(note, root=self.ELEMENTS_ROOT)))
 
     def test_a_recommended_action_nobody_answered_fails(self):
         note = self.note()
         note["detection_metadata"] = {"alerts": [{"id": "A1", "recommended_actions": [
             {"id": "RA1", "action": "Run a full scan", "disposition": None}]}]}
 
-        self.assertTrue(any("neither followed nor set aside" in f for f in note_elements.check(note)))
+        self.assertTrue(any("neither followed nor set aside" in f for f in note_elements.check(note, root=self.ELEMENTS_ROOT)))
 
     def test_a_recommendation_set_aside_with_a_reason_passes(self):
         note = self.note()
@@ -1197,13 +1207,13 @@ class TheMethodSurface(unittest.TestCase):
             {"id": "RA1", "action": "Run a full scan", "disposition": "set_aside",
              "reason": "the device was reimaged before triage opened"}]}]}
 
-        self.assertEqual(note_elements.check(note), [])
+        self.assertEqual(note_elements.check(note, root=self.ELEMENTS_ROOT), [])
 
     def test_a_gap_that_names_no_check_fails(self):
         note = self.note()
         note["visibility_gaps"] = [{"data_source": "EDR", "check_prevented": "  "}]
 
-        self.assertTrue(any("names no check" in f for f in note_elements.check(note)))
+        self.assertTrue(any("names no check" in f for f in note_elements.check(note, root=self.ELEMENTS_ROOT)))
 
     def test_the_rule_text_a_host_composes_lives_in_the_skill(self):
         for skill, names in (("zerosoc-triage", ("checks", "note-prose")),
