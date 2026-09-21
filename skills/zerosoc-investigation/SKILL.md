@@ -60,7 +60,7 @@ per Case: the playbook the script prints.
    When it holds processes, rebuild the lineage with `python3 scripts/process_chain.py evidence.json --alerts alerts.json`
    (one chain per alert, each process under its ancestors; `--case` joins them into one chain per device, the
    view to score on). Where the bound endpoint class carries process telemetry, query the Case's devices and
-   window for process creations and pass them with `--telemetry telemetry.json`: the ancestors the alerts never
+   window for process creations and pass them with `--telemetry telemetry.json --bindings zerosoc.capabilities.json` (the source profile says what the source calls its columns): the ancestors the alerts never
    cited are reconstructed and marked as such. Where it carries alert evidence only, the chain stops at the
    first ancestor no alert cited: that is a **lineage gap**, it is recorded, and no hypothesis may rest on a
    lineage the evidence does not show. Command lines, their decodings and the remediation state of each process

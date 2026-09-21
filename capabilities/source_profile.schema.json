@@ -141,6 +141,13 @@
                 "type": "string"
               },
               "description": "What this source calls a row's own identifier."
+            },
+            "process_lineage": {
+              "type": "object",
+              "description": "What this source calls the columns a process lineage is rebuilt from, on a row of its process telemetry: the name the lineage script uses (device, pid, created, name, command_line, parent_pid, parent_created, parent_name, parent_command_line, parent_parent_pid, parent_parent_created) -> the source's column. It is apart from `objects` because the identity of a process is its device, its id and its creation time together, read as the source writes them, and not an attribute placed on an OCSF object.",
+              "additionalProperties": {
+                "type": "string"
+              }
             }
           }
         }

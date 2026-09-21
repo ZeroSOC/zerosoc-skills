@@ -227,6 +227,7 @@ def telemetry_rows(profile):
         "objects": {k: tuple(v) for k, v in (rows.get("objects") or {}).items()},
         "times": tuple(rows.get("times") or ()),
         "uids": tuple(rows.get("uids") or ()),
+        "process_lineage": dict(rows.get("process_lineage") or {}),
     }
 
 

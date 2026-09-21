@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Reconstruct the process lineage of a Case from its evidence rows. Standard library only.
 
-  process_chain.py evidence.json [--telemetry telemetry.json] [--case] [--alerts alerts.json] [--width N] [--json]
+  process_chain.py evidence.json [--telemetry telemetry.json [--bindings zerosoc.capabilities.json]] [--case]
+                   [--alerts alerts.json] [--width N] [--json]
 
 One chain per alert, the way a console shows an alert story: the processes the alert cites, each under its
 ancestors, which are marked as context when they come from the Case's other alerts. `--case` prints the
@@ -22,10 +23,10 @@ alerts.json (optional): {"<alert id>": {"title": ..., "severity": ...}}, to titl
 telemetry.json (optional): process-creation rows for the Case's devices and window, as
 {"device", "pid", "created", "name", "command_line", "parent_pid", "parent_created"} and, when the source
 reports them on the same row, "parent_name", "parent_command_line", "parent_parent_pid",
-"parent_parent_created". Column names are matched case-insensitively and the common source spellings are
-accepted (ProcessId, ProcessCreationTime, FileName, ProcessCommandLine, DeviceName, InitiatingProcessId,
-InitiatingProcessCreationTime, InitiatingProcessFileName, InitiatingProcessCommandLine,
-InitiatingProcessParentId, InitiatingProcessParentCreationTime).
+"parent_parent_created". Column names are matched case-insensitively. This script knows no source: what a
+source calls these columns is declared by its **source profile** (`fields.telemetry_rows.process_lineage`), read
+with `--bindings zerosoc.capabilities.json` or `--profile`; without one, only the names above and a few generic
+spellings of them are known.
 Process rows carry "pid", "created", "parent_pid", "parent_created", "parent_name" and "device", times in UTC.
 
 - One node per process, not per row: rows with the same device, PID and creation time are one process,
@@ -37,21 +38,21 @@ Process rows carry "pid", "created", "parent_pid", "parent_created", "parent_nam
 - A row without a device, PID or creation time is unplaced: listed, never linked.
 - Conflicting parents for one process and a child created before its parent are reported as anomalies.
 """
-import argparse, json, re, sys
+import argparse, json, os, re, sys
 from datetime import datetime
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import source_profile
 
 WIDTH = 160  # where a command line is cut in the text view; --width 0 prints it whole
 LABEL = "evidence-only chain"
 LABEL_FULL = "chain from evidence and telemetry"
 ATTRS = ("path", "sha1", "sha256", "account", "upn", "user_sid", "mde_device_id", "remediation_status",
          "detection_status", "decoded_command", "decode_rounds", "decode_capped", "elevation_token")
-ALIASES = {"devicename": "device", "processid": "pid", "processcreationtime": "created", "filename": "name",
-           "processcommandline": "command_line", "initiatingprocessid": "parent_pid",
-           "initiatingprocesscreationtime": "parent_created", "initiatingprocessfilename": "parent_name",
-           "initiatingprocesscommandline": "parent_command_line",
-           "initiatingprocessparentid": "parent_parent_pid",
-           "initiatingprocessparentcreationtime": "parent_parent_created",
-           "process_id": "pid", "process_created": "created", "process_creation_time": "created",
+# the columns of a telemetry row the lineage is rebuilt from, under this script's own names
+LINEAGE = ("device", "pid", "created", "name", "command_line", "parent_pid", "parent_created", "parent_name",
+           "parent_command_line", "parent_parent_pid", "parent_parent_created")
+ALIASES = {"process_id": "pid", "process_created": "created", "process_creation_time": "created",
            "parent_process_id": "parent_pid", "parent_process_created": "parent_created",
            "image": "name", "process_name": "name", "commandline": "command_line", "host": "device"}
 TIME = re.compile(r"^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})(?:\.(\d+))?(Z|[+-]\d{2}:?\d{2})?$")
@@ -110,15 +111,22 @@ def _add(values, value):
         values.append(value)
 
 
-def _normalize(row):
+def columns_of(profile):
+    """What this source calls the columns of LINEAGE, as its profile declares them: column -> name here."""
+    named = source_profile.telemetry_rows(profile)["process_lineage"]
+    return {str(column).strip().lower(): key for key, column in named.items() if key in LINEAGE}
+
+
+def _normalize(row, columns=None):
     """A telemetry row under this script's field names; unknown columns are kept as they are."""
+    known = dict(ALIASES, **(columns or {}))
     out = {}
     for key, value in row.items():
-        out[ALIASES.get(str(key).strip().lower(), str(key).strip().lower())] = value
+        out[known.get(str(key).strip().lower(), str(key).strip().lower())] = value
     return out
 
 
-def _telemetry_index(rows):
+def _telemetry_index(rows, columns=None):
     """(device, pid) -> [(time, row)], from the processes themselves and from the parents rows report."""
     index = {}
 
@@ -137,7 +145,7 @@ def _telemetry_index(rows):
         entry.append((time, dict(fields, device=device, pid=pid, created=created)))
 
     for raw in rows:
-        row = _normalize(raw)
+        row = _normalize(raw, columns)
         device = row.get("device")
         add(device, row.get("pid"), row.get("created"),
             {k: row.get(k) for k in ("name", "command_line", "parent_pid", "parent_created", "parent_name") + ATTRS
@@ -155,7 +163,7 @@ def _from_telemetry(index, device, pid, time):
     return None
 
 
-def build(rows, telemetry=None):
+def build(rows, telemetry=None, columns=None):
     """Nodes per device with their parent links, lineage gaps, unplaced rows and anomalies."""
     rows = rows.get("entities", []) if isinstance(rows, dict) else rows
     index, gap_index, nodes, gaps, unplaced, anomalies = {}, {}, [], [], [], []
@@ -219,7 +227,7 @@ def build(rows, telemetry=None):
         parent["children"].append(node)
 
     if telemetry:
-        _fill(_telemetry_index(telemetry), index, gap_index, nodes, gaps, anomalies)
+        _fill(_telemetry_index(telemetry, columns), index, gap_index, nodes, gaps, anomalies)
 
     devices, reached = {}, set()
     for n in nodes + gaps:
@@ -461,9 +469,16 @@ def main():
     ap.add_argument("--alerts", help="alert id -> {title, severity}, to title the sections")
     ap.add_argument("--width", type=int, default=WIDTH, help="where a command line is cut; 0 prints it whole")
     ap.add_argument("--json", action="store_true")
+    source_profile.add_arguments(ap)
     a = ap.parse_args()
     telemetry = json.load(open(a.telemetry, encoding="utf-8")) if a.telemetry else None
-    chain = build(json.load(open(a.evidence, encoding="utf-8")), telemetry)
+    # the profile says what this source calls the telemetry's columns; a run with no telemetry reads none
+    columns = columns_of(source_profile.from_arguments(ap, a)) if telemetry and (a.profile or a.bindings) else None
+    chain = build(json.load(open(a.evidence, encoding="utf-8")), telemetry, columns)
+    if telemetry and not _telemetry_index(telemetry, columns):
+        print(f"none of the {len(telemetry)} telemetry rows names a device, a process id and a creation time in "
+              "a way this script knows, so the telemetry filled nothing: pass --bindings (or --profile), and the "
+              "source profile says what this source calls its columns", file=sys.stderr)
     alerts = json.load(open(a.alerts, encoding="utf-8")) if a.alerts else None
     print(json.dumps(as_json(chain), indent=2, ensure_ascii=False) if a.json else as_text(chain, alerts, a.case, a.width))
     sys.exit(0)

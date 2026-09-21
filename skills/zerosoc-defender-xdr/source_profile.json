@@ -145,7 +145,20 @@
         "EventId",
         "id",
         "uid"
-      ]
+      ],
+      "process_lineage": {
+        "device": "DeviceName",
+        "pid": "ProcessId",
+        "created": "ProcessCreationTime",
+        "name": "FileName",
+        "command_line": "ProcessCommandLine",
+        "parent_pid": "InitiatingProcessId",
+        "parent_created": "InitiatingProcessCreationTime",
+        "parent_name": "InitiatingProcessFileName",
+        "parent_command_line": "InitiatingProcessCommandLine",
+        "parent_parent_pid": "InitiatingProcessParentId",
+        "parent_parent_created": "InitiatingProcessParentCreationTime"
+      }
     }
   },
   "vocabularies": {
