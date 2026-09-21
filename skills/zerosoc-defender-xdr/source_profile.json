@@ -44,6 +44,107 @@
       "verdict": "verdict",
       "remediation_status": "remediationStatus",
       "remediation_status_details": "remediationStatusDetails"
+    },
+    "telemetry_rows": {
+      "objects": {
+        "FileName": [
+          "process",
+          "name"
+        ],
+        "ProcessCommandLine": [
+          "process",
+          "cmd_line"
+        ],
+        "ProcessId": [
+          "process",
+          "pid"
+        ],
+        "InitiatingProcessFileName": [
+          "process",
+          "parent_process",
+          "name"
+        ],
+        "InitiatingProcessCommandLine": [
+          "process",
+          "parent_process",
+          "cmd_line"
+        ],
+        "SHA256": [
+          "file",
+          "hashes",
+          "sha256"
+        ],
+        "FileHash": [
+          "file",
+          "hashes",
+          "sha256"
+        ],
+        "FolderPath": [
+          "file",
+          "path"
+        ],
+        "DeviceName": [
+          "device",
+          "hostname"
+        ],
+        "DeviceId": [
+          "device",
+          "uid"
+        ],
+        "AccountName": [
+          "user",
+          "name"
+        ],
+        "AccountUpn": [
+          "user",
+          "name"
+        ],
+        "UserPrincipalName": [
+          "user",
+          "name"
+        ],
+        "RemoteIP": [
+          "dst_endpoint",
+          "ip"
+        ],
+        "RemotePort": [
+          "dst_endpoint",
+          "port"
+        ],
+        "RemoteUrl": [
+          "url",
+          "url_string"
+        ],
+        "Url": [
+          "url",
+          "url_string"
+        ],
+        "LocalIP": [
+          "src_endpoint",
+          "ip"
+        ],
+        "LocalPort": [
+          "src_endpoint",
+          "port"
+        ],
+        "IPAddress": [
+          "src_endpoint",
+          "ip"
+        ]
+      },
+      "times": [
+        "Timestamp",
+        "TimeGenerated",
+        "EventTime",
+        "createdDateTime",
+        "LastSeen"
+      ],
+      "uids": [
+        "ReportId",
+        "EventId",
+        "id",
+        "uid"
+      ]
     }
   },
   "vocabularies": {
@@ -651,7 +752,7 @@
     {
       "path": "alerts[].recommendedActions",
       "case": "finding_info_list[].desc",
-      "note": "the source's own procedure. It reaches the Case as the disposition of each recommendation \u2014 the Finding a followed one produced, or the Finding that states why it was set aside \u2014 never as a block of text on the alert"
+      "note": "the source's own procedure. It reaches the Case as the disposition of each recommendation — the Finding a followed one produced, or the Finding that states why it was set aside — never as a block of text on the alert"
     },
     {
       "path": "alerts[].firstActivityDateTime",
@@ -895,22 +996,28 @@
         "operation": "get_machine"
       },
       "identity.directory": {
-        "answers": "Who is this account: its directory record and what it belongs to.",
+        "answers": "What this source knows about an account: the alerts it appears in and the devices it has used.",
         "limits": [
-          "the directory is read through the identity workload; an account outside it is not here"
-        ]
+          "this source has no directory record of its own: the account's attributes come from the directory itself, not from here",
+          "an account outside the directory — a local account, a guest that never signed in — appears only where an alert named it"
+        ],
+        "operation": "get_user_alerts"
       },
       "malware.repository": {
-        "answers": "What does the vendor know about this file: its prevalence and its verdict.",
+        "answers": "What the vendor knows about a file: its own verdict, its signer, and how widely it has been seen.",
         "limits": [
-          "a hash the vendor has never seen returns no record, which is an answer and not a gap"
-        ]
+          "a hash the vendor has never seen returns no record, which is an answer and not a gap",
+          "prevalence is this tenant's and the vendor's, not the world's"
+        ],
+        "operation": "get_file_info"
       },
       "reputation.multi_engine": {
-        "answers": "What is this address or URL, in the vendor's own reputation.",
+        "answers": "What this source has seen of an address or a domain: the alerts it appears in and its prevalence here.",
         "limits": [
-          "one vendor's opinion, not a multi-engine consensus"
-        ]
+          "this is one vendor's sight of the indicator, not a multi-engine consensus: the class is named for what the method wants, and this source answers the narrower question",
+          "an address the tenant has never contacted has no statistics, which is not a verdict"
+        ],
+        "operation": "get_ip_statistics"
       },
       "cases.store": {
         "answers": "Has this entity been in an incident before, and how were those incidents determined.",
@@ -931,7 +1038,8 @@
         "answers": "Sign-ins and directory changes for an account.",
         "limits": [
           "identity tables are empty where the identity workload is not deployed"
-        ]
+        ],
+        "operation": "run_hunting_query"
       }
     },
     "data_sources": {
@@ -1006,6 +1114,14 @@
       "recipe": "list_incidents(filter: lastUpdateDateTime ge {since})",
       "limits": [
         "the source's own incidents only"
+      ]
+    },
+    "directory_changes": {
+      "asks": "What changed on this account or group, and who changed it?",
+      "table": "IdentityDirectoryEvents",
+      "recipe": "IdentityDirectoryEvents | where AccountUpn =~ '{user}' or TargetAccountUpn =~ '{user}' | limit {limit}",
+      "limits": [
+        "needs the identity workload deployed against the domain controllers"
       ]
     }
   }

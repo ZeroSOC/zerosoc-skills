@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/ZeroSOC/zerosoc-skills/capabilities/source_profile.schema.json",
   "title": "ZeroSOC source profile",
-  "description": "What one security technology's records mean in the framework's terms: where each required input of Detection & Analysis \u00a71.1 lives, what the source's own words mean, where every field of its record lands on the Case, and which of the framework's questions it can answer. It changes when the framework changes. How to talk to the technology \u2014 authentication, endpoints, paging, query language, permissions \u2014 is not here: that changes when the vendor's API does and lives with the integration.",
+  "description": "What one security technology's records mean in the framework's terms: where each required input of Detection & Analysis §1.1 lives, what the source's own words mean, where every field of its record lands on the Case, and which of the framework's questions it can answer. It changes when the framework changes. How to talk to the technology — authentication, endpoints, paging, query language, permissions — is not here: that changes when the vendor's API does and lives with the integration.",
   "type": "object",
   "required": [
     "source",
@@ -70,6 +70,37 @@
         },
         "evidence": {
           "$ref": "#/$defs/paths"
+        },
+        "telemetry_rows": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Where a row of this source's telemetry belongs in OCSF, for the evidence a Finding rests on. A column this table does not name is kept under its own name rather than dropped, so a mapping that lags the source loses nothing.",
+          "properties": {
+            "objects": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "description": "column -> the path of the OCSF object attribute it fills, as a list of steps."
+            },
+            "times": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "The columns a row states its time in, tried in turn."
+            },
+            "uids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "What this source calls a row's own identifier."
+            }
+          }
         }
       }
     },
@@ -196,7 +227,7 @@
     },
     "case_map": {
       "type": "array",
-      "description": "Every path of the source's record: where it lands on the Case, or why nothing reads it. This is the block that makes silence impossible \u2014 a field the vendor adds tomorrow is neither mapped nor ignored, and the completeness test fails.",
+      "description": "Every path of the source's record: where it lands on the Case, or why nothing reads it. This is the block that makes silence impossible — a field the vendor adds tomorrow is neither mapped nor ignored, and the completeness test fails.",
       "minItems": 1,
       "items": {
         "type": "object",

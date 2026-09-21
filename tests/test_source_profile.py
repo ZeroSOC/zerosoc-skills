@@ -74,13 +74,19 @@ class SourceProfile(unittest.TestCase):
         )
 
     def test_an_added_field_is_caught(self) -> None:
-        """The guard itself: a key the vendor starts sending is not silence."""
+        """The guard itself, run: a document with a key the profile does not name fails the same
+        comparison the test above passes, rather than a comparison written for this test."""
         profile = json.loads((ROOT / "skills" / "zerosoc-defender-xdr" / "source_profile.json").read_text())
         known = {entry["path"] for entry in profile["case_map"]}
+        document = json.loads((DOCUMENTS / "incident_ransomware.json").read_text())
+        document["alerts"][0]["newVendorFieldNobodyExamined"] = "surprise"
 
-        invented = paths_of({"id": "1", "alerts": [{"id": "a", "newVendorField": "surprise"}]})
+        unexamined = {path for path in paths_of(document) if path not in known}
 
-        self.assertIn("alerts[].newVendorField", invented - known)
+        self.assertEqual(unexamined, {"alerts[].newVendorFieldNobodyExamined"})
+
+        del document["alerts"][0]["newVendorFieldNobodyExamined"]
+        self.assertEqual({p for p in paths_of(document) if p not in known}, set())
 
     def test_an_ignored_path_states_a_reason(self) -> None:
         for path, profile in self.profiles.items():

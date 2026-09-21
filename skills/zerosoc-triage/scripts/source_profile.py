@@ -61,6 +61,21 @@ def alert_rules(profile):
     return {"fields": block.get("fields") or {}, "rules": block.get("rules") or []}
 
 
+def telemetry_rows(profile):
+    """Where a row of this source's telemetry belongs in OCSF: the shape of a query's answer.
+
+    It is not a path on the source's record — the case_map describes the record — so it is
+    declared here beside the rest of what the source means, and a reader of an answer keeps a
+    column this table does not name under its own name rather than dropping it.
+    """
+    rows = (profile.get("fields") or {}).get("telemetry_rows") or {}
+    return {
+        "objects": {k: tuple(v) for k, v in (rows.get("objects") or {}).items()},
+        "times": tuple(rows.get("times") or ()),
+        "uids": tuple(rows.get("uids") or ()),
+    }
+
+
 def detection_spec(profile):
     """The view the §1.1 assertions read: where each input lives, and what the source's words mean.
 

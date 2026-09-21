@@ -43,11 +43,28 @@ def _type_ok(value: Any, expected: str) -> bool:
     return isinstance(value, TYPES[expected])
 
 
+def supported(schema: Any, where: str = "schema") -> list[str]:
+    """Every keyword of the whole schema this validator does not know.
+
+    Walked once, over the schema itself rather than over a profile: a keyword on a branch no
+    profile happens to exercise would otherwise never be reached, and the guard would pass while
+    the schema had already outgrown it.
+    """
+    problems: list[str] = []
+    if isinstance(schema, dict):
+        for name in sorted(set(schema) - KNOWN):
+            problems.append(f"{where}: the schema uses {name!r}, which this validator does not know")
+        for name, held in schema.items():
+            if name in ("properties", "$defs"):
+                for key, sub in (held or {}).items():
+                    problems += supported(sub, f"{where}.{name}.{key}")
+            elif name in ("items", "additionalProperties"):
+                problems += supported(held, f"{where}.{name}")
+    return problems
+
+
 def validate(value: Any, schema: dict[str, Any], root: dict[str, Any], where: str) -> list[str]:
     """The errors of one value against one schema, each naming where it is."""
-    unknown = set(schema) - KNOWN
-    if unknown:
-        return [f"{where}: the schema uses keywords this validator does not know: {sorted(unknown)}"]
     if "$ref" in schema:
         ref = schema["$ref"]
         if not ref.startswith("#/$defs/"):
@@ -96,7 +113,15 @@ def coherent(profile: dict[str, Any], where: str) -> list[str]:
             problems.append(f"{where}: {entry['path']!r} is neither mapped nor ignored")
         if "ignored" in entry and not str(entry["ignored"]).strip():
             problems.append(f"{where}: {entry['path']!r} is ignored with no reason")
+    # telemetry rows are not a path on the source's *record*: they are the shape of an answer to a
+    # query, and the case_map describes the record. They are checked by their own shape instead.
     for group, fields in profile["fields"].items():
+        if group == "telemetry_rows":
+            for column, attribute in (fields.get("objects") or {}).items():
+                if not attribute or not all(isinstance(step, str) and step for step in attribute):
+                    problems.append(
+                        f"{where}: telemetry column {column!r} maps to no attribute path")
+            continue
         prefix = {"case": "", "alert": "alerts[].", "evidence": "alerts[].evidence[]."}[group]
         for name, path in fields.items():
             # a key of this source may itself contain a dot (@odata.type), so the whole path is
@@ -119,6 +144,12 @@ def coherent(profile: dict[str, Any], where: str) -> list[str]:
 
 def main(argv: list[str]) -> int:
     schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
+    outgrown = supported(schema)
+    for problem in outgrown:
+        print(problem, file=sys.stderr)
+    if outgrown:
+        print("the schema has outgrown this validator; teach it the keyword or drop it", file=sys.stderr)
+        return 1
     profiles = [Path(a) for a in argv] or sorted(ROOT.glob("skills/*/source_profile.json"))
     if not profiles:
         print("no source profile found", file=sys.stderr)
@@ -127,9 +158,10 @@ def main(argv: list[str]) -> int:
     for path in profiles:
         profile = json.loads(path.read_text(encoding="utf-8"))
         where = path.relative_to(ROOT) if path.is_relative_to(ROOT) else path
-        found = validate(profile, schema, schema, str(where))
-        problems += found or coherent(profile, str(where))
-        print(f"{where}: {'ok' if not found else 'invalid'} ({len(profile['case_map'])} mapped paths)")
+        found = validate(profile, schema, schema, str(where)) or coherent(profile, str(where))
+        problems += found
+        state = "ok" if not found else f"{len(found)} problem(s)"
+        print(f"{where}: {state} ({len(profile['case_map'])} mapped paths)")
     for problem in problems:
         print(problem, file=sys.stderr)
     if problems:

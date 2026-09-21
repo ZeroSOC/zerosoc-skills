@@ -68,7 +68,7 @@ def spec_of(profile):
 
 
 def field(record, spec, name, group="fields"):
-    """The canonical field, or the source's own name for it as the map declares it."""
+    """The canonical field, or the source's own name for it as the profile declares it."""
     value = record.get(name)
     if value not in (None, "", [], {}):
         return value
@@ -175,7 +175,7 @@ def remediation(rows, profile):
     """The remediation state the source reports per entity, one entry per entity it acted on.
 
     An entity the source left active carries no entry: §1.5 makes it the live part of the Case, and the
-    absence of a remediation is not a state. A state the map does not declare is recorded as reported
+    absence of a remediation is not a state. A state the profile does not declare is recorded as reported
     and is not treated as neutralized.
     """
     spec = spec_of(profile)
