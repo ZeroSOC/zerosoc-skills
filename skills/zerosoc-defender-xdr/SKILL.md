@@ -120,7 +120,7 @@ The recipes are in the profile's `queries` block. What they do not say:
 
 ## 7. The traps
 
-- **Paging an incident re-reads it.** The agent-facing operations exist for a model's token budget; a deterministic reader takes the whole record in one call. Asking for it fifty alerts at a time used to cost one complete expansion per page, and two pages of a live incident could disagree with each other.
+- **Paging an incident re-reads it.** Reading an incident a page of alerts at a time suits a reader with a small budget per answer, and costs one complete expansion of the incident per page; on a live incident two pages can disagree with each other. A reader that wants the record takes it whole, in one call.
 - **A merge moves an incident.** A merged incident carries `redirectIncidentId` and its evidence, its comments and its updates live on the master. Follow the chain first; write where the analyst will read.
 - **The same entity is named two ways.** The source lists one process more than once when alerts describe it differently — no image file, another path, a different verdict. They are one process where the device, the process id and the creation time agree, and counting them twice inflates every count a Note reports.
 - **A field that exists is not a field that is filled.** On a lower tier the column is there and empty. Treat an empty required input as the visibility gap it is: §1.1's inputs are read from the profile's field paths, and one the source did not supply is recorded with the check it prevented.

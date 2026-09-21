@@ -201,7 +201,7 @@
       "resolved": {
         "id": 4,
         "name": "Resolved",
-        "note": "the source's own closure; the engine's is Closed, and the two are not the same event"
+        "note": "the source's own closure of its record; the Case is closed by its own verdict, and the two are not the same event"
       },
       "redirected": {
         "id": 5,
@@ -729,7 +729,7 @@
     },
     {
       "path": "comments",
-      "ignored": "the analyst thread on the source's record. The engine reads it to see whether its own write-back is already there, and a comment is not Case data: the Case's account is its Notes"
+      "ignored": "the analyst thread on the source's record. A writer of Notes to the source reads it so as not to write the same Note twice, and a comment is not Case data: the Case's account is its Notes"
     },
     {
       "path": "comments[].comment",
@@ -854,7 +854,7 @@
     },
     {
       "path": "alerts[].tenantId",
-      "ignored": "the tenant, already on the Case once from the incident; an alert of another tenant is refused at intake"
+      "ignored": "the tenant, already on the Case once from the incident; an alert of another tenant is not an alert of this Case"
     },
     {
       "path": "alerts[].category",
@@ -866,7 +866,7 @@
     },
     {
       "path": "alerts[].classification",
-      "ignored": "the source's per-alert verdict. The Case's verdict is the engine's own, and the source's sits on the incident's extension where it is visible without being weighed"
+      "ignored": "the source's per-alert verdict. The Case's verdict is the executor's own, and the source's sits on the incident's extension where it is visible without being weighed"
     },
     {
       "path": "alerts[].determination",
@@ -1150,11 +1150,11 @@
     },
     {
       "path": "alerts[].evidence[].fileDetails.signer",
-      "ignored": "the signature's subject. The signed-publisher check reads it from the evidence row and states it as a Finding, with the check that produced it"
+      "ignored": "the signature's subject. A check of who signed the file reads it from the evidence row and states it as a Finding, with the check that produced it"
     },
     {
       "path": "alerts[].evidence[].fileDetails.issuer",
-      "ignored": "as signer: read by the signed-publisher check, not carried unattributed"
+      "ignored": "the signature's issuer, as signer: read by a check of who signed the file, and not carried unattributed"
     },
     {
       "path": "alerts[].evidence[].fileDetails.sha1",
@@ -1322,7 +1322,7 @@
       "tenant_id": {
         "type": "string",
         "from": "tenantId",
-        "description": "The tenant the incident belongs to; an incident of another tenant is refused at intake."
+        "description": "The tenant the incident belongs to; an incident of another tenant is not a Case of this deployment."
       },
       "status": {
         "type": "string",
@@ -1352,7 +1352,7 @@
       "last_update_time": {
         "type": "integer",
         "from": "lastUpdateDateTime",
-        "description": "When the source last changed the record; the poller resumes from it."
+        "description": "When the source last changed the record; a poller resumes from it."
       }
     }
   },

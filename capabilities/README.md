@@ -94,7 +94,7 @@ the checker are not part of a packaged skill):
 python3 tools/check_profiles.py --bindings /path/to/zerosoc.capabilities.json
 ```
 
-The override is applied by the skills' own loader, so every script reads through it. A host that reads
+The override is applied by the skills' own loader, so every script reads through it. A reader that takes
 the profile's JSON itself does not: give it the profile as the deployment reads it, which
 `scripts/source_profile.py --bindings zerosoc.capabilities.json --effective` prints, and never the
 shipped file.

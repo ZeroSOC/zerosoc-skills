@@ -320,7 +320,7 @@ def main(argv=None):
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--effective", action="store_true",
                     help="print the profile as the deployment reads it, the override laid over it: "
-                         "what a host that reads the profile itself must be given")
+                         "what a reader that takes the profile's JSON itself must be given")
     a = ap.parse_args(argv)
     profile = from_arguments(ap, a)
     if a.effective:

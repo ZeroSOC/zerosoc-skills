@@ -344,7 +344,7 @@ class TheRunRecordsIt(unittest.TestCase):
 
 
 class CommandLine(unittest.TestCase):
-    def test_a_host_that_reads_the_profile_itself_is_given_the_effective_one(self) -> None:
+    def test_a_reader_of_the_profiles_json_is_given_the_effective_one(self) -> None:
         deployment = Deployment(RENAME)
         out = io.StringIO()
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
