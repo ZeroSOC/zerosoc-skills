@@ -283,8 +283,15 @@
             "description": "Dotted path on the source's record; [] steps into a list."
           },
           "case": {
-            "type": "string",
-            "description": "Where it lands on the Case, as a dotted path of the Case Schema."
+            "type": [
+              "string",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "description": "Where it lands on the Case, as a dotted path of the Case Schema ([] steps into a list; the source's own object is addressed by its extension key). A list where one path of the source lands in more than one place."
           },
           "ignored": {
             "type": "string",

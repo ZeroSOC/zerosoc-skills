@@ -165,6 +165,30 @@ class Coherence(unittest.TestCase):
         self.assertIn("matches nothing", found)
         self.assertIn("matches every title", found)
 
+    def case_schema(self) -> dict[str, Any]:
+        return json.loads((ROOT / "skills" / "zerosoc-defender-xdr" / "references" / "framework"
+                           / "02-Taxonomy" / "case_schema.json").read_text())
+
+    def test_every_mapped_path_lands_on_a_field_the_case_schema_declares(self) -> None:
+        self.assertEqual(check_profiles.lands(self.profile, self.case_schema(), "p"), [])
+
+    def test_a_target_the_case_schema_does_not_declare_is_said_even_on_an_open_object(self) -> None:
+        self.profile["case_map"][0]["case"] = "no_such_case_field"
+        self.profile["case_map"].append({"path": "alerts[].x", "case": "finding_info_list[].severity_id"})
+        self.profile["case_map"].append({"path": "alerts[].y", "case": "microsoft.no_such_extension_property"})
+        found = "\n".join(check_profiles.lands(self.profile, self.case_schema(), "p"))
+        self.assertIn("no_such_case_field", found)
+        self.assertIn("finding_info_list[].severity_id", found)
+        self.assertIn("no_such_extension_property", found)
+
+    def test_an_alerts_severity_lands_on_its_detection_finding_and_on_the_findings_confidence(self) -> None:
+        entry = next(e for e in self.profile["case_map"] if e["path"] == "alerts[].severity")
+        self.assertEqual(entry["case"], ["finding_info_list[].related_events[].severity_id",
+                                         "finding_info_list[].tags[]"])
+        self.assertIn("no confidence of its own", entry["note"])
+        schema = json.loads((ROOT / "capabilities" / "source_profile.schema.json").read_text())
+        self.assertEqual(check_profiles.validate(self.profile, schema, schema, "p"), [])
+
     def test_a_profile_missing_a_block_is_reported_not_crashed_on(self) -> None:
         import contextlib, io, tempfile
         del self.profile["case_map"]

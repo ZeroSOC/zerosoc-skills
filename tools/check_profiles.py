@@ -173,6 +173,47 @@ def coherent(profile: dict[str, Any], where: str) -> list[str]:
     return problems
 
 
+def _declared(target: str, schema: dict[str, Any], root: dict[str, Any]) -> bool:
+    """Whether the Case Schema declares a dotted path. An open object is no excuse: an OCSF object
+    takes any attribute, and a target nothing declares is a target nobody will read."""
+    node: dict[str, Any] = schema
+    for step in target.split("."):
+        name, into_list = (step[:-2], True) if step.endswith("[]") else (step, False)
+        while "$ref" in node:
+            node = root["$defs"][node["$ref"].split("/")[-1]]
+        node = (node.get("properties") or {}).get(name)
+        if node is None:
+            return False
+        while "$ref" in node:
+            node = root["$defs"][node["$ref"].split("/")[-1]]
+        if into_list:
+            node = node.get("items") or {}
+    return True
+
+
+def lands(profile: dict[str, Any], case_schema: dict[str, Any], where: str) -> list[str]:
+    """Every mapped path lands on a field the pinned Case Schema declares, or on a property of the
+    source's own extension object, which the profile itself declares."""
+    problems: list[str] = []
+    own = profile["extension"]["key"]
+    for entry in profile["case_map"]:
+        targets = entry.get("case") or []
+        for target in [targets] if isinstance(targets, str) else targets:
+            if target.startswith(f"{own}."):
+                ok = target[len(own) + 1:] in profile["extension"]["properties"]
+            else:
+                ok = _declared(target, case_schema, case_schema)
+            if not ok:
+                problems.append(f"{where}: {entry['path']!r} lands on {target!r}, which the Case Schema does not declare")
+    return problems
+
+
+def case_schema_beside(path: Path) -> dict[str, Any] | None:
+    """The Case Schema a tool skill carries in its generated references, at the pin it conforms to."""
+    held = path.parent / "references" / "framework" / "02-Taxonomy" / "case_schema.json"
+    return json.loads(held.read_text(encoding="utf-8")) if held.exists() else None
+
+
 def shipped(profile: dict[str, Any], where: str) -> list[str]:
     """A profile on disk is a shipped one: the record of an override is written when a deployment
     reads through one, and a file that already carries it would pass for a run that did."""
@@ -211,6 +252,9 @@ def bound(binding: Path, schema: dict[str, Any], override_schema: dict[str, Any]
             print(f"{where}: cannot be read")
             continue
         found = validate(profile, schema, schema, where) or coherent(profile, where)
+        case_schema = case_schema_beside(Path(path))
+        if not found and case_schema is not None:
+            found = lands(profile, case_schema, where)
         problems += found
         how = f"read through {Path(override).name}" if override else "as shipped"
         print(f"{where}: " + (f"{len(found)} problem(s), {how}" if found
@@ -248,6 +292,9 @@ def main(argv: list[str]) -> int:
         where = path.relative_to(ROOT) if path.is_relative_to(ROOT) else path
         found = (validate(profile, schema, schema, str(where)) or coherent(profile, str(where))) \
             + shipped(profile, str(where))
+        case_schema = case_schema_beside(path)
+        if not found and case_schema is not None:
+            found = lands(profile, case_schema, str(where))
         problems += found
         state = "ok" if not found else f"{len(found)} problem(s)"
         print(f"{where}: {state}" + ("" if found else f" ({len(profile['case_map'])} mapped paths)"))

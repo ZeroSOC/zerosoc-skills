@@ -759,7 +759,11 @@
     },
     {
       "path": "alerts[].severity",
-      "case": "finding_info_list[].severity_id"
+      "case": [
+        "finding_info_list[].related_events[].severity_id",
+        "finding_info_list[].tags[]"
+      ],
+      "note": "It lands twice. As the severity of the Detection Finding that represents the alert, the event the Alert Finding cites. And as that Finding's confidence (the zerosoc:confidence_id tag: Informational and Low give Low, Medium gives Medium, High and Critical give High) — a workaround, because this source states no confidence of its own for an alert. How bad and how sure are two measures, and the day the source states the second this entry stops borrowing the first."
     },
     {
       "path": "alerts[].mitreTechniques",
