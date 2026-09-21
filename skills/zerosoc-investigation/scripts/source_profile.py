@@ -17,7 +17,8 @@ tenant is, in minutes, and the fix to the shipped profile follows at its own pac
 only what differs, so everything else keeps following the shipped profile, and a profile read through
 one says so: ``record`` gives what the run writes on its ledger and on the Case's provenance.
 
-  source_profile.py --bindings zerosoc.capabilities.json [--source ID] [--json]
+  source_profile.py --bindings zerosoc.capabilities.json [--source ID] [--json]   the record
+  source_profile.py --bindings zerosoc.capabilities.json --effective              the profile as read
 
 Standard library only.
 """
@@ -31,23 +32,40 @@ import os
 import re
 import sys
 
-# the lists of a profile whose entries have an identity: an override's entry replaces the shipped
-# entry of the same identity, and any other list is replaced whole
-KEYED = {("case_map",): "path", ("alert_types", "rules"): "alert_type"}
+# what an override may hold: every block of a profile but the one that says which source it is
+BLOCKS = ("fields", "vocabularies", "alert_types", "case_map", "extension", "capability_coverage", "queries")
+# a list of a profile whose entries have an identity: an override's entry replaces the shipped entry
+# of the same identity. The rules are tried in order and have none: the deployment's are tried first
+# and the shipped ones are left as they are. Any other list is replaced whole.
+KEYED = {("case_map",): "path"}
+FIRST = {("alert_types", "rules"): "alert_type"}
 
 
-def named(bindings_path, source=None):
-    """The profile the binding names, as a path beside the binding file.
+def _named_by(bindings_path):
+    """What the binding names: its profiles and its local overrides, by source. An override named
+    for a source the binding has no profile for is a mistake, and is refused."""
+    with open(bindings_path, encoding="utf-8") as handle:
+        binding = json.load(handle)
+    profiles, overrides = binding.get("source_profiles") or {}, binding.get("source_profile_overrides") or {}
+    orphans = sorted(set(overrides) - set(profiles))
+    if orphans:
+        raise ValueError(f"{os.path.basename(bindings_path)} overrides {', '.join(map(repr, orphans))}, "
+                         "which it names no source profile for")
+    return profiles, overrides
+
+
+def resolved(bindings_path, source=None):
+    """What the binding names for one source: the shipped profile and the local override, as paths
+    beside the binding file.
 
     ``source_profiles`` maps a source identifier to a file. With one profile and no source asked
     for, that profile is the deployment's; with several, the caller names which. A deployment that
-    names none has no profile, which is a visibility gap and not an error.
+    names none has no profile, which is a visibility gap and not an error. The override is None
+    where the deployment names none, which is the default.
     """
-    with open(bindings_path, encoding="utf-8") as handle:
-        binding = json.load(handle)
-    profiles = binding.get("source_profiles") or {}
+    profiles, overrides = _named_by(bindings_path)
     if not profiles:
-        return None
+        return None, None
     if source is None:
         if len(profiles) > 1:
             raise ValueError(
@@ -57,27 +75,21 @@ def named(bindings_path, source=None):
         source = next(iter(profiles))
     if source not in profiles:
         raise ValueError(f"no source profile named {source!r} in {os.path.basename(bindings_path)}")
-    return os.path.join(os.path.dirname(os.path.abspath(bindings_path)), profiles[source])
+    beside = os.path.dirname(os.path.abspath(bindings_path))
+    return (os.path.join(beside, profiles[source]),
+            os.path.join(beside, overrides[source]) if source in overrides else None)
 
 
-def resolved(bindings_path, source=None):
-    """What the binding names for one source: the shipped profile and the local override, as paths
-    beside the binding file. The override is None where the deployment names none, which is the
-    default; one named for a source the binding has no profile for is a mistake, and is refused."""
-    path = named(bindings_path, source)
-    with open(bindings_path, encoding="utf-8") as handle:
-        binding = json.load(handle)
-    profiles, overrides = binding.get("source_profiles") or {}, binding.get("source_profile_overrides") or {}
-    orphans = sorted(set(overrides) - set(profiles))
-    if orphans:
-        raise ValueError(f"{os.path.basename(bindings_path)} overrides {', '.join(map(repr, orphans))}, "
-                         "which it names no source profile for")
-    if path is None:
-        return None, None
-    source = source if source is not None else next(iter(profiles))
-    if source not in overrides:
-        return path, None
-    return path, os.path.join(os.path.dirname(os.path.abspath(bindings_path)), overrides[source])
+def named(bindings_path, source=None):
+    """The profile the binding names, as a path beside the binding file."""
+    return resolved(bindings_path, source)[0]
+
+
+def _said(local):
+    """An override's value as it is laid over nothing: null says "not this key" at any depth."""
+    if isinstance(local, dict):
+        return {key: _said(value) for key, value in local.items() if value is not None}
+    return copy.deepcopy(local)
 
 
 def _laid_over(shipped, local, where=()):
@@ -99,18 +111,19 @@ def _laid_over(shipped, local, where=()):
                              "so it cannot be told which shipped entry it replaces")
         replaced = {entry[identity]: entry for entry in local}
         kept = [replaced.pop(entry[identity], entry) for entry in shipped]
-        added = list(replaced.values())
-        # a rule is tried in order, so the deployment's own is tried first; a mapped path has no order
-        return added + kept if where == ("alert_types", "rules") else kept + added
-    return copy.deepcopy(local)
+        return _said(kept + list(replaced.values()))
+    if where in FIRST and isinstance(shipped, list) and isinstance(local, list):
+        return _said(local) + shipped
+    return _said(local)
 
 
 def _paths(local, where=()):
     """What an override sets, as the paths a reader of the record can find in the profile."""
     if isinstance(local, dict):
         return [p for key, value in local.items() for p in _paths(value, where + (key,))]
-    if where in KEYED and isinstance(local, list):
-        return [f"{'.'.join(where)}[{entry[KEYED[where]]}]" for entry in local]
+    named = KEYED.get(where) or FIRST.get(where)
+    if named and isinstance(local, list):
+        return [f"{'.'.join(where)}[{entry.get(named) if isinstance(entry, dict) else entry}]" for entry in local]
     return [".".join(where)]
 
 
@@ -130,10 +143,20 @@ def overridden(profile, override_path):
     name = os.path.basename(override_path)
     if document.get("overrides") != source["id"]:
         raise ValueError(f"{name} overrides {document.get('overrides')!r}, not {source['id']!r}")
-    local = document.get("profile") or {}
+    local = document.get("profile")
+    if not isinstance(local, dict) or not local:
+        raise ValueError(f"{name} has no \"profile\": the blocks that differ from the shipped profile")
     if "source" in local:
         raise ValueError(f"{name} restates the source block: an override changes what the records "
                          "mean, never which source they come from or the version of its profile")
+    unknown = sorted(set(local) - set(BLOCKS))
+    if unknown:
+        # a block the profile does not have would be laid over nothing, recorded, and change nothing
+        raise ValueError(f"{name} overrides {', '.join(map(repr, unknown))}: a profile has no such block "
+                         f"(it has {', '.join(BLOCKS)})")
+    if not str(document.get("reason") or "").strip() or not document.get("base_profile_version"):
+        raise ValueError(f"{name} must state its \"reason\" and the \"base_profile_version\" it was "
+                         "written against: both are recorded with every run read through it")
     effective = _laid_over(profile, local)
     paths = sorted(_paths(local))
     against = document.get("base_profile_version")
@@ -239,26 +262,52 @@ def notes(profile):
     return out
 
 
-def main(argv=None):
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--bindings", required=True, help="the deployment's capability binding")
+def add_arguments(ap):
+    """The arguments by which a script is told which profile to read."""
+    ap.add_argument("--profile", help="the source profile of the technology these records come from")
+    ap.add_argument("--bindings", help="capability binding whose source_profiles names the profile, next to it")
     ap.add_argument("--source", help="which profile, where the binding names more than one")
-    ap.add_argument("--json", action="store_true")
-    a = ap.parse_args(argv)
-    path, override = resolved(a.bindings, a.source)
-    if not path:
-        print("the binding names no source profile: a visibility gap, and nothing to record", file=sys.stderr)
-        return 3
-    profile = load(path, override)
-    held = record(profile)
+    ap.add_argument("--override", help="with --profile: a local override to lay over it (a binding names its own)")
+
+
+def from_arguments(ap, a):
+    """The profile the arguments name, as the deployment reads it. A profile that is not there, or
+    cannot be read, ends the script with what is wrong and where, not with a traceback."""
+    try:
+        path, override = ((a.profile, a.override) if a.profile
+                          else resolved(a.bindings, a.source) if a.bindings else (None, None))
+        if not path:
+            ap.error("--profile, or --bindings with a source_profiles entry, is required")
+        profile = load(path, override)
+    except (OSError, ValueError, re.error) as exc:
+        ap.error(f"the source profile cannot be read: {exc}")
+    if not isinstance(profile.get("source"), dict) or "id" not in profile["source"]:
+        ap.error(f"{path} is not a source profile: it has no source block "
+                 "(capabilities/source_profile.schema.json declares one)")
     for note in notes(profile):
         print(note, file=sys.stderr)
+    return profile
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    add_arguments(ap)
+    ap.add_argument("--json", action="store_true")
+    ap.add_argument("--effective", action="store_true",
+                    help="print the profile as the deployment reads it, the override laid over it: "
+                         "what a host that reads the profile itself must be given")
+    a = ap.parse_args(argv)
+    profile = from_arguments(ap, a)
+    if a.effective:
+        print(json.dumps(profile, indent=2, ensure_ascii=False))
+        return 0
+    held = record(profile)
     if a.json:
         print(json.dumps(held, indent=2, ensure_ascii=False))
         return 0
     feature = held["product"]["feature"]
     print(f"{held['source_profile']['source']}\tsource profile {feature['version']}"
-          + ("" if override else "\tas shipped"))
+          + ("" if "override" in held["source_profile"] else "\tas shipped"))
     return 0
 
 

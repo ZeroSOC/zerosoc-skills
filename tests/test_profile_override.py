@@ -113,6 +113,24 @@ class LocalOverride(unittest.TestCase):
         self.assertEqual(built["type"], "Policy violation")
         self.assertEqual(len(rules["rules"]), len(shipped["rules"]) + 1)
 
+    def test_a_new_title_is_one_small_rule_and_the_shipped_rule_keeps_following_upstream(self) -> None:
+        shipped = alert_types.load_map(str(SHIPPED))
+        known = shipped["rules"][0]
+        local = {"alert_types": {"rules": [{"alert_type": known["alert_type"], "domain": known["domain"],
+                                             "title_patterns": ["^a title only this tenant raises$"]}]}}
+        rules = alert_types.load_map(*profiles.resolved(str(Deployment(local).binding)))
+        self.assertIn(known, rules["rules"], "the shipped rule is untouched")
+        built = alert_types.classify({"id": "A1", "title": "A title only this tenant raises"}, rules)
+        self.assertEqual((built["type"], built["unmapped"]), (known["alert_type"], False))
+
+    def test_a_block_the_profile_does_not_have_is_refused_not_ignored(self) -> None:
+        with self.assertRaisesRegex(ValueError, "feilds"):
+            Deployment({"feilds": RENAME["fields"]}).profile()
+
+    def test_an_override_that_does_not_say_why_is_refused(self) -> None:
+        with self.assertRaisesRegex(ValueError, "reason"):
+            Deployment(RENAME, reason=" ").profile()
+
     def test_the_effective_profile_is_held_to_the_same_schema_and_coherence(self) -> None:
         schema = json.loads((ROOT / "capabilities" / "source_profile.schema.json").read_text())
         effective = Deployment(RENAME).profile()
@@ -170,6 +188,28 @@ class LocalOverride(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "no-such-source"):
             profiles.resolved(str(deployment.binding))
 
+    def test_null_removes_a_key_wherever_it_is_written(self) -> None:
+        local = {"vocabularies": {"remediation_states": {"newState": {"neutralized": False, "activity": None}},
+                                  "severity": {"unknown": {"note": None}}}}
+        effective = Deployment(local).profile()
+        self.assertEqual(effective["vocabularies"]["remediation_states"]["newState"], {"neutralized": False})
+        self.assertNotIn("note", effective["vocabularies"]["severity"]["unknown"])
+
+    def test_an_override_with_no_profile_to_lay_it_over_fails_the_check_of_the_binding(self) -> None:
+        deployment = Deployment(RENAME)
+        binding = json.loads(deployment.binding.read_text())
+        del binding["source_profiles"]
+        deployment.binding.write_text(json.dumps(binding))
+        err = io.StringIO()
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
+            self.assertEqual(check_profiles.main(["--bindings", str(deployment.binding)]), 1)
+        self.assertIn("defender-xdr", err.getvalue())
+
+    def test_the_check_takes_profiles_and_bindings_in_any_order(self) -> None:
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(check_profiles.main([str(SHIPPED), "--bindings", str(Deployment(RENAME).binding)]), 0)
+            self.assertEqual(check_profiles.main(["--bindings", "/no/such/binding.json"]), 1)
+
     def test_a_shipped_profile_never_carries_an_override(self) -> None:
         effective = Deployment(RENAME).profile()
         self.assertIn("override", effective["source"])
@@ -216,7 +256,55 @@ class TheRunRecordsIt(unittest.TestCase):
         self.assertIn("FAIL  triage: the source profile the run read is on the ledger", out)
 
 
+    def test_the_binding_may_name_the_source_by_a_key_of_its_own(self) -> None:
+        run = self.run_dir(None)
+        binding = json.loads(self.deployment.binding.read_text())
+        binding["source_profiles"] = {"mdx": binding["source_profiles"]["defender-xdr"]}
+        binding["source_profile_overrides"] = {"mdx": binding["source_profile_overrides"]["defender-xdr"]}
+        self.deployment.binding.write_text(json.dumps(binding))
+        code, out = self.check(run)
+        self.assertEqual(code, 1)
+        self.assertIn("FAIL  triage: the source profile the run read is on the ledger", out)
+
+    def test_an_override_that_cannot_be_read_fails_the_run_and_does_not_crash_it(self) -> None:
+        run = self.run_dir(None)
+        self.deployment.override.write_text(json.dumps({"overrides": "defender-xdr", "profile": {"feilds": {}}}))
+        code, out = self.check(run)
+        self.assertEqual(code, 1)
+        self.assertIn("FAIL  triage: the source profile the run read is on the ledger", out)
+        self.assertIn("feilds", out)
+
+        run = self.run_dir("not an object")
+        code, out = self.check(run)
+        self.assertEqual(code, 1)
+
+    def test_a_note_that_does_not_name_the_override_fails_the_run(self) -> None:
+        run = self.run_dir(None)
+        held = profiles.record(self.deployment.profile())
+        (self.deployment.base / "ledger.triage.json").write_text(
+            json.dumps({"case_uid": "CASE-1", "severity": "High", "source_profile": held["source_profile"]}))
+        (self.deployment.base / "triage_note.md").write_text("## Provenance\nPlaybook endpoint.md.\n")
+        code, out = self.check(run)
+        self.assertEqual(code, 1)
+        self.assertIn("FAIL  triage: the Note's Provenance names the override", out)
+
+        (self.deployment.base / "triage_note.md").write_text(
+            f"## Provenance\nSource profile {held['product']['feature']['version']} "
+            f"({self.deployment.override.name}: the vendor renamed a field).\n")
+        code, out = self.check(run)
+        self.assertIn("ok    triage: the Note's Provenance names the override", out)
+
+
 class CommandLine(unittest.TestCase):
+    def test_a_host_that_reads_the_profile_itself_is_given_the_effective_one(self) -> None:
+        deployment = Deployment(RENAME)
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+            code = profiles.main(["--bindings", str(deployment.binding), "--effective"])
+        self.assertEqual(code, 0)
+        self.assertEqual(json.loads(out.getvalue()), deployment.profile())
+        self.assertEqual(json.loads(out.getvalue())["fields"]["evidence"]["remediation_status"], "remediationState")
+
     def test_the_record_is_printed_for_the_ledger_and_the_case(self) -> None:
         deployment = Deployment(RENAME)
         out = io.StringIO()

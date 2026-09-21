@@ -125,43 +125,76 @@ def check_inventory(report, run, ledger, label):
 
 
 def override_of(run, profile_path):
-    """The local override the run's binding names for this profile's source, as a path in the run."""
-    binding = os.path.join(run, "zerosoc.capabilities.json")
-    if not (os.path.exists(binding) and profile_path and os.path.exists(profile_path)):
+    """The local override the run's binding names for this profile's source, as a path in the run.
+
+    The override says itself which source it is for, so it is found by that and not by the key the
+    binding happens to file the source under. One that cannot be read is still the run's override:
+    it is returned, and reading the profile through it is what fails.
+    """
+    binding = read(run, "zerosoc.capabilities.json") or {}
+    named = binding.get("source_profile_overrides")
+    if not isinstance(named, dict) or not (profile_path and os.path.exists(profile_path)):
         return None
     source = source_profile.load(profile_path)["source"]["id"]
-    if source not in (read(run, "zerosoc.capabilities.json").get("source_profiles") or {}):
-        return None
-    return source_profile.resolved(binding, source)[1]
+    paths = [os.path.join(run, str(name)) for name in named.values()]
+    for path in paths:
+        try:
+            with open(path, encoding="utf-8") as handle:
+                if json.load(handle).get("overrides") == source:
+                    return path
+        except (OSError, ValueError, AttributeError):
+            continue
+    unread = [path for path in paths if not os.path.exists(path)]
+    return unread[0] if unread else (paths[0] if len(paths) == 1 else None)
 
 
 def effective_profile(run, profile_path):
-    """The profile as the run read it: the shipped one, with the run's override laid over it."""
-    override = override_of(run, profile_path)
-    return source_profile.load(profile_path, override if override and os.path.exists(override) else None)
+    """The profile as the run read it: the shipped one, with the run's override laid over it. An
+    override that cannot be read is check_source_profile's failure to report; the other checks go
+    on against the shipped profile."""
+    try:
+        return source_profile.load(profile_path, override_of(run, profile_path))
+    except (OSError, ValueError):
+        return source_profile.load(profile_path)
 
 
-def check_source_profile(report, run, ledger, label, profile_path):
-    """A run that read its source through a local override says so: the record is recomputed from the
-    override file the run holds, so a ledger cannot pass one override off as another, or as none."""
+def check_source_profile(report, run, ledger, label, profile_path, note_name):
+    """A run that read its source through a local override says so, on the ledger and in the Note's
+    Provenance. The record is recomputed from the override file the run holds, so a ledger cannot
+    pass one override off as another, or as none."""
     check = f"{label}: the source profile the run read is on the ledger"
     if not ledger:
         return
     override = override_of(run, profile_path)
-    held = (ledger.get("source_profile") or {}).get("override")
+    recorded = ledger.get("source_profile")
+    held = recorded.get("override") if isinstance(recorded, dict) else None
     if not override:
-        if held:
-            report.fail(check, "no override: the run's binding names none", f"the ledger records {held.get('file')!r}")
+        if held or (recorded is not None and not isinstance(recorded, dict)):
+            report.fail(check, "no override: the run's binding names none", f"the ledger records {recorded!r}")
         return
-    if not os.path.exists(override):
+    try:
+        profile = source_profile.load(profile_path, override)
+    except OSError:
         return report.fail(check, f"{os.path.basename(override)} in the run, beside the binding that names it",
                            "the file is not in the run, so what the run read cannot be reproduced")
-    fresh = source_profile.record(source_profile.load(profile_path, override))["source_profile"]["override"]
-    report.check(bool(held) and held.get("sha256") == fresh["sha256"], check,
-                 f"source_profile.override with sha256 {fresh['sha256'][:12]}… ({fresh['file']}: {fresh['reason']})",
-                 f"sha256 {str(held.get('sha256'))[:12]}…" if held else "no source_profile.override in the ledger")
-    if fresh["stale"]:
-        report.note(check, source_profile.notes(source_profile.load(profile_path, override))[-1])
+    except ValueError as exc:
+        return report.fail(check, "an override the profile can be read through", str(exc))
+    fresh = source_profile.record(profile)
+    stated = fresh["source_profile"]["override"]
+    report.check(isinstance(held, dict) and held.get("sha256") == stated["sha256"], check,
+                 f"source_profile.override with sha256 {stated['sha256'][:12]}… ({stated['file']}: {stated['reason']})",
+                 f"sha256 {str(held.get('sha256'))[:12]}…" if isinstance(held, dict)
+                 else "no source_profile.override in the ledger")
+    if stated["stale"]:
+        report.note(check, source_profile.notes(profile)[-1])
+    said = f"{label}: the Note's Provenance names the override"
+    note = read(run, note_name)
+    if note is None:
+        return report.skip(said, f"no {note_name} in the run")
+    version = fresh["product"]["feature"]["version"]
+    report.check(version in note or stated["file"] in note, said,
+                 f"the profile version {version} or the override's file name {stated['file']}",
+                 "named" if version in note or stated["file"] in note else "the Note names neither")
 
 
 def check_alert_map(report, run, profile_path):
@@ -405,7 +438,7 @@ def _run(run, profile):
     check_inventory(report, run, triage, "triage")
     titles = check_alert_map(report, run, profile)
     check_alert_ledger(report, triage, "triage", titles)
-    check_source_profile(report, run, triage, "triage", profile)
+    check_source_profile(report, run, triage, "triage", profile, "triage_note.md")
     check_detection_metadata(report, run, triage, "triage", "triage_note.md", profile)
     check_visibility_gaps(report, run, triage, "triage")
     check_decision(report, triage, None, "triage", triage_decide.decide)
@@ -413,7 +446,7 @@ def _run(run, profile):
     print("\n# investigation")
     check_inventory(report, run, investigation, "investigation")
     check_alert_ledger(report, investigation, "investigation", titles)
-    check_source_profile(report, run, investigation, "investigation", profile)
+    check_source_profile(report, run, investigation, "investigation", profile, "investigation_note.md")
     check_detection_metadata(
         report, run, investigation, "investigation", "investigation_note.md", profile
     )

@@ -283,29 +283,20 @@ def decision_notes(record, ledger=None):
                    "arrived, what ran before it was stopped, and whether the same thing is elsewhere")
     undeclared = sorted({str(r.get("state")) for r in record.get("remediation", []) if not r.get("declared")})
     if undeclared:
-        out.append("remediation states the deployment's map does not declare: " + ", ".join(undeclared) +
-                   " — add them to detection_metadata.remediation_states; until then they count as not neutralized")
+        out.append("remediation states the source profile does not declare: " + ", ".join(undeclared) +
+                   " — add them to vocabularies.remediation_states; until then they count as not neutralized")
     return out
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("alerts")
-    ap.add_argument("--profile", help="the source profile of the technology these alerts come from")
-    ap.add_argument("--bindings", help="capability binding whose source_profiles names the profile, next to it")
-    ap.add_argument("--source", help="which profile, where the binding names more than one")
-    ap.add_argument("--override", help="with --profile: a local override to lay over it (a binding names its own)")
+    source_profile.add_arguments(ap)
     ap.add_argument("--evidence", help="the evidence rows, for the remediation state the source reports per entity")
     ap.add_argument("--root", default=FRAMEWORK)
     ap.add_argument("--json", action="store_true")
     a = ap.parse_args()
-    path, override = ((a.profile, a.override) if a.profile
-                      else source_profile.resolved(a.bindings, a.source) if a.bindings else (None, None))
-    if not path:
-        ap.error("--profile, or --bindings with a source_profiles entry, is required")
-    profile = source_profile.load(path, override)
-    for note in source_profile.notes(profile):
-        print(note, file=sys.stderr)
+    profile = source_profile.from_arguments(ap, a)
     evidence = json.load(open(a.evidence, encoding="utf-8")) if a.evidence else None
     if isinstance(evidence, dict):  # the output of evidence_inventory.py
         evidence = evidence.get("entities") or evidence.get("rows") or []
@@ -330,7 +321,7 @@ def main():
         print("\nremediation the source already performed (an action of the Case, not an explanation of it):")
         for r in built["remediation"]:
             print(f"  {r['type']}\t{r['entity']}\t{r['state']}\t{'neutralized' if r['neutralized'] else 'still to be treated as live'}"
-                  + ("" if r["declared"] else "\t(state not declared in the map: add it)"))
+                  + ("" if r["declared"] else "\t(state not declared in the source profile: add it)"))
     print("\ncandidate_incident_categories: " + (", ".join(built["candidate_incident_categories"]) or "none from the techniques"))
     if built["techniques"]:
         unknown = sorted({t for a in built["alerts"] for t in a["techniques_not_in_the_catalog"]})

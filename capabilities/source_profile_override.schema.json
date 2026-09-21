@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/ZeroSOC/zerosoc-skills/capabilities/source_profile_override.schema.json",
   "title": "ZeroSOC source profile: local override",
-  "description": "What one deployment changes in a shipped source profile, and why. It holds only what differs: objects are laid over the shipped ones key by key (null removes a key), an entry of case_map replaces the shipped entry of the same path and a rule of alert_types the shipped rule of the same alert_type (a new rule is tried before the shipped ones), and any other list is replaced whole. The profile that results is held to source_profile.schema.json and to the same coherence as a shipped one.",
+  "description": "What one deployment changes in a shipped source profile, and why. It holds only what differs: objects are laid over the shipped ones key by key (null removes a key), an entry of case_map replaces the shipped entry of the same path, the rules of alert_types are tried before the shipped ones, which stay as they are, and any other list is replaced whole. A block a profile does not have is refused. The profile that results is held to source_profile.schema.json and to the same coherence as a shipped one.",
   "type": "object",
   "required": [
     "overrides",

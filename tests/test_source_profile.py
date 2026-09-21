@@ -96,5 +96,57 @@ class SourceProfile(unittest.TestCase):
                         self.assertGreater(len(entry.get("ignored", "")), 20, entry["path"])
 
 
+class Coherence(unittest.TestCase):
+    """The shipped profile, broken one way at a time: each break has to be said, not passed."""
+
+    def setUp(self) -> None:
+        self.profile = json.loads((ROOT / "skills" / "zerosoc-defender-xdr" / "source_profile.json").read_text())
+
+    def problems(self) -> str:
+        return "\n".join(check_profiles.coherent(self.profile, "p"))
+
+    def test_a_nested_field_path_is_checked_whole_not_by_its_first_step(self) -> None:
+        self.profile["case_map"].append({"path": "alerts[].evidence[].userAccount", "case": "observables[]"})
+        self.profile["fields"]["evidence"]["upn"] = "userAccount.userPrincipalNam"
+        self.assertIn("userAccount.userPrincipalNam", self.problems())
+
+    def test_the_alert_type_fields_are_paths_of_the_record_too(self) -> None:
+        self.profile["alert_types"]["fields"]["detector_id"] = "detectorIdX"
+        self.assertIn("detectorIdX", self.problems())
+
+    def test_a_path_is_mapped_once(self) -> None:
+        self.profile["case_map"].append({"path": "id", "ignored": "a second entry that contradicts the first"})
+        self.assertIn("'id' is in the case_map 2 times", self.problems())
+
+    def test_a_path_is_mapped_or_ignored_never_both(self) -> None:
+        self.profile["case_map"][0]["ignored"] = "and yet it is mapped, so which is it"
+        self.assertIn("both mapped and ignored", self.problems())
+
+    def test_a_rule_that_can_match_nothing_or_everything_is_said(self) -> None:
+        rules = self.profile["alert_types"]["rules"]
+        rules[0]["detector_ids"], rules[0]["title_patterns"] = [], []
+        rules[1]["title_patterns"] = [""]
+        found = self.problems()
+        self.assertIn("matches nothing", found)
+        self.assertIn("matches every title", found)
+
+    def test_a_profile_missing_a_block_is_reported_not_crashed_on(self) -> None:
+        import contextlib, io, tempfile
+        del self.profile["case_map"]
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+            json.dump(self.profile, handle)
+        err = io.StringIO()
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
+            code = check_profiles.main([handle.name])
+        self.assertEqual(code, 1)
+        self.assertIn("missing required 'case_map'", err.getvalue())
+
+    def test_a_schema_keyword_the_validator_does_not_know_is_an_error(self) -> None:
+        schema = {"type": "object", "properties": {"deep": {"type": "array", "items": {"type": "string", "pattern": "^x"}}}}
+        self.assertEqual(len(check_profiles.supported(schema)), 1)
+        self.assertIn("'pattern'", check_profiles.supported(schema)[0])
+        self.assertTrue(check_profiles.supported({"type": "number"}), "a type the validator cannot check")
+
+
 if __name__ == "__main__":
     unittest.main()

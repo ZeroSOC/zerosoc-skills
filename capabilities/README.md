@@ -72,21 +72,36 @@ writes a **local override** beside its binding and names it under `source_profil
 It is declared by [source_profile_override.schema.json](source_profile_override.schema.json) and holds
 **only what differs**, so everything else keeps following the shipped profile across pin bumps: objects
 are laid over the shipped ones key by key (`null` removes a key), an entry of `case_map` replaces the
-shipped entry of the same `path`, a rule of `alert_types` replaces the shipped rule of the same
-`alert_type` and a new rule is tried before the shipped ones, and any other list is replaced whole. It may
-not restate the `source` block. The profile that results is held to the same schema and the same
-coherence as a shipped one — check it before using it:
+shipped entry of the same `path`, the rules of `alert_types` are tried **before** the shipped ones, which
+stay as they are, and any other list is replaced whole. It may not restate the `source` block, and a block
+a profile does not have is refused rather than recorded and ignored. A title the shipped rules do not know
+is therefore one small rule, and the shipped rule of the same alert type keeps following the releases:
+
+```json
+"profile": { "alert_types": { "rules": [
+  { "alert_type": "Malware / loader execution", "domain": "Endpoint",
+    "title_patterns": ["^a title only this tenant raises$"] } ] } }
+```
+
+The profile that results is held to the same schema and the same coherence as a shipped one. Check it
+before using it, from a checkout of this repository at the release the deployment runs (the schemas and
+the checker are not part of a packaged skill):
 
 ```bash
-python3 tools/check_profiles.py --bindings zerosoc.capabilities.json
+python3 tools/check_profiles.py --bindings /path/to/zerosoc.capabilities.json
 ```
+
+The override is applied by the skills' own loader, so every script reads through it. A host that reads
+the profile's JSON itself does not: give it the profile as the deployment reads it, which
+`scripts/source_profile.py --bindings zerosoc.capabilities.json --effective` prints, and never the
+shipped file.
 
 An override is **on the record of every run read through it**. `scripts/source_profile.py --bindings
 zerosoc.capabilities.json --json` prints the `source_profile` object for the ledger — the override's file
 name, digest, reason and the paths it sets — and the source's `product` entry for the Case's
 `provenance.products`, whose `feature.version` is the shipped profile's version followed by
 `+local.<digest>`. `tools/check_run.py` recomputes the digest from the override file in the run and fails
-a ledger that does not carry it.
+a ledger that does not carry it, or a Note whose Provenance names neither that version nor the file.
 
 An override is a stopgap. It names the version of the shipped profile it was written against; once the
 shipped profile moves past that version the override is still read — a tenant does not break on a pin
@@ -99,17 +114,17 @@ the override if it has.
 detection asserts required inputs of triage: the technique identifiers, the threat name and family, the
 detection source and detector, the remediation state of each entity, the source's description and its
 recommended actions. Every source names them differently, and the scripts know no source, so the
-deployment's alert-type map declares where each one lives under `detection_metadata`:
+source profile declares where each one lives and what the source's words for them mean:
 
-- `fields` — assertion → the field on the source's alert that carries it.
-- `entity_fields` — the remediation state and its details on an evidence item.
-- `analytic_types` — the source's detection sources → the OCSF analytic each maps onto, as
+- `fields.alert` — assertion → the field on the source's alert that carries it.
+- `fields.evidence` — the remediation state and its details on an evidence item.
+- `vocabularies.analytic_types` — the source's detection sources → the OCSF analytic each maps onto, as
   `{"type_id": 5, "type": "Fingerprinting"}` (Rule, Behavioral, Statistical, Learning (ML/DL),
-  Fingerprinting). One the map does not list is Other (99); the script never guesses.
-- `remediation_states` — the source's states → whether the entity was **neutralized**, the OCSF
-  Remediation Activity `status_id` and the activity it performed. A state the map does not declare is
-  recorded as reported and counts as **not** neutralized, because a state nobody declared is not evidence
-  that anything was stopped.
+  Fingerprinting). One the profile does not list is Other (99); the script never guesses.
+- `vocabularies.remediation_states` — the source's states → whether the entity was **neutralized**, the
+  OCSF Remediation Activity `status_id` and the activity it performed. A state the profile does not declare
+  is recorded as reported and counts as **not** neutralized, because a state nobody declared is not
+  evidence that anything was stopped.
 
 `scripts/alert_metadata.py` reads them, records the result in the ledger as `detection_metadata`, and
 names every assertion the source did not supply as a **visibility gap** with the check it prevented — so

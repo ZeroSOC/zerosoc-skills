@@ -18,7 +18,7 @@ as a shipped one, so an override cannot say less than the profile it stands in f
 Usage:
   python3 tools/check_profiles.py                   # every skills/*/source_profile.json
   python3 tools/check_profiles.py PATH ...          # these profiles
-  python3 tools/check_profiles.py --bindings PATH   # what this binding names, overrides laid over
+  python3 tools/check_profiles.py [PATH ...] --bindings PATH ...   # what a binding names, overrides laid over
 """
 from __future__ import annotations
 
@@ -63,6 +63,10 @@ def supported(schema: Any, where: str = "schema") -> list[str]:
     if isinstance(schema, dict):
         for name in sorted(set(schema) - KNOWN):
             problems.append(f"{where}: the schema uses {name!r}, which this validator does not know")
+        declared = schema.get("type")
+        for kind in [declared] if isinstance(declared, str) else list(declared or []):
+            if kind not in TYPES:
+                problems.append(f"{where}: the schema uses the type {kind!r}, which this validator cannot check")
         for name, held in schema.items():
             if name in ("properties", "$defs"):
                 for key, sub in (held or {}).items():
@@ -116,10 +120,17 @@ def validate(value: Any, schema: dict[str, Any], root: dict[str, Any], where: st
 def coherent(profile: dict[str, Any], where: str) -> list[str]:
     """What the schema cannot say: the profile has to agree with itself."""
     problems: list[str] = []
-    paths = {entry["path"] for entry in profile["case_map"]}
+    listed = [entry["path"] for entry in profile["case_map"]]
+    paths = set(listed)
+    for path in sorted(paths):
+        if listed.count(path) > 1:
+            problems.append(f"{where}: {path!r} is in the case_map {listed.count(path)} times; "
+                            "a path lands in one place")
     for entry in profile["case_map"]:
         if "case" not in entry and "ignored" not in entry:
             problems.append(f"{where}: {entry['path']!r} is neither mapped nor ignored")
+        if "case" in entry and "ignored" in entry:
+            problems.append(f"{where}: {entry['path']!r} is both mapped and ignored")
         if "ignored" in entry and not str(entry["ignored"]).strip():
             problems.append(f"{where}: {entry['path']!r} is ignored with no reason")
     # telemetry rows are not a path on the source's *record*: they are the shape of an answer to a
@@ -133,14 +144,25 @@ def coherent(profile: dict[str, Any], where: str) -> list[str]:
             continue
         prefix = {"case": "", "alert": "alerts[].", "evidence": "alerts[].evidence[]."}[group]
         for name, path in fields.items():
-            # a key of this source may itself contain a dot (@odata.type), so the whole path is
-            # tried before its first segment
-            if f"{prefix}{path}" not in paths and f"{prefix}{path.split('.')[0]}" not in paths:
+            # the whole path, never its first step: the case_map names every nested key, and a
+            # parent that is mapped says nothing about a child that is misspelt
+            if f"{prefix}{path}" not in paths:
                 problems.append(
                     f"{where}: fields.{group}.{name} reads {path!r}, which the case_map does not name"
                 )
+    for name, path in (profile["alert_types"].get("fields") or {}).items():
+        if f"alerts[].{path}" not in paths:
+            problems.append(
+                f"{where}: alert_types.fields.{name} reads {path!r}, which the case_map does not name")
     for rule in profile["alert_types"]["rules"]:
+        if not rule.get("detector_ids") and not rule.get("title_patterns"):
+            problems.append(f"{where}: alert type {rule['alert_type']!r} has no detector id and no "
+                            "title pattern, so it matches nothing")
         for pattern in rule.get("title_patterns", []):
+            if not pattern.strip():
+                problems.append(f"{where}: alert type {rule['alert_type']!r} has an empty title "
+                                "pattern, which matches every title")
+                continue
             try:
                 re.compile(pattern)
             except re.error as exc:
@@ -154,7 +176,8 @@ def coherent(profile: dict[str, Any], where: str) -> list[str]:
 def shipped(profile: dict[str, Any], where: str) -> list[str]:
     """A profile on disk is a shipped one: the record of an override is written when a deployment
     reads through one, and a file that already carries it would pass for a run that did."""
-    if "override" in profile.get("source", {}):
+    source = profile.get("source") if isinstance(profile, dict) else None
+    if isinstance(source, dict) and "override" in source:
         return [f"{where}: source.override is written by the loader when a deployment reads through "
                 "a local override; a profile file never carries one"]
     return []
@@ -163,7 +186,14 @@ def shipped(profile: dict[str, Any], where: str) -> list[str]:
 def bound(binding: Path, schema: dict[str, Any], override_schema: dict[str, Any]) -> list[str]:
     """Every profile a binding names, as the deployment reads it: its override laid over it."""
     problems: list[str] = []
-    named = json.loads(binding.read_text(encoding="utf-8")).get("source_profiles") or {}
+    try:
+        named = json.loads(binding.read_text(encoding="utf-8")).get("source_profiles") or {}
+        source_profile.resolved(str(binding), next(iter(named), None))  # an override with no profile
+    except (OSError, ValueError) as exc:
+        print(f"{binding.name}: cannot be read")
+        return [f"{binding.name}: {exc}"]
+    if not named:
+        print(f"{binding.name}: names no source profile, which is a visibility gap and not an error")
     for source in sorted(named):
         where = f"{binding.name}: {source}"
         try:
@@ -182,9 +212,9 @@ def bound(binding: Path, schema: dict[str, Any], override_schema: dict[str, Any]
             continue
         found = validate(profile, schema, schema, where) or coherent(profile, where)
         problems += found
-        state = "ok" if not found else f"{len(found)} problem(s)"
-        print(f"{where}: {state} ({len(profile['case_map'])} mapped paths"
-              + (f", read through {Path(override).name}" if override else ", as shipped") + ")")
+        how = f"read through {Path(override).name}" if override else "as shipped"
+        print(f"{where}: " + (f"{len(found)} problem(s), {how}" if found
+                              else f"ok ({len(profile['case_map'])} mapped paths, {how})"))
         for note in source_profile.notes(profile):
             print(f"note: {note}")
     return problems
@@ -200,15 +230,16 @@ def main(argv: list[str]) -> int:
         print("the schema has outgrown this validator; teach it the keyword or drop it", file=sys.stderr)
         return 1
     problems: list[str] = []
-    if argv[:1] == ["--bindings"]:
-        if len(argv) < 2:
-            print("--bindings takes the path of a capability binding", file=sys.stderr)
-            return 1
-        for binding in argv[1:]:
-            problems += bound(Path(binding), schema, override_schema)
-        profiles: list[Path] = []
-    else:
-        profiles = [Path(a) for a in argv] or sorted(ROOT.glob("skills/*/source_profile.json"))
+    split = argv.index("--bindings") if "--bindings" in argv else len(argv)
+    bindings = [Path(a) for a in argv[split + 1:]]
+    if split < len(argv) and not bindings:
+        print("--bindings takes the path of a capability binding", file=sys.stderr)
+        return 1
+    for binding in bindings:
+        problems += bound(binding, schema, override_schema)
+    profiles = [Path(a) for a in argv[:split]]
+    if not profiles and not bindings:
+        profiles = sorted(ROOT.glob("skills/*/source_profile.json"))
         if not profiles:
             print("no source profile found", file=sys.stderr)
             return 1
@@ -219,7 +250,7 @@ def main(argv: list[str]) -> int:
             + shipped(profile, str(where))
         problems += found
         state = "ok" if not found else f"{len(found)} problem(s)"
-        print(f"{where}: {state} ({len(profile['case_map'])} mapped paths)")
+        print(f"{where}: {state}" + ("" if found else f" ({len(profile['case_map'])} mapped paths)"))
     for problem in problems:
         print(problem, file=sys.stderr)
     if problems:

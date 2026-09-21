@@ -4,7 +4,7 @@
   alert_types.py alerts.json --profile <source_profile.json> [--json]
 
 Detection & Analysis §1.1: the same alert type on the same entity counts once. That is only
-deterministic when the alert type is: this script assigns it from a deployment's map (detector id first,
+deterministic when the alert type is: this script assigns it from the source profile (detector id first,
 then title pattern) and collapses same type + same entity to the strongest alert, listing what it merged.
 
   alert_types.py alerts.json --bindings zerosoc.capabilities.json   (reads the binding's "source_profiles")
@@ -17,7 +17,7 @@ what its records mean, validated against capabilities/source_profile.schema.json
                             "detector_ids": ["..."], "title_patterns": ["<regex, case-insensitive>"]}]}}
 "fields" lets the source's records be passed unrenamed; the script itself knows no source. An alert no
 rule matches keeps its normalized title as its type and is flagged "unmapped": it still deduplicates,
-and the flag tells the maintainer of the map what to add. Output: the "alerts" array of ledger.json
+and the flag tells the maintainer of the profile what to add. Output: the "alerts" array of ledger.json
 (format in triage_decide.py). Each entry also carries "alert_type" and "side": "Malicious", so the same
 entries seed the findings of resolve.py, where one type on one entity again counts once.
 """
@@ -51,7 +51,7 @@ def framework_alert_types(markdown):
 
 
 def _field(alert, amap, name):
-    """The canonical field, or the source's own name for it as the map declares under "fields"."""
+    """The canonical field, or the source's own name for it as the profile declares under "fields"."""
     value = alert.get(name)
     alias = (amap.get("fields") or {}).get(name)
     return value if value not in (None, "") or not alias else alert.get(alias)
@@ -112,25 +112,16 @@ def build_alerts(alerts, amap):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("alerts")
-    ap.add_argument("--profile", help="the source profile of the technology these alerts come from")
-    ap.add_argument("--bindings", help="capability binding whose source_profiles names the profile, next to it")
-    ap.add_argument("--source", help="which profile, where the binding names more than one")
-    ap.add_argument("--override", help="with --profile: a local override to lay over it (a binding names its own)")
+    source_profile.add_arguments(ap)
     ap.add_argument("--json", action="store_true")
     a = ap.parse_args()
-    path, override = ((a.profile, a.override) if a.profile
-                      else source_profile.resolved(a.bindings, a.source) if a.bindings else (None, None))
-    if not path:
-        ap.error("--profile, or --bindings with a source_profiles entry, is required")
-    profile = source_profile.load(path, override)
-    for note in source_profile.notes(profile):
-        print(note, file=sys.stderr)
+    profile = source_profile.from_arguments(ap, a)
     out = build_alerts(json.load(open(a.alerts, encoding="utf-8")), source_profile.alert_rules(profile))
     if a.json:
         print(json.dumps(out, indent=2, ensure_ascii=False))
         return
     for x in out:
-        flag = "  UNMAPPED: add a rule to the map" if x["unmapped"] else ""
+        flag = "  UNMAPPED: add a rule to the source profile's alert_types" if x["unmapped"] else ""
         merged = f"  (counts once for {', '.join(x['merged_ids'])})" if len(x["merged_ids"]) > 1 else ""
         print(f"{x['id']}\t{x['type']}\t{x['entity']}\t{x['confidence']}{merged}{flag}")
     if any(x["unmapped"] for x in out):

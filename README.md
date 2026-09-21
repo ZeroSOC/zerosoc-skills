@@ -19,10 +19,16 @@ playbook questions into tool queries, writing the Notes.
 | [`zerosoc-investigation`](skills/zerosoc-investigation/SKILL.md) | 2.b Investigation | the verdict by score and coverage (True Positive, False Positive, Benign, Duplicate, Insufficient Data) | Investigation Note, Investigation → Response contract |
 | [`zerosoc-response`](skills/zerosoc-response/SKILL.md) | 3 Incident Response | pre-authorized vs requires approval per action, under the autonomy matrix | contained, eradicated, recovered environment; Case timeline; notifications |
 
+Those three are the **method skills**, and they know no source. Beside them sits one **tool skill** per
+technology: [`zerosoc-defender-xdr`](skills/zerosoc-defender-xdr/SKILL.md) holds the expertise that makes
+that source answer the framework's questions well, and its **source profile** — the one versioned home for
+what its records mean, which the capability binding names and the method skills' scripts read.
+
 Each skill directory is self-contained: `SKILL.md` (the procedure, under 200 lines), `references/framework/`
 (the framework documents and playbooks it needs, copied verbatim from the pinned framework commit with
-their directory layout preserved so links keep resolving) and `scripts/` (standard-library Python, no host
-SDK). The framework commit is recorded in each skill's `metadata.framework`.
+their directory layout preserved so links keep resolving) and, in a method skill, `scripts/`
+(standard-library Python, no host SDK); a tool skill carries `source_profile.json` instead. The framework
+commit is recorded in each skill's `metadata.framework`.
 
 ## Install
 
@@ -38,9 +44,10 @@ sources are available. See [capabilities/](capabilities/README.md).
 skills/<name>/SKILL.md            the skill (Agent Skills spec)
 skills/<name>/references/         generated from framework/ — do not edit
 skills/<name>/scripts/            deterministic helpers, Python 3 standard library
+skills/<name>/source_profile.json a tool skill's source profile: what one technology's records mean
 framework/                        the ZeroSOC Framework, git submodule pinned to a commit
 capabilities/                     capability classes, binding schema, example and reference bindings,
-                                  alert-type maps
+                                  the schemas of a source profile and of a local override of one
 tools/                            build (references generation) and checks
 tests/                            unit tests for the scripts, built from the framework's worked examples
 ```
@@ -51,13 +58,15 @@ tests/                            unit tests for the scripts, built from the fra
 git submodule update --init                  # fetch the pinned framework
 python3 tools/build_references.py            # regenerate references/ after bumping the pin
 python3 tools/check_skills.py                # spec and portability lint
+python3 tools/check_profiles.py              # every source profile against its schema and itself
+python3 tools/check_profiles.py --bindings capabilities/zerosoc.capabilities.defender-for-business.json
 python3 tools/build_references.py --check    # references up to date with the pin
 python3 -m unittest discover -s tests        # script tests
 python3 tools/package.py                     # rebuild skills/<name>.zip for hosts that take an archive
 ```
 
 Versioning: a skills release conforms to one framework commit, recorded in `metadata.framework`. Bump the
-submodule, regenerate, rerun the checks, bump `metadata.version` in the three skills, add the entry to
+submodule, regenerate, rerun the checks, bump `metadata.version` in every skill, add the entry to
 [CHANGELOG.md](CHANGELOG.md), tag `v<version>`. Implementations pin a tag.
 
 ## Scope and status

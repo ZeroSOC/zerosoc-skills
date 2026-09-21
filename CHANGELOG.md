@@ -23,9 +23,13 @@
   (`capabilities/source_profile_override.schema.json`). It holds only what differs and is laid over the
   shipped profile, so the rest keeps following it across pin bumps; the profile that results is held to
   the same schema and coherence (`tools/check_profiles.py --bindings`). The shipped profile stays the
-  default. A run read through an override says so: `scripts/source_profile.py` prints the record for
+  default. A local alert-type rule is tried before the shipped ones, which stay as they are, so a title
+  the shipped rules do not know is one small rule. A host that reads the profile's JSON itself is given
+  the profile as the deployment reads it (`scripts/source_profile.py --effective`). A run read through
+  an override says so: `scripts/source_profile.py` prints the record for
   the ledger and the source's entry for the Case's `provenance.products`, whose profile version carries
-  the override's digest, and `tools/check_run.py` fails a ledger that does not carry it. An override
+  the override's digest, and `tools/check_run.py` fails a ledger that does not carry it and a Note whose
+  Provenance does not name it. An override
   names the shipped version it was written against and is flagged stale — never refused — once the
   shipped profile moves past it.
 - **The tool skill's other half: the expertise.** `skills/zerosoc-defender-xdr/SKILL.md` says which of
