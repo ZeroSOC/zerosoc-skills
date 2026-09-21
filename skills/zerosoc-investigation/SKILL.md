@@ -4,7 +4,7 @@ description: Investigate a promoted Case under the ZeroSOC Framework (Phase 2.b)
 license: Apache-2.0
 metadata:
   version: "0.3.0"
-  framework: "zerosoc-framework@c6fb175 (PR #66, 2026-09-20)"
+  framework: "zerosoc-framework@b5f4966 (2026-09-21)"
   status: draft
   author: ZeroSOC
 ---
