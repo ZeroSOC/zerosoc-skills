@@ -3,7 +3,7 @@ name: zerosoc-defender-xdr
 description: What Microsoft Defender XDR's records mean in ZeroSOC Framework terms, and how to make it answer the framework's questions. Carries the machine-readable source profile every method skill reads - where each required triage input lives on an incident, what the source's own words mean, where every field of its records lands on the Case, and which capability classes it answers with what limits. Use it beside zerosoc-triage or zerosoc-investigation when the Case comes from this technology.
 license: Apache-2.0
 metadata:
-  version: "0.3.0"
+  version: "0.4.0"
   framework: "zerosoc-framework@b5f4966 (2026-09-21)"
   status: draft
   author: ZeroSOC
