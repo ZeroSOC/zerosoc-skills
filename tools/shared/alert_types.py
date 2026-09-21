@@ -138,10 +138,15 @@ def main():
         print(json.dumps(out, indent=2, ensure_ascii=False))
         return
     for x in out:
-        flag = "  UNMAPPED: add a rule to the source profile's alert_types" if x["unmapped"] else ""
+        if x.get("unmapped_reason"):        # a gap the profile decided: there is nothing to add
+            flag = f"  left unmapped on purpose: {x['unmapped_reason']}"
+        elif x["unmapped"]:
+            flag = "  UNMAPPED: add a rule to the source profile's alert_types"
+        else:
+            flag = ""
         merged = f"  (counts once for {', '.join(x['merged_ids'])})" if len(x["merged_ids"]) > 1 else ""
         print(f"{x['id']}\t{x['type']}\t{x['entity']}\t{x['confidence']}{merged}{flag}")
-    if any(x["unmapped"] for x in out):
+    if any(x["unmapped"] and not x.get("unmapped_reason") for x in out):
         sys.exit(3)
 
 

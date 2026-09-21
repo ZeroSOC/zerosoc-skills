@@ -305,6 +305,31 @@ class AlertTypeMapping(unittest.TestCase):
         os.unlink(f.name)
         self.assertEqual(j.loads(out)[0]["type"], "Inbox forwarding / redirect or hide rule")
 
+    def _ran(self, alerts):
+        import subprocess, sys, tempfile, json as j
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+            j.dump(alerts, f)
+        ran = subprocess.run([sys.executable, os.path.join(ROOT, "tools/shared/alert_types.py"),
+                              f.name, "--profile", XDR_PROFILE], capture_output=True, text=True)
+        os.unlink(f.name)
+        return ran
+
+    def test_only_a_gap_nobody_decided_asks_the_maintainer_for_a_rule(self):
+        """Exit 3 is "this profile is missing a rule". A gap the profile decided is not missing
+        anything, so it neither asks for a rule nor fails the run."""
+        decided = self._ran([{"id": "B1", "title": "Potential human-operated malicious activity", "entity": "h"}])
+        self.assertEqual(decided.returncode, 0, decided.stderr)
+        self.assertIn("left unmapped on purpose", decided.stdout)
+        self.assertNotIn("add a rule", decided.stdout)
+
+        unknown = self._ran([{"id": "C1", "title": "A title this source has never raised", "entity": "h"}])
+        self.assertEqual(unknown.returncode, 3)
+        self.assertIn("add a rule", unknown.stdout)
+
+        both = self._ran([{"id": "B1", "title": "Potential human-operated malicious activity", "entity": "h"},
+                          {"id": "C1", "title": "A title this source has never raised", "entity": "h"}])
+        self.assertEqual(both.returncode, 3, "one undecided gap is enough to ask")
+
     def test_every_mapped_alert_type_exists_in_the_framework_taxonomy(self):
         with open(os.path.join(ROOT, "framework/02-Taxonomy/alert_types.md"), encoding="utf-8") as f:
             text = f.read()
