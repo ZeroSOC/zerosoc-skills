@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased — conforms to zerosoc-framework@b5f4966
+
+- **A source the deployment cannot read is a visibility gap, not a Note nobody may write.**
+  `note_elements.py` refused every Note of a deployment that declares no source profile: none of
+  §1.1 can be read without the field names a profile carries, so each Alert rendered no assertion
+  and the check called that non-conformant. The framework's answer to a source that cannot be read
+  is the gap, which the run records — the check already honoured that for one assertion the source
+  did not supply, and now honours it for a record it could not read at all. What a gap still does
+  not excuse is an assertion the source supplied and the Note dropped.
+- **The investigation skill carries the tables its own script reads.** `alert_metadata.py` ships
+  in `zerosoc-investigation` and names a technique from the framework's tables; the alert catalog
+  that holds those names was generated into `zerosoc-triage` alone, so at the investigation gate
+  every technique came back unnamed — `T1486` included — and a Note that renders one is written
+  bare, which §2.5 refuses. `02-Taxonomy/alert_types.md` is now generated into that skill too.
+
 ## v0.4.0 (2026-09-21) — conforms to zerosoc-framework@b5f4966
 
 What one technology's records mean now has one versioned home, a deployment may override it locally,
