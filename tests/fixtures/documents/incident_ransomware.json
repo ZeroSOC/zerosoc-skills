@@ -14,7 +14,13 @@
   "severity": "high",
   "customTags": [],
   "systemTags": [],
-  "comments": [],
+  "comments": [
+    {
+      "comment": "Sample Note written back to the source's thread.",
+      "createdByDisplayName": "API-App:Sample connector",
+      "createdDateTime": "2026-09-01T08:30:00Z"
+    }
+  ],
   "alerts": [
     {
       "id": "da637551227677560813_-961444813",
@@ -32,7 +38,9 @@
       "title": "Ransomware behavior detected in the file system",
       "description": "A process exhibited behaviour typical of ransomware: mass file renames with an unusual extension.",
       "category": "Impact",
-      "mitreTechniques": ["T1486"],
+      "mitreTechniques": [
+        "T1486"
+      ],
       "createdDateTime": "2026-09-14T14:58:12.4Z",
       "firstActivityDateTime": "2026-09-14T14:55:40Z",
       "lastActivityDateTime": "2026-09-14T14:57:59Z",
@@ -43,7 +51,48 @@
           "deviceDnsName": "ws-lab-04.lab.local",
           "osPlatform": "Windows11",
           "verdict": "suspicious",
-          "remediationStatus": "none"
+          "remediationStatus": "none",
+          "createdDateTime": "2026-09-01T08:01:00Z",
+          "detectionStatus": "detected",
+          "roles": [],
+          "detailedRoles": [
+            "PrimaryDevice"
+          ],
+          "tags": [
+            "sample-tag"
+          ],
+          "hostName": "sample-ws-01",
+          "dnsDomain": "corp.example",
+          "ntDomain": null,
+          "azureAdDeviceId": null,
+          "osBuild": 22631,
+          "version": "23H2",
+          "healthStatus": "active",
+          "onboardingStatus": "onboarded",
+          "defenderAvStatus": "unknown",
+          "riskScore": "high",
+          "rbacGroupId": 0,
+          "rbacGroupName": null,
+          "firstSeenDateTime": "2026-08-01T00:00:00Z",
+          "lastIpAddress": "10.0.0.4",
+          "lastExternalIpAddress": "198.51.100.4",
+          "ipInterfaces": [
+            "10.0.0.4",
+            "127.0.0.1"
+          ],
+          "loggedOnUsers": [
+            {
+              "accountName": "sample.user",
+              "domainName": "CORP"
+            }
+          ],
+          "resourceAccessEvents": [],
+          "vmMetadata": {
+            "vmId": "aaaaaaaa-0000-4000-8000-000000000001",
+            "cloudProvider": "azure",
+            "resourceId": "/subscriptions/aaaaaaaa-0000-4000-8000-000000000002/resourceGroups/sample-rg/providers/Microsoft.Compute/virtualMachines/sample-ws-01",
+            "subscriptionId": "aaaaaaaa-0000-4000-8000-000000000002"
+          }
         },
         {
           "@odata.type": "#microsoft.graph.security.userEvidence",
@@ -51,29 +100,124 @@
             "accountName": "m.rossi",
             "domainName": "LAB",
             "userPrincipalName": "m.rossi@lab.local",
-            "azureAdUserId": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+            "azureAdUserId": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+            "userSid": "S-1-5-21-1111111111-2222222222-3333333333-1104",
+            "displayName": null,
+            "activeDirectoryObjectGuid": null,
+            "tenantId": null,
+            "resourceAccessEvents": []
           },
           "verdict": "suspicious",
-          "remediationStatus": "none"
+          "remediationStatus": "none",
+          "createdDateTime": "2026-09-01T08:01:00Z",
+          "detectionStatus": "detected",
+          "roles": [],
+          "detailedRoles": [
+            "PrimaryDevice"
+          ],
+          "tags": [
+            "sample-tag"
+          ],
+          "stream": null
         },
         {
           "@odata.type": "#microsoft.graph.security.fileEvidence",
           "fileDetails": {
             "fileName": "invoice_2026_09.exe",
             "filePath": "C:\\Users\\m.rossi\\Downloads",
-            "sha256": "3f786850e387550fdab836ed7e6dc881de23001b6e2ba7ed6a02d2a6f6a1f5a2"
+            "sha256": "3f786850e387550fdab836ed7e6dc881de23001b6e2ba7ed6a02d2a6f6a1f5a2",
+            "sha1": "1111111111111111111111111111111111111111",
+            "md5": "22222222222222222222222222222222",
+            "sha256Ac": null,
+            "fileSize": 450560,
+            "filePublisher": "Sample Publisher",
+            "signer": null,
+            "issuer": null
           },
           "verdict": "malicious",
-          "remediationStatus": "none"
+          "remediationStatus": "none",
+          "createdDateTime": "2026-09-01T08:01:00Z",
+          "detectionStatus": "detected",
+          "roles": [],
+          "detailedRoles": [
+            "PrimaryDevice"
+          ],
+          "tags": [
+            "sample-tag"
+          ]
         },
         {
           "@odata.type": "#microsoft.graph.security.ipEvidence",
           "ipAddress": "198.51.100.23",
           "countryLetterCode": "NL",
           "verdict": "suspicious",
-          "remediationStatus": "none"
+          "remediationStatus": "none",
+          "createdDateTime": "2026-09-01T08:01:00Z",
+          "detectionStatus": "detected",
+          "roles": [],
+          "detailedRoles": [
+            "PrimaryDevice"
+          ],
+          "tags": [
+            "sample-tag"
+          ],
+          "location": null,
+          "stream": null
+        },
+        {
+          "@odata.type": "#microsoft.graph.security.registryKeyEvidence",
+          "registryHive": "HKEY_LOCAL_MACHINE",
+          "registryKey": "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run",
+          "verdict": "suspicious",
+          "remediationStatus": "none",
+          "remediationStatusDetails": null,
+          "createdDateTime": "2026-09-01T08:01:00Z",
+          "detectionStatus": "detected",
+          "roles": [],
+          "detailedRoles": [
+            "PrimaryDevice"
+          ],
+          "tags": [
+            "sample-tag"
+          ]
+        },
+        {
+          "@odata.type": "#microsoft.graph.security.registryValueEvidence",
+          "registryHive": "HKEY_LOCAL_MACHINE",
+          "registryKey": "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run",
+          "registryValueName": "Updater",
+          "registryValue": "C:\\Users\\Public\\upd.exe",
+          "registryValueType": "String",
+          "verdict": "suspicious",
+          "remediationStatus": "none",
+          "remediationStatusDetails": null,
+          "createdDateTime": "2026-09-01T08:01:00Z",
+          "detectionStatus": "detected",
+          "roles": [],
+          "detailedRoles": [
+            "PrimaryDevice"
+          ],
+          "tags": [
+            "sample-tag"
+          ]
         }
-      ]
+      ],
+      "assignedTo": null,
+      "categories": [
+        "Execution",
+        "Impact"
+      ],
+      "systemTags": [],
+      "comments": [],
+      "investigationState": "unsupportedAlertType",
+      "actorDisplayName": null,
+      "alertPolicyId": null,
+      "alertWebUrl": "https://security.example/alerts/da637551227677560813_-961444813",
+      "incidentWebUrl": "https://security.microsoft.com/incidents/4711?tid=11111111-2222-3333-4444-555555555555",
+      "lastUpdateDateTime": "2026-09-01T08:05:00Z",
+      "resolvedDateTime": null,
+      "additionalData": {},
+      "customDetails": {}
     },
     {
       "id": "da637551227677560813_-961444814",
@@ -89,7 +233,10 @@
       "title": "Suspicious process launched from a downloaded file",
       "description": "An executable saved by a browser was launched and spawned command-line tooling.",
       "category": "Execution",
-      "mitreTechniques": ["T1204.002", "T1059.003"],
+      "mitreTechniques": [
+        "T1204.002",
+        "T1059.003"
+      ],
       "createdDateTime": "2026-09-14T14:56:01Z",
       "firstActivityDateTime": "2026-09-14T14:55:40Z",
       "lastActivityDateTime": "2026-09-14T14:55:58Z",
@@ -99,17 +246,98 @@
           "mdeDeviceId": "0f6cd3e2c0f2f1b5b5e0d2fbb1e0b26a2c6b5c11",
           "deviceDnsName": "ws-lab-04.lab.local",
           "verdict": "suspicious",
-          "remediationStatus": "none"
+          "remediationStatus": "none",
+          "createdDateTime": "2026-09-01T08:01:00Z",
+          "detectionStatus": "detected",
+          "roles": [],
+          "detailedRoles": [
+            "PrimaryDevice"
+          ],
+          "tags": [
+            "sample-tag"
+          ],
+          "hostName": "sample-ws-01",
+          "dnsDomain": "corp.example",
+          "ntDomain": null,
+          "azureAdDeviceId": null,
+          "osBuild": 22631,
+          "version": "23H2",
+          "healthStatus": "active",
+          "onboardingStatus": "onboarded",
+          "defenderAvStatus": "unknown",
+          "riskScore": "high",
+          "rbacGroupId": 0,
+          "rbacGroupName": null,
+          "firstSeenDateTime": "2026-08-01T00:00:00Z",
+          "lastIpAddress": "10.0.0.4",
+          "lastExternalIpAddress": "198.51.100.4",
+          "ipInterfaces": [
+            "10.0.0.4",
+            "127.0.0.1"
+          ],
+          "loggedOnUsers": [
+            {
+              "accountName": "sample.user",
+              "domainName": "CORP"
+            }
+          ],
+          "resourceAccessEvents": [],
+          "vmMetadata": {
+            "vmId": "aaaaaaaa-0000-4000-8000-000000000001",
+            "cloudProvider": "azure",
+            "resourceId": "/subscriptions/aaaaaaaa-0000-4000-8000-000000000002/resourceGroups/sample-rg/providers/Microsoft.Compute/virtualMachines/sample-ws-01",
+            "subscriptionId": "aaaaaaaa-0000-4000-8000-000000000002"
+          }
         },
         {
           "@odata.type": "#microsoft.graph.security.processEvidence",
           "processId": 5120,
           "processCommandLine": "cmd.exe /c vssadmin delete shadows /all /quiet",
-          "imageFile": { "fileName": "cmd.exe", "filePath": "C:\\Windows\\System32" },
+          "imageFile": {
+            "fileName": "cmd.exe",
+            "filePath": "C:\\Windows\\System32",
+            "sha1": "1111111111111111111111111111111111111111",
+            "md5": "22222222222222222222222222222222",
+            "sha256Ac": null,
+            "fileSize": 450560,
+            "filePublisher": "Sample Publisher",
+            "signer": null,
+            "issuer": null
+          },
           "verdict": "malicious",
-          "remediationStatus": "none"
+          "remediationStatus": "none",
+          "createdDateTime": "2026-09-01T08:01:00Z",
+          "detectionStatus": "detected",
+          "roles": [],
+          "detailedRoles": [
+            "PrimaryDevice"
+          ],
+          "tags": [
+            "sample-tag"
+          ]
         }
-      ]
+      ],
+      "assignedTo": null,
+      "categories": [
+        "Execution",
+        "Impact"
+      ],
+      "systemTags": [],
+      "comments": [],
+      "investigationState": "unsupportedAlertType",
+      "actorDisplayName": null,
+      "alertPolicyId": null,
+      "alertWebUrl": "https://security.example/alerts/da637551227677560813_-961444814",
+      "incidentWebUrl": "https://security.microsoft.com/incidents/4711?tid=11111111-2222-3333-4444-555555555555",
+      "lastUpdateDateTime": "2026-09-01T08:05:00Z",
+      "resolvedDateTime": null,
+      "additionalData": {},
+      "customDetails": {}
     }
-  ]
+  ],
+  "description": "Sample narrative the source generates from its alerts.",
+  "summary": null,
+  "priorityScore": 64,
+  "lastModifiedBy": "API-App:Sample connector",
+  "resolvingComment": null
 }

@@ -12,7 +12,7 @@
   each required input of §1.1 lives, what the source's words mean in the framework's and OCSF's
   terms, the alert-type rules, the capability classes it answers with their limits, the query recipes,
   the extension object it keeps on the Case — and `case_map`, every path of its records mapped to a
-  Case field or ignored with a reason. That block is executable: a test walks recorded documents and
+  Case field or ignored with a reason. That block is executable: a test walks sample documents of the source and
   fails on a key that is neither, so a field the vendor adds tomorrow is not silence. The binding names
   profiles under `source_profiles`; `alert_type_map` and `capabilities/alert_types.defender-xdr.json`
   are gone, absorbed whole.

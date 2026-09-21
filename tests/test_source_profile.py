@@ -1,4 +1,11 @@
-"""The source profile: valid against its schema, and complete against recorded documents.
+"""The source profile: valid against its schema, and complete against sample documents.
+
+The documents under fixtures/documents are **samples**: every key and every enum word is one the
+source sends, and every value is invented. The case_map was measured against real records of a
+tenant — 155 distinct paths, all of them in the map and none in the map that the records lack —
+and those records are not published, because a tenant's incidents name its people and its
+addresses. The samples carry every path of the map, so the guard below runs over the whole shape
+of a record, and a real record dropped beside them is checked the same way.
 
 The point of the case_map is that it is executable. Over one recorded incident, 15 of 49 distinct
 keys of this source's records were read by nothing here — some read elsewhere, some deliberately
@@ -58,7 +65,7 @@ class SourceProfile(unittest.TestCase):
         profile = json.loads((ROOT / "skills" / "zerosoc-defender-xdr" / "source_profile.json").read_text())
         known = {entry["path"] for entry in profile["case_map"]}
         documents = sorted(DOCUMENTS.glob("*.json"))
-        self.assertTrue(documents, "no recorded document to check the profile against")
+        self.assertTrue(documents, "no sample document to check the profile against")
 
         unexamined: dict[str, str] = {}
         for document in documents:
@@ -72,6 +79,15 @@ class SourceProfile(unittest.TestCase):
             "keys of the source's records that the profile neither maps nor ignores — "
             "add each to case_map with where it lands, or with the reason nothing reads it",
         )
+
+    def test_every_mapped_path_is_shown_by_a_sample_document(self) -> None:
+        """The other direction: a path enters the map only with a document that carries it, so the
+        map cannot grow by a path nobody can show, and the documents stay the whole shape of a record."""
+        profile = json.loads((ROOT / "skills" / "zerosoc-defender-xdr" / "source_profile.json").read_text())
+        shown: set[str] = set()
+        for document in DOCUMENTS.glob("*.json"):
+            shown |= paths_of(json.loads(document.read_text()))
+        self.assertEqual(sorted({entry["path"] for entry in profile["case_map"]} - shown), [])
 
     def test_an_added_field_is_caught(self) -> None:
         """The guard itself, run: a document with a key the profile does not name fails the same

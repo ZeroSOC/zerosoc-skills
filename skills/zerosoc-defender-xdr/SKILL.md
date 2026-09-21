@@ -57,9 +57,10 @@ the shipped profile moves on; the fix still belongs here.
 permissions and the query language belong to the integration, and change when the vendor's API
 does rather than when the framework does.
 
-**Every key is accounted for.** `case_map` names every path of a recorded incident — mapped to a
-Case field, or ignored with the reason nothing reads it. A test walks recorded documents and fails
-on a key that is neither, so a field the vendor adds tomorrow arrives with a noise rather than in
+**Every key is accounted for.** `case_map` names every path of this source's incident record —
+155 of them, measured against real incidents of a tenant, which are not published — each mapped to a
+Case field, or ignored with the reason nothing reads it. A test walks sample documents that carry
+every one of those paths, with invented values, and fails on a key that is neither, so a field the vendor adds tomorrow arrives with a noise rather than in
 silence. That is the block to extend first when the source starts sending something new.
 
 ## 3. Reading this source's assertions

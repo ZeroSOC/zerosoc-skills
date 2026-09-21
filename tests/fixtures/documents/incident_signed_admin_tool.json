@@ -75,13 +75,28 @@
           "processCommandLine": "\"C:\\Program Files\\LabTools\\labadmin-inventory.exe\" --collect --upload",
           "parentProcessId": 4416,
           "parentProcessCreationDateTime": "2026-09-15T08:10:30.11Z",
-          "parentProcessImageFile": { "fileName": "explorer.exe", "filePath": "C:\\Windows" },
+          "parentProcessImageFile": {
+            "fileName": "explorer.exe",
+            "filePath": "C:\\Windows",
+            "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+            "sha1": "1111111111111111111111111111111111111111",
+            "md5": "22222222222222222222222222222222",
+            "sha256Ac": null,
+            "fileSize": 232960,
+            "filePublisher": "Sample Publisher",
+            "signer": null,
+            "issuer": null
+          },
           "imageFile": {
             "fileName": "labadmin-inventory.exe",
             "filePath": "C:\\Program Files\\LabTools",
             "sha256": "9c2f0a1b4e6d8f70a2c4e6081a3c5e7f9b1d3f5a7c9e0b2d4f6a8c0e2b4d6f8a"
           },
-          "userAccount": { "accountName": "a.bianchi", "domainName": "LAB", "userPrincipalName": "a.bianchi@lab.local" },
+          "userAccount": {
+            "accountName": "a.bianchi",
+            "domainName": "LAB",
+            "userPrincipalName": "a.bianchi@lab.local"
+          },
           "mdeDeviceId": "7a1f0c3e9d2b4a5c6e7f8091a2b3c4d5e6f70812",
           "verdict": "suspicious",
           "remediationStatus": "prevented"

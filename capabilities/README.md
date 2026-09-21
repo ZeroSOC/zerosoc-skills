@@ -45,7 +45,7 @@ no rule matches. Every `alert_type` in a profile must exist in the framework's `
 (the tests check it). Detector ids are added as they are observed: they make a rule exact where a title is
 ambiguous or localized.
 
-Its `case_map` block is executable: a test walks recorded documents of the source and fails on any key
+Its `case_map` block is executable: a test walks sample documents of the source — every key one the source sends, every value invented — and fails on any key
 that is neither mapped to a Case field nor ignored with a reason, so a field the vendor adds tomorrow is
 not silence.
 
