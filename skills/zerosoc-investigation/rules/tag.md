@@ -31,7 +31,8 @@ executor puts that language in its place; read as it is, it means the language o
   each one against the explanation first: a detection's own wording is its reading of the
   behaviour, not a fact — where the evidence shows the behaviour was part of the explained
   activity, the finding is covered and the detection's reading was wrong. Where the evidence does
-  not reach it, say so, and the Case stays an Incident on that finding.
+  not reach it, say so: it stands, a finding that stands blocks a Benign verdict, and what the Case
+  then is the resolution rule computes.
 - Coverage (§2.4): mark a Malicious finding covered when the Benign explanation accounts for that
   specific finding on evidence. Do not mark one covered because a verdict would be tidier, and do
   not leave one uncovered that the evidence plainly accounts for: the first invents a Benign

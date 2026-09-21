@@ -15,6 +15,7 @@ selector = load("tools/shared/select_playbook.py", "select_playbook")
 timeline = load("tools/shared/timeline.py", "timeline")
 note_elements = load("tools/shared/note_elements.py", "note_elements")
 FRAMEWORK = os.path.join(ROOT, "skills", "zerosoc-investigation", "references", "framework")
+T = 1789397741000  # 2026-09-14T14:55:41Z in milliseconds: the toy times below are offsets from a real day
 
 
 class TheMethodSurface(unittest.TestCase):
@@ -42,10 +43,10 @@ class TheMethodSurface(unittest.TestCase):
 
     def test_the_timeline_flags_exactly_one_t0(self):
         built = timeline.build({
-            "t0": 100, "now": 500,
+            "t0": T + 100, "now": T + 500,
             "entries": [
-                {"time": 100, "kind": "detection", "desc": "ransomware behaviour"},
-                {"time": 100, "kind": "detection", "desc": "the same activity, seen twice"},
+                {"time": T + 100, "kind": "detection", "desc": "ransomware behaviour"},
+                {"time": T + 100, "kind": "detection", "desc": "the same activity, seen twice"},
                 {"kind": "investigation", "desc": "Q1: what ran before it?"},
             ],
         })
@@ -55,29 +56,29 @@ class TheMethodSurface(unittest.TestCase):
         self.assertEqual(timeline.check(built), [])
 
     def test_an_entry_without_a_time_happens_when_this_gate_ran(self):
-        built = timeline.build({"t0": None, "now": 500, "entries": [
+        built = timeline.build({"t0": None, "now": T + 500, "entries": [
             {"kind": "investigation", "desc": "Q1"}, {"kind": "handover", "desc": "a human"}]})
 
-        self.assertEqual([e["time"] for e in built["entries"]], [500, 500])
+        self.assertEqual([e["time"] for e in built["entries"]], [T + 500, T + 500])
         self.assertEqual(built["unplaced"], [])
 
     def test_a_detection_with_no_time_cannot_be_placed_and_says_so(self):
-        built = timeline.build({"t0": None, "now": 500, "entries": [
+        built = timeline.build({"t0": None, "now": T + 500, "entries": [
             {"kind": "detection", "desc": "an alert with no time at all"}]})
 
         self.assertEqual(built["entries"], [])
         self.assertIn("no time", timeline.check(built)[0])
 
     def test_a_t0_no_entry_carries_is_a_failure(self):
-        built = timeline.build({"t0": 90, "now": 500, "entries": [
-            {"time": 100, "kind": "detection", "desc": "ransomware behaviour"}]})
+        built = timeline.build({"t0": T + 90, "now": T + 500, "entries": [
+            {"time": T + 100, "kind": "detection", "desc": "ransomware behaviour"}]})
 
         self.assertTrue(any("no entry carries it" in f for f in timeline.check(built)))
 
     def test_an_entry_before_t0_is_a_failure(self):
-        built = timeline.build({"t0": 100, "now": 500, "entries": [
-            {"time": 90, "kind": "detection", "desc": "something earlier"},
-            {"time": 100, "kind": "detection", "desc": "ransomware behaviour"}]})
+        built = timeline.build({"t0": T + 100, "now": T + 500, "entries": [
+            {"time": T + 90, "kind": "detection", "desc": "something earlier"},
+            {"time": T + 100, "kind": "detection", "desc": "ransomware behaviour"}]})
 
         self.assertTrue(any("happens before T0" in f for f in timeline.check(built)))
 
@@ -281,6 +282,75 @@ class TheNoteCheck(unittest.TestCase):
             with self.subTest(note=str(broken)[:40]):
                 self.assertTrue(note_elements.check(broken, "triage", FRAMEWORK))
 
+    def test_malformed_detection_metadata_is_a_failure_and_never_a_traceback(self):
+        for name, held in (("techniques", ["T1486 (Data Encrypted for Impact)"]), ("recommended_actions", "Run a scan"),
+                           ("absent", 3), ("absent", "threat name")):
+            note = ledger_note()
+            note["detection_metadata"]["alerts"][0][name] = held
+            with self.subTest(field=name, value=str(held)[:20]):
+                self.assertIsInstance(self.failures(note), list)
+        for whole in (["DF-1"], {"id": "DF-1"}, 3):
+            note = ledger_note()
+            note["detection_metadata"]["alerts"] = whole
+            with self.subTest(alerts=str(whole)):
+                self.assertTrue(self.failures(note))
+        self.assertTrue(self.failures(ledger_note(visibility_gaps=5)))
+        self.assertTrue(self.failures(ledger_note(visibility_gaps=["EDR was down"])))
+        note = ledger_note()
+        note["findings"][0]["event_refs"] = 12345
+        self.assertEqual(self.failures(note), [], "an event identifier may be a number")
+        one_per_letter = ledger_note()
+        one_per_letter["detection_metadata"]["alerts"][0]["absent"] = "threat name"
+        self.assertEqual(len([f for f in self.failures(one_per_letter) if "did not supply" in f]), 1)
+
+    def test_an_investigation_ledger_holds_its_alerts_among_its_findings(self):
+        note = ledger_note(kind="investigation", timeline=[{"id": "F1"}])
+        del note["alerts"], note["detection_metadata"]
+        note["findings"][0].update(alert_type="Malware / loader execution", entity="ws-01")
+        self.assertTrue(any("what its detection asserted" in f for f in self.failures(note, "investigation")))
+
+    def test_a_hunt_opened_case_with_no_alert_asserts_nothing(self):
+        note = ledger_note()
+        del note["alerts"], note["detection_metadata"]
+        self.assertEqual(self.failures(note), [])
+
+    def test_a_case_closed_on_its_alerts_alone_renders_them_as_its_findings(self):
+        self.assertEqual(self.failures(ledger_note(findings=[])), [], "the Alerts are the Case's first Findings")
+        empty = ledger_note(findings=[], alerts=[])
+        del empty["detection_metadata"]
+        self.assertTrue(any("Findings" in f for f in self.failures(empty)))
+
+    def test_a_code_in_a_link_is_an_address_and_not_a_bare_code(self):
+        for written in ("See [T1486 (Data Encrypted for Impact)](https://attack.example/techniques/T1486/).",
+                        "[T1114.003](https://attack.example/techniques/T1114/003/) (Email Forwarding Rule)",
+                        "T1486 (Data Encrypted for Impact): https://attack.example/techniques/T1486/"):
+            with self.subTest(written=written[:30]):
+                self.assertEqual(self.failures(ledger_note(summary=written)), [])
+
+    def test_a_bare_code_in_what_a_finding_renders_beside_its_text_is_caught(self):
+        for name in ("retraction_reason", "analytic"):
+            note = ledger_note()
+            note["findings"][0][name] = "T1486 refuted by the file listing"
+            with self.subTest(field=name):
+                self.assertTrue(any("written bare" in f for f in self.failures(note)))
+        note = ledger_note()
+        note["alerts"][0]["technique"] = "T1003"
+        note["findings"][0]["artifact"] = "hash:T1486"
+        self.assertEqual(self.failures(note), [], "the ledger's own codes are data, not the Note's prose")
+
+    def test_a_required_element_holds_something_a_reader_can_read(self):
+        for held in (True, 5, "None."):
+            note = ledger_note(kind="investigation", timeline=held)
+            with self.subTest(timeline=held):
+                self.assertTrue(any("Case Timeline" in f for f in self.failures(note, "investigation")))
+        self.assertTrue(any("Summary" in f for f in self.failures(ledger_note(summary=5))))
+        note = ledger_note()
+        del note["findings"][0]["desc"]
+        self.assertTrue(any("F1" in f and "says nothing" in f for f in self.failures(note)))
+
+    def test_a_kind_the_framework_does_not_have_is_said(self):
+        self.assertTrue(note_elements.check(ledger_note(kind="bogus"), None, FRAMEWORK))
+
     def test_the_older_tag_shape_is_still_read(self):
         note = ledger_note(findings=[{"n": 1, "finding": "T1486 (Data Encrypted for Impact) was observed",
                                       "tag": {"side": "malicious", "confidence_id": 3}, "event_refs": ["A1"]}])
@@ -321,6 +391,37 @@ class AFrameworkChangeIsASkillsReleaseAndNothingElse(unittest.TestCase):
         with self.assertRaises(SystemExit) as stopped:
             note_elements.elements("triage", root)
         self.assertIn("Rationale", str(stopped.exception))
+
+    def test_prose_between_two_elements_does_not_end_the_list(self):
+        def rewrite(text):
+            return text.replace("    Each **Alert** Finding also renders", "Each **Alert** Finding also renders", 1)
+        names = [e["element"] for e in note_elements.elements("triage", self.served(rewrite))]
+        self.assertEqual(names[-1], "provenance", "a paragraph at the margin is still inside the list")
+
+    def test_a_list_inside_an_element_is_not_a_list_of_elements(self):
+        def rewrite(text):
+            return text.replace("4.  **Rationale** —", "    1. **Alerts** — first\n    2. **Checks** — then\n4.  **Rationale** —", 1)
+        names = [e["element"] for e in note_elements.elements("triage", self.served(rewrite))]
+        self.assertNotIn("alerts", names)
+        self.assertIn("rationale", names)
+
+    def test_two_elements_one_field_or_a_name_with_no_field_stops_the_script(self):
+        for change in (("7.  **Provenance** —", "7.  **Summary** —"), ("7.  **Provenance** —", "7.  **来歴** —"),
+                       ("7.  **Provenance** —", "7.  **Findings!** —")):
+            with self.subTest(renamed=change[1]), self.assertRaises(SystemExit):
+                note_elements.elements("triage", self.served(lambda text, c=change: text.replace(c[0], c[1], 1)))
+
+    def test_which_elements_may_be_empty_is_the_frameworks_and_is_pinned(self):
+        def optional(kind):
+            return sorted(e["element"] for e in note_elements.elements(kind, FRAMEWORK) if e["may_be_empty"])
+        self.assertEqual(optional("triage"), ["timeline", "visibility_gaps"])
+        self.assertEqual(optional("investigation"), ["reclassification_pivots", "visibility_gaps"])
+
+    def test_none_quoted_about_something_else_does_not_make_an_element_optional(self):
+        def rewrite(text):
+            return text.replace("    Each **Alert** Finding also renders", "    An Alert with no technique renders \"None.\" there. Each **Alert** Finding also renders", 1)
+        findings = next(e for e in note_elements.elements("triage", self.served(rewrite)) if e["element"] == "findings")
+        self.assertFalse(findings["may_be_empty"])
 
     def test_every_element_of_both_notes_is_read_at_this_pin(self):
         self.assertEqual([e["element"] for e in note_elements.elements("triage", FRAMEWORK)],
@@ -392,8 +493,60 @@ class TheCaseTimeline(unittest.TestCase):
         self.assertEqual(built["entries"], [])
         self.assertTrue(any("first_seen" in f for f in timeline.check(built)))
 
+    def test_t0_is_carried_by_a_malicious_entry_never_by_whatever_shares_its_instant(self):
+        at = "2026-09-14T14:55:41Z"
+        for label, other in (("benign", self.finding("B1", at, side="Benign")),
+                             ("context", self.finding("C1", "2026-09-14T14:55:40.500Z", side=None)),
+                             ("retracted", self.finding("R1", at, retracted=True))):
+            built = timeline.build(self.ledger(other, self.finding("M1", at)))
+            with self.subTest(sharing=label):
+                self.assertEqual([e["id"] for e in built["entries"] if e["is_t0"]], ["M1"])
+        handover = timeline.build(self.ledger(self.finding("M1", "2026-09-14T15:12:00Z"),
+                                              entries=[{"kind": "handover", "desc": "a human takes it"}]))
+        self.assertEqual([e.get("id") for e in handover["entries"] if e["is_t0"]], ["M1"])
+
+    def test_a_benign_entry_at_t0_does_not_hide_that_the_malicious_one_is_off_the_timeline(self):
+        at = "2026-09-14T14:55:41Z"
+        built = timeline.build(self.ledger(self.finding("M1", at, timeline=False), self.finding("B1", at, side="Benign")))
+        self.assertTrue(any("no entry carries it" in f for f in timeline.check(built)))
+
+    def test_a_stated_t0_with_nothing_malicious_known_is_a_failure(self):
+        built = timeline.build(self.ledger(self.finding("B1", "2026-09-14T14:55:41Z", side="Benign"), t0="2026-09-14T14:55:41Z"))
+        self.assertTrue(any("nothing Malicious" in f for f in timeline.check(built)))
+
+    def test_a_malicious_finding_within_the_same_second_but_before_a_stated_t0_is_said(self):
+        built = timeline.build(self.ledger(self.finding("M1", "2026-09-14T14:55:40.100Z"), t0="2026-09-14T14:55:41Z"))
+        self.assertTrue(any("happens before T0" in f for f in timeline.check(built)))
+        same_second = timeline.build(self.ledger(self.finding("M1", "2026-09-14T14:55:41.900Z"), t0="2026-09-14T14:55:41Z"))
+        self.assertEqual(timeline.check(same_second), [], "a T0 written to the second holds the whole of that second")
+
+    def test_a_time_out_of_any_case_is_unreadable_and_seconds_are_not_milliseconds(self):
+        for bad in (1789397741, 1e400, float("nan"), 10 ** 18, "9999-12-31T23:59:59-05:00", -5):
+            built = timeline.build(self.ledger(self.finding("F1", bad)))
+            with self.subTest(first_seen=str(bad)):
+                self.assertTrue(any("F1" in f for f in timeline.check(built)))
+
+    def test_what_is_not_a_finding_or_a_readable_now_is_said(self):
+        built = timeline.build({"now": "soon", "findings": ["F1", 3]})
+        found = " | ".join(timeline.check(built))
+        self.assertIn("now", found)
+        self.assertIn("findings", found)
+
+    def test_it_is_t0_only_on_a_confirmed_incident(self):
+        """Until the Malicious hypothesis is proven the anchor is the Case's start_time, which is
+        not a T0 and anchors no metric."""
+        open_case = timeline.build(self.ledger(self.finding("M1", "2026-09-14T14:55:41Z")))
+        self.assertEqual((open_case["start_time_utc"], open_case["confirmed_incident"]), ("2026-09-14T14:55:41Z", False))
+        confirmed = timeline.build(self.ledger(self.finding("M1", "2026-09-14T14:55:41Z"), recorded_verdict="True Positive"))
+        self.assertTrue(confirmed["confirmed_incident"])
+
+    def test_the_older_tag_shape_moves_t0_too(self):
+        built = timeline.build(self.ledger({"n": 1, "finding": "ransomware behaviour", "tag": {"side": "malicious", "confidence_id": 3},
+                                            "first_seen": "2026-09-14T14:55:41Z", "timeline": True}))
+        self.assertEqual(built["t0_utc"], "2026-09-14T14:55:41Z")
+
     def test_an_anchor_with_nothing_to_say_does_not_crash(self):
-        built = timeline.build({"t0": 100, "entries": [{"time": 100, "kind": "detection"}]})
+        built = timeline.build({"t0": T, "entries": [{"time": T, "kind": "detection"}]})
         self.assertEqual(timeline.check(built), [])
 
 
@@ -466,8 +619,16 @@ class TheRuleText(unittest.TestCase):
                         ignore=shutil.ignore_patterns("references", "__pycache__"))
         with open(os.path.join(skill, "SKILL.md"), "a", encoding="utf-8") as f:
             f.write("\nSee [rules/no-such-rule.md](rules/no-such-rule.md).\n")
-        problems = checker.check_skill(skill)
-        self.assertTrue(any("no-such-rule" in str(p) for p in problems), problems)
+        with open(os.path.join(skill, "rules", "checks.md"), "a", encoding="utf-8") as f:
+            f.write("\nSee [the method](../references/framework/03-Processes/NOPE.md) and [a glossary](glossary.md).\n")
+        with open(os.path.join(skill, "rules", "glossary.md"), "w", encoding="utf-8") as f:
+            f.write("# Words\n")
+        import contextlib, io
+        with contextlib.redirect_stdout(io.StringIO()):
+            problems = "\n".join(checker.check_skill(skill))
+        self.assertIn("no-such-rule", problems)
+        self.assertIn("NOPE.md", problems, "a link in a rule file is followed from the rule file")
+        self.assertNotIn("glossary.md is linked from nowhere", problems, "a rule linked from a rule is linked")
 
 
 class FromTheCommandLine(unittest.TestCase):

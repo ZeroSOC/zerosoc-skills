@@ -60,19 +60,22 @@ def check_skill(base):
         if fn.endswith(".md"):
             read[f"rules/{fn}"] = open(os.path.join(rules, fn), encoding="utf-8").read()
     for where, held in read.items():
+        here = os.path.join(base, os.path.dirname(where))  # a link is followed from the file that writes it
         for pat in FORBIDDEN_BODY:
             for m in re.finditer(pat, held):
                 failures.append(f"{skill}: host-specific or non-public-safe text '{m.group(0)}' in {where}")
-        for m in re.finditer(r"\]\(((?:references|scripts|rules)/[^)#\s]+)", held):
-            if not os.path.exists(os.path.join(base, m.group(1))):
+        # in SKILL.md, the links into the skill's own folders; in a rule file, every link that is not a web address
+        links = r"\]\(((?:references|scripts|rules)/[^)#\s]+)" if where == "SKILL.md" else r"\]\((?![a-z]+:|#)([^)#\s]+)"
+        for m in re.finditer(links, held):
+            if not os.path.exists(os.path.normpath(os.path.join(here, m.group(1)))):
                 failures.append(f"{skill}: missing referenced path {m.group(1)} in {where}")
         for m in re.finditer(r"`(scripts/[\w./-]+\.py)`|python3 (scripts/[\w./-]+\.py)", held):
             rel = m.group(1) or m.group(2)
             if not os.path.exists(os.path.join(base, rel)):
                 failures.append(f"{skill}: missing script {rel} in {where}")
-    for fn in sorted(os.listdir(rules)) if os.path.isdir(rules) else []:
-        if fn.endswith(".md") and f"rules/{fn}" not in body:
-            failures.append(f"{skill}: rules/{fn} is linked from nowhere in SKILL.md, so no executor is sent to it")
+    for name in read:
+        if name != "SKILL.md" and not any(os.path.basename(name) in held for where, held in read.items() if where != name):
+            failures.append(f"{skill}: {name} is linked from nowhere in the skill, so no executor is sent to it")
     print(f"{skill}: ok ({n} body lines, description {len(desc)} chars)")
     return failures
 
