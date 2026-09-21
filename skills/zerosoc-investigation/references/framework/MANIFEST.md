@@ -6,6 +6,7 @@ Do not edit these files; regenerate with `python3 tools/build_references.py`.
 
 
 - `references/framework/01-Foundation/definitions.md`
+- `references/framework/02-Taxonomy/alert_types.md`
 - `references/framework/02-Taxonomy/case_schema.json`
 - `references/framework/02-Taxonomy/case_schema.md`
 - `references/framework/02-Taxonomy/incident_categories.md`

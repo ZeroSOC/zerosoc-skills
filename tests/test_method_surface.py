@@ -272,6 +272,27 @@ class TheNoteCheck(unittest.TestCase):
         note["detection_metadata"]["alerts"][0]["absent"] = ["threat name"]
         self.assertTrue(any("threat name" in f and "Visibility Gap" in f for f in self.failures(note)))
 
+    def test_a_source_the_deployment_cannot_read_is_a_gap_and_not_a_broken_note(self):
+        """A deployment that declares no source profile reads nothing of §1.1: there are no field
+        names to read it under. The run records that as the visibility gap it is, and the Note that
+        holds the gap is conformant — a source nobody can read is not a Note nobody may write."""
+        note = ledger_note(visibility_gaps=[{
+            "data_source": "alert metadata: the deployment declares no field names",
+            "check_prevented": "everything every detection of this Case asserted: its techniques, "
+                               "the threat it named, what detected it and what it already remediated",
+        }])
+        note["detection_metadata"] = {"alerts": []}
+
+        self.assertEqual(self.failures(note), [])
+
+    def test_an_assertion_the_source_supplied_is_still_rendered_or_it_is_a_failure(self):
+        """The gap excuses what could not be read, never what was read and dropped."""
+        note = ledger_note(visibility_gaps=[{"data_source": "EDR", "check_prevented": "the process lineage"}])
+        note["detection_metadata"] = {"alerts": []}
+
+        self.assertTrue(any("renders nothing of what its detection asserted" in f
+                            for f in self.failures(note)))
+
     def test_the_findings_element_says_what_an_alert_finding_renders(self):
         findings = next(e for e in note_elements.elements("triage", FRAMEWORK) if e["element"] == "findings")
         for words in ("ID (Name)", "remediation state", "disposition of the recommended actions"):

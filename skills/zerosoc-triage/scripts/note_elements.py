@@ -269,10 +269,17 @@ def _asserted(note, alerts, findings, finding_ids, recorded_gaps):
                             "Finding renders what its detection asserted (techniques, threat, source, remediation state)")
         return failures
     read = {str(a.get("id")) for a in record["alerts"]} if record.get("alerts") else set()
+    # A deployment that declares no source profile reads nothing of §1.1 — there are no field names
+    # to read it under — and alert_metadata.py answers with that as a visibility gap and no alerts.
+    # The Note then renders no assertion because the run could gather none, and it says so where it
+    # says what it could not check: a gap is the framework's answer to a source it cannot read, and
+    # the Note is not less conformant for holding it. What a gap does not excuse is an assertion the
+    # source supplied and the Note dropped, which is the case below.
+    blind = any(gap.startswith("alert metadata") for gap in recorded_gaps)
     for alert in alerts:
-        if str(alert.get("id")) not in read:
+        if str(alert.get("id")) not in read and not blind:
             failures.append(f"alert {alert.get('id')} renders nothing of what its detection asserted")
-    if among and not read:
+    if among and not read and not blind:
         failures.append(f"{len(among)} Alert Finding(s) and a detection_metadata that read no alert: each renders "
                         "what its detection asserted")
     actions = []

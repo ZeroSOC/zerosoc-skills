@@ -34,6 +34,7 @@
     "zerosoc-investigation": {
       "files": [
         "03-Processes/02-detection_and_analysis.md",
+        "02-Taxonomy/alert_types.md",
         "02-Taxonomy/incident_categories.md",
         "06-Deliverables/investigation_note.md",
         "03-Processes/03-response.md"
