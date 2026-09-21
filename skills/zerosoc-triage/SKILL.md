@@ -4,7 +4,7 @@ description: Triage a security alert under the ZeroSOC Framework (Phase 2.a). Se
 license: Apache-2.0
 metadata:
   version: "0.3.0"
-  framework: "zerosoc-framework@c6fb175 (PR #66, 2026-09-20)"
+  framework: "zerosoc-framework@b5f4966 (2026-09-21)"
   status: draft
   author: ZeroSOC
 ---
@@ -163,7 +163,9 @@ Read per alert: the playbook section the script prints.
    Name it `triage_note_<case-id>_<YYYYMMDD-HHMM>`.
    Technique codes are always `ID (Name)`: `scripts/alert_metadata.py` renders the ones the framework's
    tables name, and for the rest write the ATT&CK or ATLAS name — a bare identifier is not conformant.
-   Summarize evidence; never paste raw logs.
+   Summarize evidence in the Note and never paste raw logs — what the Note summarizes, the Case
+   keeps: the events each Finding rests on stay on the Case and the Note cites them
+   ([Case Schema §3](references/framework/02-Taxonomy/case_schema.md)).
 11. **Emit.** On Close: `verdict_id` 1 (False Positive; also a tuning ticket to Phase 1), 5 (Benign; also a
     Knowledge Base entry if the exception was unrecorded) or 10 (Duplicate, with `master_case_uid`). On
     Promote: `verdict_id` stays 0 and the Case carries the **Triage → Investigation contract** of

@@ -1,11 +1,16 @@
 # Changelog
 
-## Unreleased — conforms to zerosoc-framework@c6fb175 (PR #66)
+## Unreleased — conforms to zerosoc-framework@b5f4966
 
-The framework pin moves 35 commits, from before the Case Schema was mapped natively to OCSF. It is
-ahead of `main` while framework PR #66 is open, and is re-pinned to the merge commit when it lands. The three
-skills were instructing an agent to produce Notes whose elements the framework no longer defines, and to
-hand on two fields the Case Schema now rejects.
+The framework pin moves 37 commits, from before the Case Schema was mapped natively to OCSF, and
+now sits on `main` at the merge of framework PR #66. The three skills were instructing an agent to
+produce Notes whose elements the framework no longer defines, and to hand on two fields the Case
+Schema now rejects.
+
+- **What a Note summarizes, the Case keeps.** The framework's evidence rule changed with the pin: a
+  Finding's evidence is kept with the Case and cited by identifier, not cited alone, because a
+  citation is evidence only while the source still holds the event. The Note still summarizes and
+  still pastes no raw log; the instruction now says which of the two is which.
 
 - **What the detection asserts is read before enrichment.** The skills read the Alerts for their entities
   and their type and dropped everything the detection said about the threat. The new
