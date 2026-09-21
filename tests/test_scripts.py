@@ -15,6 +15,7 @@ alert_types = load("tools/shared/alert_types.py", "alert_types")
 evidence = load("tools/shared/evidence_inventory.py", "evidence_inventory")
 selector = load("tools/shared/select_playbook.py", "select_playbook")
 chain = load("tools/shared/process_chain.py", "process_chain")
+metadata = load("tools/shared/alert_metadata.py", "alert_metadata")
 checker = load("tools/check_run.py", "check_run")
 
 CAPABILITIES = os.path.join(ROOT, "capabilities")
@@ -258,6 +259,242 @@ class AlertTypeMapping(unittest.TestCase):
         for rule in self.map["rules"]:
             self.assertIn(rule["alert_type"], known, rule["alert_type"])
             self.assertEqual(rule["domain"], known[rule["alert_type"]])
+
+
+class DecisionReadsWhatTheDetectionAsserts(unittest.TestCase):
+    """§1.1 and §1.5 at the decision: the assertions are on the ledger, the recommendations are
+    dispositioned, and a remediated entity does not explain anything."""
+
+    def ledger(self, **overrides):
+        led = {"case_uid": "CASE-1",
+               "alerts": [{"id": "A1", "type": "Malware / loader execution", "entity": "ws-04", "confidence": "High"}],
+               "findings": [{"id": "B1", "side": "Benign", "confidence": "High"}],
+               "evidence_inventory": {"extracted": 2, "source_count": 2, "complete": True},
+               "detection_metadata": {
+                   "alerts": [{"id": "A1", "techniques": [{"id": "T1204", "rendered": "T1204 (User Execution)"}],
+                               "threat": {"name": "Trojan:Win32/Wacatac", "family": "Wacatac"},
+                               "detection": {"source": "antivirus", "analytic_type_id": 5, "analytic_type": "Fingerprinting"},
+                               "description": "d", "absent": [],
+                               "recommended_actions": [{"id": "RA1", "action": "Run a full scan", "disposition": "followed"}]}],
+                   "remediation": [{"entity": "loader.exe", "type": "file", "state": "quarantined", "neutralized": True,
+                                    "alert_ids": ["A1"]}],
+                   "neutralized_entities": ["loader.exe"],
+                   "visibility_gaps": []}}
+        led.update(overrides)
+        return led
+
+    def test_a_ledger_without_the_assertions_is_told_to_extract_them(self):
+        r = triage.decide({"alerts": [{"id": "A", "type": "x", "entity": "e", "confidence": "Low"}], "findings": []})
+        self.assertIn("what the detection asserts", " ".join(r["detection_notes"]))
+        self.assertIn("alert_metadata.py", " ".join(r["detection_notes"]))
+
+    def test_a_recommendation_left_unread_holds_the_decision(self):
+        led = self.ledger()
+        led["detection_metadata"]["alerts"][0]["recommended_actions"].append({"id": "RA2", "action": "Check other devices"})
+        r = triage.decide(led)
+        self.assertFalse(r["decision_ready"])
+        self.assertEqual(r["recommended_actions"]["open"], ["RA2"])
+        self.assertIn("RA2", " ".join(r["detection_notes"]))
+        self.assertEqual(r["decision"], "Close", "the coverage rule is unchanged; what changes is whether it may be acted on")
+
+    def test_set_aside_needs_a_reason_and_then_the_decision_is_ready(self):
+        led = self.ledger()
+        led["detection_metadata"]["alerts"][0]["recommended_actions"].append(
+            {"id": "RA2", "action": "Reset the user's password", "disposition": "set aside"})
+        self.assertFalse(triage.decide(led)["decision_ready"])
+        led["detection_metadata"]["alerts"][0]["recommended_actions"][-1]["reason"] = "no identity in scope"
+        r = triage.decide(led)
+        self.assertTrue(r["decision_ready"])
+        self.assertEqual(r["recommended_actions"], {"followed": ["RA1"], "set_aside": ["RA2"], "open": []})
+
+    def test_a_neutralized_entity_is_recorded_and_never_taken_as_an_explanation(self):
+        r = triage.decide(self.ledger())
+        self.assertEqual(r["neutralized_entities"], ["loader.exe"])
+        note = " ".join(r["detection_notes"])
+        self.assertIn("loader.exe", note)
+        self.assertIn("not an explanation", note)
+        self.assertIn("how it arrived", note)
+
+    def test_an_assertion_absent_without_a_recorded_gap_is_reported(self):
+        led = self.ledger()
+        led["detection_metadata"]["alerts"][0]["absent"] = ["techniques", "threat name"]
+        led["detection_metadata"]["visibility_gaps"] = [{"data_source": "alert metadata: techniques"}]
+        r = triage.decide(led)
+        self.assertIn("threat name", " ".join(r["detection_notes"]))
+        self.assertNotIn("alert metadata: techniques", " ".join(r["detection_notes"]))
+
+    def test_the_techniques_of_the_alerts_raise_the_confidence_the_rule_raises(self):
+        # §1.5: independent alerts of different types or techniques raise the confidence one level
+        led = self.ledger()
+        led["alerts"].append({"id": "A2", "type": "Malware / loader execution", "entity": "ws-09", "confidence": "Medium"})
+        led["detection_metadata"]["alerts"].append(dict(led["detection_metadata"]["alerts"][0], id="A2"))
+        led["findings"] = []
+        self.assertEqual(triage.decide(led)["confidence_id"], 3, "one technique on both alerts: no raise beyond High")
+        led["alerts"][0]["confidence"] = "Low"
+        led["alerts"][1]["confidence"] = "Low"
+        same = triage.decide(led)
+        self.assertEqual(same["confidence_id"], 1, "the same technique twice is not two techniques")
+        led["detection_metadata"]["alerts"][1] = dict(led["detection_metadata"]["alerts"][1],
+                                                      techniques=[{"id": "T1003", "rendered": "T1003 (OS Credential Dumping)"}])
+        self.assertEqual(triage.decide(led)["confidence_id"], 2, "two techniques across two alerts raise it one level")
+
+    def test_the_candidate_categories_of_the_case_come_back_with_the_decision(self):
+        led = self.ledger()
+        led["detection_metadata"]["candidate_incident_categories"] = ["IC-03", "IC-05"]
+        self.assertEqual(triage.decide(led)["candidate_incident_categories"], ["IC-03", "IC-05"])
+
+    def test_investigation_reads_the_same_record_at_its_own_gate(self):
+        led = self.ledger()
+        led["findings"] = [{"id": "F1", "side": "Malicious", "confidence": "High"}]
+        r = inv.resolve(led)
+        self.assertIn("loader.exe", " ".join(r["detection_notes"]))
+        self.assertEqual(r["verdict_id"], 2, "the resolution rule is unchanged")
+
+
+class TechniqueIndex(unittest.TestCase):
+    """The techniques a detection names are looked up in the framework's own tables: what they are
+    called, and which Incident Categories they point at (Detection & Analysis §1.4)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.index = selector.technique_index(os.path.join(ROOT, "framework"))
+
+    def test_the_index_names_techniques_and_points_at_categories(self):
+        self.assertEqual(self.index["T1003"]["name"], "OS Credential Dumping")
+        self.assertIn("IC-06", self.index["T1003"]["categories"])
+        self.assertIn("Endpoint", self.index["T1003"]["domains"])
+        self.assertIn("Credential dumping", self.index["T1003"]["alert_types"])
+
+    def test_a_sub_technique_falls_back_to_its_parent(self):
+        found = selector.candidates(["T1003.001"], self.index)
+        self.assertEqual(found["techniques"][0]["id"], "T1003.001")
+        self.assertEqual(found["techniques"][0]["matched"], "T1003")
+        self.assertIn("IC-06", found["categories"])
+
+    def test_a_technique_the_catalog_does_not_hold_is_reported_not_dropped(self):
+        found = selector.candidates(["T1003", "T9999"], self.index)
+        self.assertIn("IC-06", found["categories"])
+        self.assertEqual(found["unknown"], ["T9999"])
+        self.assertIsNone(found["techniques"][1]["name"])
+
+    def test_candidates_widen_over_every_technique_the_detection_names(self):
+        found = selector.candidates(["T1003", "T1486"], self.index)
+        self.assertIn("IC-06", found["categories"])
+        self.assertIn("IC-03", found["categories"])
+        self.assertEqual(found["categories"], sorted(found["categories"]))
+
+
+class DetectionMetadata(unittest.TestCase):
+    """What the detection asserts, read before enrichment (Detection & Analysis §1.1)."""
+
+    ALERT = {"id": "A1", "title": "'Impacket' malware was detected", "severity": "high",
+             "mitreTechniques": ["T1021.002", "T1047"], "threatDisplayName": "VirTool:Win32/Impacket.D",
+             "threatFamilyName": "Impacket", "detectionSource": "antivirus", "detectorId": "det-7",
+             "description": "Impacket is a collection of Python classes for working with network protocols.",
+             "recommendedActions": "Run a full antivirus scan.\nCheck whether the file is present on other devices."}
+
+    @classmethod
+    def setUpClass(cls):
+        cls.spec = alert_types.load_map(XDR_MAP)
+        cls.index = selector.technique_index(os.path.join(ROOT, "framework"))
+
+    def one(self, alert=None, **kw):
+        return metadata.assertions(alert or self.ALERT, self.spec, index=self.index, **kw)
+
+    def test_every_assertion_is_read_under_the_source_own_field_names(self):
+        a = self.one()
+        self.assertEqual([t["id"] for t in a["techniques"]], ["T1021.002", "T1047"])
+        self.assertEqual(a["threat"], {"name": "VirTool:Win32/Impacket.D", "family": "Impacket"})
+        self.assertEqual(a["detection"]["source"], "antivirus")
+        self.assertEqual(a["detection"]["detector_id"], "det-7")
+        self.assertIn("Python classes", a["description"])
+        self.assertEqual(len(a["recommended_actions"]), 2)
+        self.assertEqual(a["absent"], [])
+
+    def test_a_technique_is_rendered_only_with_the_name_the_framework_gives_it(self):
+        a = self.one()
+        self.assertEqual(a["techniques"][0]["rendered"], "T1021.002",
+                         "the catalog names T1021, not the sub-technique: the id is not dressed in the parent's name")
+        self.assertEqual(a["techniques"][0]["matched"], "T1021", "the parent is still what the categories come from")
+        self.assertEqual(a["techniques"][1]["rendered"], "T1047", "a technique the framework never names renders bare")
+        named = self.one({"id": "A3", "title": "t", "mitreTechniques": ["T1003"]})
+        self.assertEqual(named["techniques"][0]["rendered"], "T1003 (OS Credential Dumping)")
+
+    def test_the_detection_source_maps_to_an_ocsf_analytic_type(self):
+        self.assertEqual(self.one()["detection"]["analytic_type_id"], 5)
+        self.assertEqual(self.one()["detection"]["analytic_type"], "Fingerprinting")
+        custom = self.one(dict(self.ALERT, detectionSource="customDetection"))
+        self.assertEqual((custom["detection"]["analytic_type_id"], custom["detection"]["analytic_type"]), (1, "Rule"))
+        unknown = self.one(dict(self.ALERT, detectionSource="somethingElse"))
+        self.assertEqual(unknown["detection"]["analytic_type_id"], 99, "an unmapped source is Other, never guessed")
+
+    def test_recommended_actions_start_undecided_and_are_followed_or_set_aside(self):
+        a = self.one()
+        self.assertEqual([r["disposition"] for r in a["recommended_actions"]], [None, None])
+        d = metadata.dispositions([{"id": "RA1", "action": "x", "disposition": "followed", "finding": "F4"},
+                                   {"id": "RA2", "action": "y", "disposition": "set aside", "reason": "no such tool here"},
+                                   {"id": "RA3", "action": "z"}])
+        self.assertEqual(d["followed"], ["RA1"]); self.assertEqual(d["set_aside"], ["RA2"])
+        self.assertEqual(d["open"], ["RA3"])
+        self.assertEqual(metadata.dispositions([{"id": "RA4", "action": "z", "disposition": "set aside"}])["open"], ["RA4"],
+                         "set aside without a reason is not a disposition")
+
+    def test_an_assertion_the_source_does_not_supply_is_named_not_assumed(self):
+        bare = self.one({"id": "A2", "title": "Suspicious activity"})
+        self.assertEqual(bare["techniques"], [])
+        self.assertIsNone(bare["threat"])
+        self.assertEqual(bare["absent"], ["description", "detection source", "recommended actions", "techniques", "threat name"])
+        self.assertEqual(bare["candidate_incident_categories"], [])
+
+    def test_what_an_alert_does_not_supply_is_a_visibility_gap_naming_that_alert(self):
+        built = metadata.build([self.ALERT, {"id": "A2", "title": "t"}], self.spec, index=self.index)
+        gaps = {g["data_source"]: g["alerts"] for g in built["visibility_gaps"]}
+        self.assertEqual(sorted(gaps), ["alert metadata: description", "alert metadata: detection source",
+                                        "alert metadata: recommended actions", "alert metadata: techniques",
+                                        "alert metadata: threat name"])
+        self.assertEqual(gaps["alert metadata: techniques"], ["A2"],
+                         "the assertions of one alert do not make up for another's: the gap names the alert that lacks it")
+        empty = metadata.build([{"id": "A2", "title": "t"}], self.spec, index=self.index)
+        self.assertEqual(sorted(g["data_source"] for g in empty["visibility_gaps"]),
+                         ["alert metadata: description", "alert metadata: detection source",
+                          "alert metadata: recommended actions", "alert metadata: techniques",
+                          "alert metadata: threat name"])
+        self.assertTrue(all(g["check_prevented"] for g in empty["visibility_gaps"]))
+
+    def test_the_remediation_state_is_a_gap_only_once_the_evidence_has_been_read(self):
+        rows = [{"type": "file", "name": "x.exe", "alert_ids": ["A1"]}]
+        read = metadata.build([self.ALERT], self.spec, rows, index=self.index)
+        self.assertEqual([g["data_source"] for g in read["visibility_gaps"]], ["alert metadata: remediation state"])
+        unread = metadata.build([self.ALERT], self.spec, index=self.index)
+        self.assertEqual(unread["visibility_gaps"], [], "not passing the evidence is not a finding about the deployment")
+
+    def test_the_case_candidate_categories_come_from_the_techniques(self):
+        built = metadata.build([self.ALERT], self.spec, index=self.index)
+        self.assertIn("IC-08", built["candidate_incident_categories"])
+        self.assertEqual(built["techniques"], ["T1021.002", "T1047"])
+
+    def test_remediation_state_is_read_per_entity(self):
+        rows = [{"type": "process", "name": "wmiprvse.exe", "device": "ws-04", "alert_ids": ["A1"],
+                 "remediationStatus": "prevented", "remediationStatusDetails": "blocked at execution"},
+                {"type": "process", "name": "rundll32.exe", "device": "ws-04", "alert_ids": ["A1"],
+                 "remediation_status": "prevented"},
+                {"type": "file", "name": "x.exe", "device": "ws-04", "alert_ids": ["A1"], "remediationStatus": "none"},
+                {"type": "device", "name": "ws-04", "alert_ids": ["A1"]}]
+        out = metadata.remediation(rows, self.spec)
+        self.assertEqual([(r["entity"], r["state"], r["neutralized"]) for r in out],
+                         [("wmiprvse.exe", "prevented", True), ("rundll32.exe", "prevented", True),
+                          ("x.exe", "none", False)],
+                         "a row that already carries the canonical name needs no alias: the inventory's rows do")
+        self.assertEqual(out[0]["activity"], "Evict"); self.assertEqual(out[0]["status"], "Success")
+        self.assertEqual(out[0]["alert_ids"], ["A1"])
+        self.assertIn("blocked at execution", out[0]["details"])
+
+    def test_a_remediation_the_source_did_not_complete_is_not_neutralized(self):
+        rows = [{"type": "file", "name": "y.exe", "alert_ids": ["A1"], "remediationStatus": "notFound"},
+                {"type": "file", "name": "z.exe", "alert_ids": ["A1"], "remediationStatus": "failed"}]
+        out = metadata.remediation(rows, self.spec)
+        self.assertEqual([(r["state"], r["neutralized"], r["status"]) for r in out],
+                         [("notFound", False, "Does Not Exist"), ("failed", False, "Failure")])
 
 
 class EvidenceInventory(unittest.TestCase):
@@ -569,11 +806,24 @@ class RunCheck(unittest.TestCase):
         ledger = {"case_uid": "CASE-1", "severity": "High", "started_at": "2026-09-14T15:00:00Z",
                   "resolved_at": "2026-09-14T15:06:00Z",
                   "evidence_inventory": {"extracted": 2, "source_count": 2, "complete": True},
+                  "detection_metadata": {
+                      "alerts": [{"id": "A1", "techniques": [{"id": "T1003", "rendered": "T1003 (OS Credential Dumping)"}],
+                                  "threat": {"name": "HackTool:Win32/Mimikatz", "family": "Mimikatz"},
+                                  "detection": {"source": "antivirus", "analytic_type_id": 5, "analytic_type": "Fingerprinting"},
+                                  "description": "d", "absent": [],
+                                  "recommended_actions": [{"id": "RA1", "action": "Run a full scan",
+                                                           "disposition": "followed", "finding": "F1"}]}],
+                      "remediation": [], "visibility_gaps": []},
                   "findings": [{"id": "F1", "side": "Malicious", "confidence": "High", "at": "2026-09-14T15:01:00Z",
                                 "alert_type": "Credential dumping", "entity": "ws-01"}]}
         ledger.update(overrides)
-        for name, document in (("evidence.json", rows), ("ledger.triage.json", ledger),
-                               ("ledger.investigation.json", ledger)):
+        alerts = [{"id": "A1", "title": "Possible credential dumping (LSASS)", "entity": "ws-01",
+                   "mitreTechniques": ["T1003"], "threatDisplayName": "HackTool:Win32/Mimikatz",
+                   "threatFamilyName": "Mimikatz", "detectionSource": "antivirus",
+                   "description": "A process read credential material from LSASS.",
+                   "recommendedActions": "Run a full scan"}]
+        for name, document in (("evidence.json", rows), ("alerts.json", alerts),
+                               ("ledger.triage.json", ledger), ("ledger.investigation.json", ledger)):
             with open(os.path.join(base, name), "w", encoding="utf-8") as f:
                 json.dump(document, f)
         return base
@@ -589,6 +839,60 @@ class RunCheck(unittest.TestCase):
         code, out = self.check(self.run_dir())
         self.assertEqual(code, 0, out)
         self.assertIn("ok    triage: extracted count matches the evidence", out)
+
+    def test_a_run_that_never_read_what_the_detection_asserts_fails(self):
+        code, out = self.check(self.run_dir(detection_metadata=None))
+        self.assertEqual(code, 1)
+        self.assertIn("FAIL  triage: what the detection asserts is on the ledger", out)
+
+    def test_a_recommended_action_left_unread_fails_the_run(self):
+        run = self.run_dir()
+        base = self.run_dir()
+        with open(os.path.join(base, "ledger.triage.json"), encoding="utf-8") as f:
+            ledger = json.load(f)
+        ledger["detection_metadata"]["alerts"][0]["recommended_actions"].append({"id": "RA2", "action": "Check other devices"})
+        with open(os.path.join(base, "ledger.triage.json"), "w", encoding="utf-8") as f:
+            json.dump(ledger, f)
+        code, out = self.check(base)
+        self.assertEqual(code, 1)
+        self.assertIn("FAIL  triage: every recommended action followed or set aside with a reason", out)
+        self.assertEqual(self.check(run)[0], 0, "the unchanged run still passes")
+
+    def test_a_ledger_claiming_an_assertion_its_alerts_do_not_carry_fails(self):
+        """The assertions are recomputed from the run's own alerts: the ledger does not get to
+        state a technique or a threat name the source never sent."""
+        base = self.run_dir()
+        with open(os.path.join(base, "ledger.triage.json"), encoding="utf-8") as f:
+            ledger = json.load(f)
+        ledger["detection_metadata"]["alerts"][0]["techniques"].append(
+            {"id": "T1486", "rendered": "T1486 (Data Encrypted for Impact)"})
+        with open(os.path.join(base, "ledger.triage.json"), "w", encoding="utf-8") as f:
+            json.dump(ledger, f)
+        code, out = self.check(base)
+        self.assertEqual(code, 1)
+        self.assertIn("FAIL  triage: the assertions are the ones the alerts carry", out)
+        self.assertIn("T1486", out)
+
+    def test_a_deployment_without_an_alert_type_map_degrades_and_is_not_failed(self):
+        """§1.1 runs where the binding declares no field names for the source: the assertions
+        cannot be read at all, and the harness says so instead of failing the run for it."""
+        base = self.run_dir(detection_metadata=None)
+        with open(os.path.join(base, "zerosoc.capabilities.json"), "w", encoding="utf-8") as f:
+            json.dump({"capabilities": {}, "data_sources": {}}, f)
+        code, out = self.check(base)
+        self.assertIn("skip  triage: what the detection asserts is on the ledger", out)
+        self.assertNotIn("FAIL  triage: what the detection asserts is on the ledger", out)
+
+    def test_an_assertion_absent_without_a_recorded_gap_fails_the_run(self):
+        base = self.run_dir()
+        with open(os.path.join(base, "ledger.triage.json"), encoding="utf-8") as f:
+            ledger = json.load(f)
+        ledger["detection_metadata"]["alerts"][0]["absent"] = ["recommended actions"]
+        with open(os.path.join(base, "ledger.triage.json"), "w", encoding="utf-8") as f:
+            json.dump(ledger, f)
+        code, out = self.check(base)
+        self.assertEqual(code, 1)
+        self.assertIn("FAIL  triage: an assertion the source did not supply is a recorded gap", out)
 
     def test_an_inventory_the_evidence_does_not_support_fails(self):
         code, out = self.check(self.run_dir(evidence_inventory={"extracted": 31, "source_count": 31, "complete": True}))

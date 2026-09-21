@@ -11,7 +11,7 @@ required_data_sources:
   - Cloud billing / cost telemetry
 status: draft
 ---
-<!-- generated from zerosoc-framework@f740364d664a : 04-Playbooks/01-Triage/cloud.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@c6fb175ad3f8 : 04-Playbooks/01-Triage/cloud.md — do not edit; regenerate with tools/build_references.py -->
 
 # Cloud Triage Playbook
 

@@ -19,7 +19,7 @@ required_data_sources:
   - HR context (joiner-mover-leaver)
 status: draft
 ---
-<!-- generated from zerosoc-framework@f740364d664a : 04-Playbooks/02-Investigation-Response/09-insider_threat.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@c6fb175ad3f8 : 04-Playbooks/02-Investigation-Response/09-insider_threat.md — do not edit; regenerate with tools/build_references.py -->
 
 # 09-Insider Threat & Privilege Misuse Investigation & Response
 

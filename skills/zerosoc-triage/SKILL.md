@@ -4,7 +4,7 @@ description: Triage a security alert under the ZeroSOC Framework (Phase 2.a). Se
 license: Apache-2.0
 metadata:
   version: "0.3.0"
-  framework: "zerosoc-framework@5f4ab24 (main, 2026-09-18)"
+  framework: "zerosoc-framework@c6fb175 (PR #66, 2026-09-20)"
   status: draft
   author: ZeroSOC
 ---
@@ -29,7 +29,9 @@ Read per alert: the playbook section the script prints.
 
 ## Inputs
 
-- The Case with its Alerts (id, type, entity, tool confidence or severity, technique).
+- The Case with its Alerts (id, type, entity, tool confidence or severity) and **what each Alert asserts
+  about the threat**: its techniques, the threat name and family, the detection source and detector, the
+  remediation state of its entities, the description and the recommended actions (§1.1).
 - The capability binding `zerosoc.capabilities.json` (see the repository's `capabilities/` folder): it
   resolves capability classes to tools and states which `required_data_sources` are available.
 - Access to the enrichment capability classes: `reputation.multi_engine`, `url.detonation`,
@@ -67,8 +69,31 @@ Read per alert: the playbook section the script prints.
      **lineage gap**, never matched on the PID alone and never guessed. Gaps are normal here, not a failure:
      record them, and never argue from a lineage the evidence does not support. An alert whose evidence names
      no process has no chain, whatever the console draws from its own telemetry.
-3. **Select the playbook and check visibility.** Identify the telemetry domain (Endpoint, Identity,
-   Network, Cloud, Email, Data, Application, OT/ICS) and the alert type, then run:
+3. **Read what the detection asserts** (§1.1 names the six inputs, what each is for, and what to do
+   with it; this step only sequences them). Before any enrichment, run
+   `python3 scripts/alert_metadata.py alerts.json --bindings zerosoc.capabilities.json --evidence evidence.json --json`:
+   it reads them under the field names the deployment's map declares and records what the source did not
+   supply. Put the printed object in the ledger as `detection_metadata` — every later script reads it
+   from there and the Note renders it — then:
+   - Take the **techniques** to step 4: they are the first input to the candidate Incident Categories and
+     to the playbook section (`scripts/select_playbook.py --technique T1003` resolves one alone, a
+     sub-technique falling back to its parent). One the framework's tables do not hold widens nothing,
+     and is recorded on the Case and named in the Note rather than dropped or renamed.
+   - Take the **threat name and family** to step 6: they direct the enrichment and seed the hypotheses.
+   - **Follow each recommended action, or set it aside with a stated reason**, and record the disposition
+     on the action: `"disposition": "followed"` with the finding it produced, tagged like any other check
+     on the evidence it returned, or `"disposition": "set aside"` with `"reason"`.
+     `scripts/triage_decide.py` refuses to call the decision ready while one is unread.
+   - Aim the checks of step 6 where the **remediation state** leaves them: at the entities the source left
+     **active** first, and at what a block does not answer — how the entity arrived, what ran before it
+     was stopped, whether the same thing is elsewhere. The state is recorded, never weighed (§1.5).
+   An assertion the source does not supply is a **visibility gap**: the script names it with the check it
+   prevented, and it goes in the ledger's `visibility_gaps` and in the Note. Never infer one from the
+   alert title.
+
+4. **Select the playbook and check visibility.** Identify the telemetry domain (Endpoint, Identity,
+   Network, Cloud, Email, Data, Application, OT/ICS) and the alert type — the alert types the techniques of
+   step 3 point at are the first candidates — then run:
    `python3 scripts/select_playbook.py --domain Endpoint --alert-type "Malware / loader execution" --bindings zerosoc.capabilities.json`.
    It prints the playbook version, the required data sources with their availability, the **visibility
    gaps** to record, and only the per-alert section you need. Record the selection in the ledger
@@ -76,8 +101,8 @@ Read per alert: the playbook section the script prints.
    playbook is not recorded cannot be reproduced. When no playbook exists for the domain at
    this framework pin, use the domain's alert catalog in
    [alert_types.md](references/framework/02-Taxonomy/alert_types.md) and apply §1.2–§1.5 directly.
-4. **Start the ledger.** Create `ledger.json` (format in `scripts/triage_decide.py`) with the
-   `evidence_inventory` object of step 2. When the deployment ships an alert-type map (the binding's
+5. **Start the ledger.** Create `ledger.json` (format in `scripts/triage_decide.py`) with the
+   `evidence_inventory` object of step 2 and the `detection_metadata` of step 3. When the deployment ships an alert-type map (the binding's
    `alert_type_map`), build the alerts with `python3 scripts/alert_types.py alerts.json --bindings zerosoc.capabilities.json --json`:
    it gives each alert its framework alert type (detector id first, then title) and collapses the same
    type on the same entity to the strongest alert, so the rule below is applied the same way every time;
@@ -85,12 +110,15 @@ Read per alert: the playbook section the script prints.
    alert is the first Malicious finding at the tool's confidence, or at the level its severity maps to
    (Informational/Low → Low, Medium → Medium, High/Critical → High). Same type on the same entity counts
    once.
-5. **Enrich** (§1.2–§1.3) through the playbook's *Enrich entities* links (the `99-Shared` sub-playbooks;
+6. **Enrich** (§1.2–§1.3), starting from what the detection already asserted rather than repeating it: a
+   family it named is looked up for its behaviour, not re-attributed, and a question it has already
+   answered is recorded with the detection as its source and asked again only where the decision turns on
+   it and the answer can be checked independently. Go through the playbook's *Enrich entities* links (the `99-Shared` sub-playbooks;
    carry back their **Produces** outputs by name) and its numbered **Checks**. Query threat intelligence,
    the asset inventory, the directory, the SOC Knowledge Base, prior Cases, the 30-day history, lateral
    scope and the campaign check. **Egress rule**: only hashes and already-public IPs and domains leave the
    environment; never files, full URLs or message bodies; detonation only in an isolated sandbox.
-6. **Tag every result** as the playbook prescribes: `Malicious` or `Benign` at Low, Medium or High
+7. **Tag every result** as the playbook prescribes: `Malicious` or `Benign` at Low, Medium or High
    (Definitions §7: High establishes the side alone, Medium is a strong signal needing a second, Low is
    consistent but common in normal operation). A result that bears on neither side is context, untagged.
    A `Benign (High)` finding is one that **explains** an alert: an approved exception or documented
@@ -100,9 +128,12 @@ Read per alert: the playbook section the script prints.
    one applies, because they lead to different verdicts. A prior Case's verdict is context, never a
    verdict: verify its reasoning applies to *this* Case. A campaign firing across many entities becomes one
    campaign-level Case with severity for the campaign scope.
-7. **Classify** (§1.4). Validate or override the source `severity_id` from asset criticality, identity
+8. **Classify** (§1.4). Validate or override the source `severity_id` from asset criticality, identity
    privilege and blast radius, and state why. Record `impact_id` only when already known; never guess.
-8. **Decide** by the coverage rule: `python3 scripts/triage_decide.py ledger.json`. The script closes
+9. **Decide** by the coverage rule: `python3 scripts/triage_decide.py ledger.json`. It prints
+   `DECISION NOT READY` while a recommended action of step 3 is neither followed nor set aside with a
+   reason, and it repeats what the source already neutralized, so that no Case is closed because
+   everything in it was blocked. The script closes
    only when no Malicious finding exists beyond the alerts *and* the Benign findings cover every alert
    (a High alert only by a `Benign (High)` finding; a Low or Medium alert by Benign weights summing above
    its own); otherwise it promotes, including when there is no finding at all. It also computes the
@@ -111,7 +142,7 @@ Read per alert: the playbook section the script prints.
    merged), set `duplicate_of` in the ledger, and never treat the same alert on a different entity as a
    duplicate. Checklist before promoting or closing: can you say in one sentence, with evidence, why
    the activity is or is not suspicious? If not, gather more.
-9. **Write the Triage Note.** The Note renders the Case and holds no state of its own: everything it
+10. **Write the Triage Note.** The Note renders the Case and holds no state of its own: everything it
    shows is already on the Case, sampled at this gate. The canonical element list is
    [Detection & Analysis §1.6](references/framework/03-Processes/02-detection_and_analysis.md), and the
    order is part of it — **Classification** (severity, confidence, impact when known, the candidate
@@ -119,15 +150,21 @@ Read per alert: the playbook section the script prints.
    on a Duplicate); **Summary** (what happened and when, which entities were involved and who acted on
    whom, and the root cause where found — how it is known and how sure you are, in prose, which is not
    `confidence_id`); **Findings** (a table, alerts first, each with its tag, **what produced it** — the
-   check is the Finding's `analytic` — and the events it rests on by OCSF identifier); **Rationale**
+   check is the Finding's `analytic` — and the events it rests on by OCSF identifier; each **Alert** also
+   renders what its detection asserted: its techniques as `ID (Name)`, the threat name and family, the
+   detection source and detector, and the remediation state of each entity it names, with the
+   **disposition of the recommended actions** — each followed, with the Finding it produced, or set aside,
+   with the reason); **Rationale**
    (the coverage rule applied in one or two sentences); **Case Timeline** (only the Findings flagged for
    it, which at triage is usually none — write "None."); **Visibility Gaps** (or "None."); **Provenance**
    (playbook path and version, executor classes, capability classes invoked, Case id).
    There is no Actions Taken element and no References element: the check that produced a Finding is
    rendered beside that Finding, and so are the events it cites.
    Name it `triage_note_<case-id>_<YYYYMMDD-HHMM>`.
-   Technique codes are always `ID (Name)`. Summarize evidence; never paste raw logs.
-10. **Emit.** On Close: `verdict_id` 1 (False Positive; also a tuning ticket to Phase 1), 5 (Benign; also a
+   Technique codes are always `ID (Name)`: `scripts/alert_metadata.py` renders the ones the framework's
+   tables name, and for the rest write the ATT&CK or ATLAS name — a bare identifier is not conformant.
+   Summarize evidence; never paste raw logs.
+11. **Emit.** On Close: `verdict_id` 1 (False Positive; also a tuning ticket to Phase 1), 5 (Benign; also a
     Knowledge Base entry if the exception was unrecorded) or 10 (Duplicate, with `master_case_uid`). On
     Promote: `verdict_id` stays 0 and the Case carries the **Triage → Investigation contract** of
     [Playbook Architecture §5](references/framework/04-Playbooks/playbook_architecture.md): `uid`,
@@ -151,6 +188,8 @@ Read per alert: the playbook section the script prints.
 ## Completion criteria
 
 Exactly one outcome recorded; the Triage Note conformant (every tagged Finding has an event reference,
-Visibility Gaps stated); on Promote the contract populated; on Close the verdict and its emission done.
+what each detection asserted rendered with its Alert, every recommended action followed or set aside with
+a reason, Visibility Gaps stated); on Promote the contract populated; on Close the verdict and its
+emission done.
 A Note whose Findings lack event references, or a close that leaves an alert uncovered, is
 non-conformant and voids the run.

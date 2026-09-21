@@ -9,6 +9,9 @@ Ledger (JSON):
   "playbook": "04-Playbooks/01-Triage/endpoint.md", "playbook_version": "2026-09-16", "domain": "Endpoint",
   "alerts":   [{"id": "DF-1", "type": "Credential dumping", "entity": "host-1", "confidence": "High"|null,
                 "severity": "High", "technique": "T1003"}],
+  "detection_metadata": {...},   the output of scripts/alert_metadata.py: what each Alert's detection
+                                 asserts (§1.1), the remediation the source already performed, and the
+                                 assertions it did not supply
   "findings": [{"id": "F1", "desc": "...", "side": "Malicious"|"Benign"|null, "confidence": "Low|Medium|High",
                 "covers": ["DF-1"], "artifact": "hash:...", "retracted": false}],
   "evidence_inventory": {"extracted": 31, "source_count": 31, "complete": true},
@@ -16,6 +19,11 @@ Ledger (JSON):
   "duplicate_of": null | "CASE-0"
 }
 Alerts are the first Malicious findings at the tool's confidence, or at the level their severity maps to.
+The confidence leaving triage rises on independent alerts of different types **or techniques**, which are
+the techniques the detections named. The coverage rule itself is unchanged: what the source already
+neutralized is reported with the decision and never weighed into it — a block is a response, not an
+explanation — and a recommended action the run has neither followed nor set aside with a reason leaves
+`decision_ready` false, so the rule is computed but not yet acted on.
 Findings with side null are context and do not score. A Benign finding with no "covers" covers every alert.
 Prints the decision, the coverage per alert, the confidence leaving triage and the verdict to record.
 """
@@ -26,6 +34,10 @@ try:
     from evidence_inventory import note as inventory_note
 except ImportError:  # the shared script is copied next to this one by tools/build_references.py
     inventory_note = None
+try:
+    from alert_metadata import actions_of, decision_notes, dispositions, neutralized, techniques_of
+except ImportError:
+    actions_of = decision_notes = dispositions = neutralized = techniques_of = None
 
 W = {"Low": 1, "Medium": 2, "High": 3}
 LEVELS = ["Low", "Medium", "High"]
@@ -84,7 +96,14 @@ def _decide(ledger):
         result.update(confidence_id=level, confidence=LEVELS[level - 1], confidence_notes=notes)
     elif alerts:
         level = max(W[a["confidence"]] for a in alerts)
-        kinds = {(a.get("technique") or a.get("type", "")).strip().lower() for a in alerts}
+        named = techniques_of(ledger.get("detection_metadata")) if techniques_of else {}
+        kinds = set()
+        for a in alerts:
+            ids = [i for i in [a["id"], *(a.get("merged_ids") or [])] if named.get(i)]
+            asserted = frozenset(str(t).strip().upper() for i in ids for t in named[i])
+            # one shape for a kind, so the same kind named twice counts once: the techniques the
+            # detection named, or, where it named none, the alert type itself
+            kinds.add(asserted or frozenset({(a.get("technique") or a.get("type", "")).strip().lower()}))
         artifacts = {f.get("artifact") or f["id"] for f in mal}
         raised = len(kinds) >= 2 or len(artifacts) >= 2
         if raised: level += 1
@@ -99,11 +118,24 @@ def _decide(ledger):
 
 
 def decide(ledger):
-    """The §1.5 decision, plus a note when the evidence inventory is missing, unverified or incomplete."""
+    """The §1.5 decision, with the evidence inventory and what the detection asserts read at the gate.
+
+    The coverage rule is untouched by either: an incomplete inventory and an unread recommendation are
+    reported, and `decision_ready` says whether the decision may be acted on yet.
+    """
     r = _decide(ledger)
     inventory = inventory_note(ledger.get("evidence_inventory")) if inventory_note else None
     if inventory:
         r["evidence_inventory_note"] = inventory
+    record = ledger.get("detection_metadata")
+    if decision_notes:
+        r["detection_notes"] = decision_notes(record, ledger)
+    if record:
+        r["recommended_actions"] = dispositions(actions_of(record)) if dispositions else {}
+        r["neutralized_entities"] = neutralized(record)
+        if record.get("candidate_incident_categories"):
+            r["candidate_incident_categories"] = record["candidate_incident_categories"]
+    r["decision_ready"] = not r.get("recommended_actions", {}).get("open")
     return r
 
 
@@ -128,7 +160,12 @@ def main():
         print(f"Confidence leaving triage: {r['confidence']} ({r['confidence_id']})" + (" — " + "; ".join(r["confidence_notes"]) if r["confidence_notes"] else ""))
     if r.get("emit"): print("Emit: " + r["emit"])
     if r.get("reminder"): print(r["reminder"])
+    if r.get("candidate_incident_categories"):
+        print("Candidate Incident Categories from the techniques the detections named: " + ", ".join(r["candidate_incident_categories"]))
     if r.get("evidence_inventory_note"): print("Note: " + r["evidence_inventory_note"])
+    for note in r.get("detection_notes", []): print("Note: " + note)
+    if not r.get("decision_ready"):
+        print("DECISION NOT READY: a recommended action is neither followed nor set aside with a reason (§1.5).")
 
 
 if __name__ == "__main__":

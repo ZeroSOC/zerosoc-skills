@@ -4,7 +4,7 @@ description: Respond to a confirmed Incident under the ZeroSOC Framework (Phase 
 license: Apache-2.0
 metadata:
   version: "0.3.0"
-  framework: "zerosoc-framework@5f4ab24 (main, 2026-09-18)"
+  framework: "zerosoc-framework@c6fb175 (PR #66, 2026-09-20)"
   status: draft
   author: ZeroSOC
 ---
@@ -34,7 +34,9 @@ and the autonomy matrix, §2.1) and [Guardrails §2–§3](references/framework/
   the Findings and any action already taken), `start_time` (the Incident's T0), `severity_id`,
   `confidence_id`, `impact_id`, `significant`, `cross_border`, `handover_reason`, `notes` carrying the
   Investigation Note, the recommended actions. A tool-initiated action that fired before any executor
-  opened the Case is already an entry: read them before acting, so nothing is done twice.
+  opened the Case is already an entry — this is where the **remediation the source performed per entity**
+  is carried, blocked, quarantined or removed: read them before acting, so nothing is done twice and an
+  entity the source left active is not mistaken for one it treated.
 - The capability binding `zerosoc.capabilities.json` with the `containment.*` classes, `ticketing` and
   `notification`; the telemetry classes to verify containment and eradication.
 
@@ -52,7 +54,10 @@ and the autonomy matrix, §2.1) and [Guardrails §2–§3](references/framework/
    and record each notification (`notifications`: kind, recipient, deadline, sent time). Internal
    notification by severity: High within 30 minutes to asset owners and the security lead; Critical
    within 15 minutes to the CISO, legal, risk and executives (reference times).
-3. **Select containment actions** from the playbook:
+3. **Select containment actions** from the playbook. Subtract what the source has already done: an
+   entity it blocked, quarantined or removed needs no containment repeating on it, and the action is
+   recorded as taken by the source rather than claimed by this run; an entity it left **active** keeps
+   every action the matrix allows. Then run:
    `python3 scripts/select_playbook.py --category IC-01 --section "Incident Response" --bindings zerosoc.capabilities.json`
    prints the playbook version, its required data sources and the **Containment**, **Eradication** and
    **Recovery** lists. Actions marked **requires approval** are in the approval tier; every other action

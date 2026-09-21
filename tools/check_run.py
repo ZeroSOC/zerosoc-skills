@@ -7,8 +7,8 @@ A run is a directory holding what the executor produced, one file per artifact:
 
   evidence.json            the Case's evidence rows, as given to evidence_inventory.py
   alerts.json              the source alerts, as given to alert_types.py
-  ledger.triage.json       the triage ledger at the decision, with "domain" and the Note's
-                           "recorded_verdict"
+  ledger.triage.json       the triage ledger at the decision, with "domain", the Note's
+                           "recorded_verdict" and the "detection_metadata" of alert_metadata.py
   ledger.investigation.json  the investigation ledger at the resolution   (optional)
   triage_note.md           the Triage Note                                 (optional)
   investigation_note.md    the Investigation Note                          (optional)
@@ -37,6 +37,7 @@ def load(rel, name):
 
 evidence_inventory = load("tools/shared/evidence_inventory.py", "evidence_inventory")
 alert_types = load("tools/shared/alert_types.py", "alert_types")
+alert_metadata = load("tools/shared/alert_metadata.py", "alert_metadata")
 triage_decide = load("skills/zerosoc-triage/scripts/triage_decide.py", "triage_decide")
 resolve_rule = load("skills/zerosoc-investigation/scripts/resolve.py", "resolve_rule")
 
@@ -174,6 +175,80 @@ def check_alert_ledger(report, ledger, label, source_titles=None):
     return findings
 
 
+def check_detection_metadata(report, run, ledger, label, note_name, mapping_path=None):
+    """Detection & Analysis §1.1: what the detection asserted is on the Case, and what it did not supply
+    is a recorded gap.
+
+    The assertions are **recomputed** from the run's own alerts and evidence, so a ledger cannot claim a
+    technique or a threat name the alerts never carried, or quietly drop one they did. The dispositions
+    of the recommended actions are the run's own work and are read from the ledger; everything else here
+    is checked against the source records the run was given.
+    """
+    if not ledger:
+        return report.skip(f"{label}: what the detection asserts is on the ledger", "no ledger in the run")
+    binding = read(run, "zerosoc.capabilities.json")
+    if binding is not None and not binding.get("alert_type_map"):
+        return report.skip(f"{label}: what the detection asserts is on the ledger",
+                           "the binding names no alert-type map, so no field names are declared for this "
+                           "source: the assertions cannot be read and the deployment degrades explicitly")
+    record = ledger.get("detection_metadata")
+    if not record:
+        return report.fail(f"{label}: what the detection asserts is on the ledger",
+                           "the alerts' techniques, threat name, detection source, remediation state, "
+                           "description and recommended actions, extracted before enrichment",
+                           "the ledger carries no detection_metadata")
+    alerts = read(run, "alerts.json")
+    fresh = None
+    if alerts and mapping_path and os.path.exists(mapping_path):
+        amap = alert_types.load_map(mapping_path)
+        fresh = alert_metadata.build(alerts, amap, read(run, "evidence.json"))
+        claimed = {str(a.get("id")): a for a in record.get("alerts", [])}
+        wrong = []
+        for alert in fresh["alerts"]:
+            held = claimed.get(str(alert["id"]))
+            if held is None:
+                wrong.append(f"{alert['id']} not read")
+                continue
+            for field, ours in (("techniques", [t["id"] for t in alert["techniques"]]),
+                                ("threat", alert["threat"]),
+                                ("absent", alert["absent"])):
+                theirs = ([t.get("id") for t in held.get("techniques") or []] if field == "techniques"
+                          else held.get(field))
+                if theirs != ours:
+                    wrong.append(f"{alert['id']} {field}: {theirs!r} for {ours!r}")
+        report.check(not wrong, f"{label}: the assertions are the ones the alerts carry",
+                     f"the {len(fresh['alerts'])} alerts as alert_metadata.py reads them",
+                     "; ".join(wrong[:4]) if wrong else f"all {len(fresh['alerts'])} as recomputed")
+    elif alerts:
+        report.skip(f"{label}: the assertions are the ones the alerts carry", "no alert-type map given")
+    recorded = {str(g.get("data_source", "")).strip().lower() for g in ledger.get("visibility_gaps", [])
+                if isinstance(g, dict)}
+    absent = sorted({a for alert in record.get("alerts", []) for a in alert.get("absent", [])})
+    unrecorded = [a for a in absent if f"alert metadata: {a}" not in recorded]
+    report.check(not unrecorded, f"{label}: an assertion the source did not supply is a recorded gap",
+                 "each absence in visibility_gaps with the check it prevented",
+                 f"{len(unrecorded)} absent and not recorded: " + ", ".join(unrecorded) if unrecorded
+                 else ("nothing absent" if not absent else f"all {len(absent)} recorded"))
+    state = alert_metadata.dispositions(alert_metadata.actions_of(record))
+    actions = alert_metadata.actions_of(record)
+    report.check(not state["open"], f"{label}: every recommended action followed or set aside with a reason",
+                 f"a disposition for each of the {len(actions)} the source published",
+                 f"{len(state['open'])} left unread: " + ", ".join(str(i) for i in state["open"]) if state["open"]
+                 else f"{len(state['followed'])} followed, {len(state['set_aside'])} set aside")
+    neutralized = [r["entity"] for r in record.get("remediation", []) if r.get("neutralized")]
+    note = read(run, note_name)
+    if not neutralized:
+        report.ok(f"{label}: the remediation the source performed is in the Note", "the source neutralized nothing")
+    elif note is None:
+        report.skip(f"{label}: the remediation the source performed is in the Note", f"no {note_name} in the run")
+    else:
+        unsaid = [e for e in neutralized if str(e) not in note]
+        report.check(not unsaid, f"{label}: the remediation the source performed is in the Note",
+                     f"the state of all {len(neutralized)} entities the source neutralized",
+                     f"{len(unsaid)} missing from the Note: " + ", ".join(str(e) for e in unsaid[:4]) if unsaid
+                     else f"all {len(neutralized)} named")
+
+
 def check_timebox(report, ledger):
     """The timebox is measured from the ledger's own timestamps, never self-reported."""
     if not ledger:
@@ -288,12 +363,16 @@ def _run(run, mapping):
     check_inventory(report, run, triage, "triage")
     titles = check_alert_map(report, run, mapping)
     check_alert_ledger(report, triage, "triage", titles)
+    check_detection_metadata(report, run, triage, "triage", "triage_note.md", mapping)
     check_visibility_gaps(report, run, triage, "triage")
     check_decision(report, triage, None, "triage", triage_decide.decide)
 
     print("\n# investigation")
     check_inventory(report, run, investigation, "investigation")
     check_alert_ledger(report, investigation, "investigation", titles)
+    check_detection_metadata(
+        report, run, investigation, "investigation", "investigation_note.md", mapping
+    )
     check_visibility_gaps(report, run, investigation, "investigation")
     result = check_timebox(report, investigation)
     check_decision(report, investigation, result, "investigation", resolve_rule.resolve)
