@@ -231,7 +231,7 @@
     },
     "alert_types": {
       "type": "object",
-      "description": "The source's alerts in the framework's alert types. A detector id wins over any title match; then the first rule, in order, whose title pattern matches.",
+      "description": "The source's alerts in the framework's alert types. A detector id wins over any title match; then the first rule, in order, whose title pattern matches. A rule either names the framework alert type its alerts carry, or declares that they are deliberately left unmapped and says why.",
       "required": [
         "rules"
       ],
@@ -245,31 +245,55 @@
           "minItems": 1,
           "items": {
             "type": "object",
-            "required": [
-              "alert_type",
-              "domain"
-            ],
-            "additionalProperties": false,
-            "properties": {
-              "alert_type": {
-                "type": "string"
-              },
-              "domain": {
-                "type": "string"
-              },
-              "detector_ids": {
-                "type": "array",
-                "items": {
-                  "type": "string"
+            "oneOf": [
+              {
+                "title": "Mapping rule",
+                "description": "The alerts this rule matches carry this framework alert type.",
+                "required": [
+                  "alert_type",
+                  "domain"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "alert_type": {
+                    "type": "string"
+                  },
+                  "domain": {
+                    "type": "string"
+                  },
+                  "detector_ids": {
+                    "$ref": "#/$defs/alert_rule_detector_ids"
+                  },
+                  "title_patterns": {
+                    "$ref": "#/$defs/alert_rule_title_patterns"
+                  }
                 }
               },
-              "title_patterns": {
-                "type": "array",
-                "items": {
-                  "type": "string"
+              {
+                "title": "Deliberate non-mapping",
+                "description": "The alerts this rule matches are left unmapped on purpose: they keep their own title as their type, and `reason` says why no framework alert type is right for them. An alert that no rule matches at all is still reported as unmapped — this rule form is the difference between a gap nobody has looked at and one that has been decided.",
+                "required": [
+                  "unmapped",
+                  "reason"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "unmapped": {
+                    "const": true
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "detector_ids": {
+                    "$ref": "#/$defs/alert_rule_detector_ids"
+                  },
+                  "title_patterns": {
+                    "$ref": "#/$defs/alert_rule_title_patterns"
+                  }
                 }
               }
-            }
+            ]
           }
         }
       }
@@ -433,6 +457,20 @@
     }
   },
   "$defs": {
+    "alert_rule_detector_ids": {
+      "type": "array",
+      "description": "The source's own detector identifiers. A detector id match wins over any title match, so a detector that the source reuses across alerts of different meaning does not belong here — match those by title.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "alert_rule_title_patterns": {
+      "type": "array",
+      "description": "Case-insensitive regular expressions matched against the alert title.",
+      "items": {
+        "type": "string"
+      }
+    },
     "paths": {
       "type": "object",
       "description": "name the framework uses -> path on the source's record.",

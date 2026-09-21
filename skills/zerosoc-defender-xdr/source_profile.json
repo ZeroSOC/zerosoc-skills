@@ -361,6 +361,37 @@
     },
     "rules": [
       {
+        "unmapped": true,
+        "reason": "A correlation verdict the source draws over its own alerts, carrying no technique of its own. It states that a sequence looks human-operated, which is a conclusion about a Case rather than a behaviour observed on an entity, and no alert type describes it.",
+        "detector_ids": [
+          "5ec617e4-67e1-44be-a592-067be1d5b31d",
+          "c2232c2e-3294-49ba-ae3a-9f0bfb5fa6be"
+        ],
+        "title_patterns": [
+          "human[- ]operated malicious activity"
+        ]
+      },
+      {
+        "unmapped": true,
+        "reason": "Attribution to a named actor, carrying no technique of its own. It says who the source believes is present, not what was seen; mapping it to a behaviour would assert an act the record does not report.",
+        "detector_ids": [
+          "80fdda5d-5e32-47be-b536-e217c0e2cb10"
+        ],
+        "title_patterns": [
+          "threat actor detected"
+        ]
+      },
+      {
+        "unmapped": true,
+        "reason": "A containment record: the source reports that it disrupted an attack and may isolate the entity. It carries no technique, and describes a response already taken rather than a detection to triage.",
+        "detector_ids": [
+          "807e2ff2-de6b-4cb7-9ce7-86fb36f83347"
+        ],
+        "title_patterns": [
+          "\\(attack disruption\\)"
+        ]
+      },
+      {
         "alert_type": "User-reported phishing",
         "domain": "Email",
         "detector_ids": [],
@@ -432,7 +463,10 @@
       {
         "alert_type": "Credential dumping",
         "domain": "Endpoint",
-        "detector_ids": [],
+        "detector_ids": [
+          "0f60e988-0708-445b-8ded-bed43f54cf4e",
+          "cfae1552-d6bf-4a57-97ec-a97d45fbc0e2"
+        ],
         "title_patterns": [
           "credential dump",
           "credential memory read",
@@ -440,7 +474,25 @@
           "credential theft",
           "ntds",
           "sam (database|registry) .*(dump|access)",
-          "mimikatz"
+          "mimikatz",
+          "local security authority",
+          "process memory dump"
+        ]
+      },
+      {
+        "alert_type": "Remote execution / lateral movement",
+        "domain": "Endpoint",
+        "detector_ids": [
+          "6d9db1e3-5be3-449a-a1f1-e9b3d0819386",
+          "a7252db9-9b32-4995-8dfc-82aa1c87dc2d",
+          "ab9004ab-d4ab-4f8e-8c13-c8ab245788dd",
+          "b5270c42-a2cb-433d-b18e-ed70e3aef9ad",
+          "c7fd1547-da0e-415b-bfbb-ada9e2705feb"
+        ],
+        "title_patterns": [
+          "^impacket toolkit",
+          "compromised account conducting hands[- ]on[- ]keyboard",
+          "remote (service|wmi|winrm) execution"
         ]
       },
       {
@@ -458,14 +510,20 @@
       {
         "alert_type": "Persistence mechanism created",
         "domain": "Endpoint",
-        "detector_ids": [],
+        "detector_ids": [
+          "446b23e1-48b0-41f9-ae7b-03655adcf941",
+          "96e4d617-29a5-418e-90f7-6962e63cf6ea",
+          "a5af9713-6eea-4d23-9bdc-9cab19f19092"
+        ],
         "title_patterns": [
           "scheduled task",
-          "suspicious service (registration|registered|creat|install)",
+          "suspicious service (registration|registered|creat|install|launch)",
           "(registry )?run key",
           "autostart",
           "anomaly detected in asep",
-          "persistence"
+          "persistence",
+          "task scheduler",
+          "masqueraded task or service"
         ]
       },
       {
@@ -492,14 +550,17 @@
       {
         "alert_type": "Suspicious script / interpreter execution",
         "domain": "Endpoint",
-        "detector_ids": [],
+        "detector_ids": [
+          "9c3a70ec-e18a-4f92-865a-530f73130b7c"
+        ],
         "title_patterns": [
           "powershell",
           "suspicious (script|command ?line|wscript|cscript|mshta|rundll32|regsvr32)",
           "living[- ]off[- ]the[- ]land",
           "encoded command",
           "remote (shell|command|powershell)",
-          "suspicious remote activity"
+          "suspicious remote activity",
+          "ongoing hands[- ]on[- ]keyboard"
         ]
       },
       {
@@ -526,7 +587,9 @@
       {
         "alert_type": "Malware / loader execution",
         "domain": "Endpoint",
-        "detector_ids": [],
+        "detector_ids": [
+          "f37b8bc2-cfd2-4a8e-ac62-24a7df1e698c"
+        ],
         "title_patterns": [
           "(malware|ransomware) (was )?(detected|prevented|blocked|found)",
           "an active .* (malware|hacktool|backdoor|trojan)",
@@ -537,7 +600,8 @@
           "\\bloader\\b",
           "suspicious (file|binary|executable|process)",
           "process injection",
-          "unwanted software"
+          "unwanted software",
+          "post[- ]exploitation tool"
         ]
       },
       {

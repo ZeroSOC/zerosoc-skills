@@ -38,6 +38,7 @@ import source_profile  # noqa: E402
 KNOWN = {
     "$schema", "$id", "$ref", "$defs", "title", "description",
     "type", "required", "properties", "additionalProperties", "items", "minItems", "enum",
+    "oneOf", "const", "minLength",
 }
 TYPES: dict[str, type | tuple[type, ...]] = {
     "object": dict, "array": list, "string": str, "integer": int, "boolean": bool, "null": type(None)
@@ -73,6 +74,9 @@ def supported(schema: Any, where: str = "schema") -> list[str]:
                     problems += supported(sub, f"{where}.{name}.{key}")
             elif name in ("items", "additionalProperties"):
                 problems += supported(held, f"{where}.{name}")
+            elif name == "oneOf":
+                for n, sub in enumerate(held or []):
+                    problems += supported(sub, f"{where}.oneOf[{n}]")
     return problems
 
 
@@ -94,6 +98,12 @@ def validate(value: Any, schema: dict[str, Any], root: dict[str, Any], where: st
         return [f"{where}: expected {' or '.join(kinds)}, found {type(value).__name__}"]
     if "enum" in schema and value not in schema["enum"]:
         problems.append(f"{where}: {value!r} is not one of {schema['enum']}")
+    if "const" in schema and value != schema["const"]:
+        problems.append(f"{where}: expected {schema['const']!r}, found {value!r}")
+    if "minLength" in schema and isinstance(value, str) and len(value) < schema["minLength"]:
+        problems.append(f"{where}: {value!r} is shorter than the {schema['minLength']} characters required")
+    if "oneOf" in schema:
+        problems += _one_of(value, schema["oneOf"], root, where)
 
     if isinstance(value, dict):
         for name in schema.get("required", []):
@@ -115,6 +125,25 @@ def validate(value: Any, schema: dict[str, Any], root: dict[str, Any], where: st
             for n, held in enumerate(value):
                 problems += validate(held, schema["items"], root, f"{where}[{n}]")
     return problems
+
+
+def _one_of(value: Any, branches: list[dict[str, Any]], root: dict[str, Any], where: str) -> list[str]:
+    """One of several forms the same place may take, and exactly one of them.
+
+    When none fits, the branch that came closest is the useful answer — a rule missing one key is
+    reported against the form it was nearly, not against all of them at once — so the branch with
+    the fewest problems is the one reported, named by its title where the schema gives one.
+    """
+    failures = [(sub, validate(value, sub, root, where)) for sub in branches]
+    fitting = [sub for sub, problems in failures if not problems]
+    if len(fitting) == 1:
+        return []
+    forms = " or ".join(sub.get("title", f"form {n + 1}") for n, sub in enumerate(branches))
+    if not fitting:
+        closest, problems = min(failures, key=lambda pair: len(pair[1]))
+        named = closest.get("title", "one of the forms")
+        return [f"{where}: fits none of {forms}; read as {named}: " + "; ".join(problems)]
+    return [f"{where}: fits more than one of {forms}, so which was meant is ambiguous"]
 
 
 def coherent(profile: dict[str, Any], where: str) -> list[str]:
@@ -155,18 +184,22 @@ def coherent(profile: dict[str, Any], where: str) -> list[str]:
             problems.append(
                 f"{where}: alert_types.fields.{name} reads {path!r}, which the case_map does not name")
     for rule in profile["alert_types"]["rules"]:
+        # a rule either names the framework type its alerts carry, or says they are deliberately
+        # left unmapped; both forms match the same way, so both are reported by what they are
+        named = (f"alert type {rule['alert_type']!r}" if "alert_type" in rule
+                 else f"the non-mapping {rule.get('reason', '')!r}")
         if not rule.get("detector_ids") and not rule.get("title_patterns"):
-            problems.append(f"{where}: alert type {rule['alert_type']!r} has no detector id and no "
+            problems.append(f"{where}: {named} has no detector id and no "
                             "title pattern, so it matches nothing")
         for pattern in rule.get("title_patterns", []):
             if not pattern.strip():
-                problems.append(f"{where}: alert type {rule['alert_type']!r} has an empty title "
+                problems.append(f"{where}: {named} has an empty title "
                                 "pattern, which matches every title")
                 continue
             try:
                 re.compile(pattern)
             except re.error as exc:
-                problems.append(f"{where}: alert type {rule['alert_type']!r} has a bad pattern {pattern!r}: {exc}")
+                problems.append(f"{where}: {named} has a bad pattern {pattern!r}: {exc}")
     for name, held in profile["extension"]["properties"].items():
         if held["from"] not in paths:
             problems.append(f"{where}: extension.{name} reads {held['from']!r}, which the case_map does not name")

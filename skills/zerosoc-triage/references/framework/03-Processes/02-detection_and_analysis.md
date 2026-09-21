@@ -2,10 +2,10 @@
 title: Phase 2 - Detection & Analysis
 type: process
 status: development
-last_updated: 2026-09-20
+last_updated: 2026-09-21
 license: Apache-2.0
 ---
-<!-- generated from zerosoc-framework@b5f4966fd685 : 03-Processes/02-detection_and_analysis.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@a5ef27cbdbd7 : 03-Processes/02-detection_and_analysis.md — do not edit; regenerate with tools/build_references.py -->
 
 # Phase 2: Detection & Analysis
 
@@ -156,7 +156,7 @@ Otherwise promote — including when there is no finding at all: an alert that e
 >
 > **Example — the source blocked it, and the Case still promotes.** Endpoint alert "Malware / loader execution", tool confidence High → `Malicious (High)`, 3. The detection asserts `T1204 (User Execution)` and `T1059 (Command and Scripting Interpreter)`, names the threat as a known loader family, was raised by a signature rather than a behavioral rule, and reports the file **quarantined** and the process **terminated**. Its recommended actions are a full scan of the device and a check for the same file elsewhere. Triage runs both, and neither bears on the side: a clean scan says no *other* malware is on the device and the file being on no other device bounds the blast radius — both are **context**, because neither is consistent with the activity having been authorized or the detection having misfired (§2.4). Two checks the block does not answer remain: the file was written by the mail client twenty minutes earlier, from an attachment no email alert fired on → `Malicious (Medium)`, 2, and the user opened it. Nothing weighs on the Benign side at all, and a Malicious finding stands beyond the Alert. **Promote** — quarantining the payload closed the execution, not the delivery, and the unexamined mail path is the Case. The quarantine and the termination are recorded as actions of the Case, so Response is not asked to contain what is already contained.
 >
-> **Example — a Case that promotes.** Endpoint alerts "Credential dumping" (tool confidence High → `Malicious (High)`, 3) and "Internal scan / lateral movement" (no confidence field, severity Medium → `Malicious (Medium)`, 2) on the same host. Findings: the host is a jump server used by administrators → `Benign (Low)`, 1; the knowledge base records an authorized penetration test this week whose scope does not include this host (context); the dumping process was launched from a scheduled task created two hours earlier → `Malicious (Medium)`, 2; the task creator is a service account that never created tasks before → `Malicious (Low)`, 1. A Malicious finding exists beyond the alerts and neither alert is covered. **Promote**; two independent techniques raise the confidence to High.
+> **Example — a Case that promotes.** Endpoint alerts "Credential dumping" (tool confidence High → `Malicious (High)`, 3) and "Remote execution / lateral movement" (no confidence field, severity Medium → `Malicious (Medium)`, 2) on the same host. Findings: the host is a jump server used by administrators → `Benign (Low)`, 1; the knowledge base records an authorized penetration test this week whose scope does not include this host (context); the dumping process was launched from a scheduled task created two hours earlier → `Malicious (Medium)`, 2; the task creator is a service account that never created tasks before → `Malicious (Low)`, 1. A Malicious finding exists beyond the alerts and neither alert is covered. **Promote**; two independent techniques raise the confidence to High.
 
 **Closing as Duplicate.** A Case is closed as Duplicate (`verdict_id` 10) — at triage or during investigation — when its activity, root cause and threat vector are already being handled by an open **master Case** (a tuning ticket submitted, an investigation or a response in progress) and the recurrence adds neither risk nor evidence to it. Because a wrongly closed duplicate is a missed threat, all of the following are validated first:
 
@@ -171,7 +171,7 @@ Do **not** close as Duplicate when the identical alert fires on a *different* ho
 
 Every triage — whether performed by a human, automation, or an agent — produces a **Triage Note**, the decision record that travels with the Case and its phase transition contract. It is distinct from, and lighter than, the forensic **Evidence Preservation & Chain of Custody** record (§3.3), which is incident-grade and tamper-proof.
 
-**The Note holds no state of its own.** Everything it shows is already on the Case, sampled at this gate: the Note is one `note` on the Case — `title` the deliverable name, `comment` the rendering, `owner` the executor, `created_time` and `modified_time` its anchors ([Case Schema](../02-Taxonomy/case_schema.md)). What follows is therefore what the rendering MUST contain, and in what order; it is not a second place the same facts are kept. Whatever the Case cannot carry is not recoverable from the Note either.
+**The Note holds no state of its own.** Everything it shows is already on the Case, sampled at this gate: the Note is one `note` on the Case — `title` the deliverable name, `comment` the rendering, `owner` the executor, `created_time` and `modified_time` its anchors ([Case Schema](../02-Taxonomy/case_schema.md)). What follows is therefore what the rendering MUST contain, and in what order; it is not a second place the same facts are kept. What has no field of its own — the reasoning — is what the rendering carries, and it is on the Case because the Note is.
 
 A conformant Triage Note renders, in this order:
 

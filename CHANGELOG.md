@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased — conforms to zerosoc-framework@a5ef27c
+
+- **The alert-type map covers the alert titles four real incidents actually raised.** The map reads
+  an alert, never the incident that holds it: measured over the alerts of whole incidents read from
+  a lab tenant, 43 of 93 alerts across 13 distinct alert titles matched no rule and kept their own
+  title as their type, so they never reached a per-alert playbook section. Ten of the
+  thirteen now map — two of them to `Remote execution / lateral movement`, an Endpoint alert type
+  the framework did not have until it was added for exactly this (ZeroSOC/zerosoc-framework#71):
+  lateral movement had one home, and its telemetry was the network rather than the host. Where a
+  detector id is stable it is matched first, as it should be; two detectors in these recordings
+  carry more than one title, and because a detector id wins over any title match, binding them
+  would have retyped alerts that were already right — those are matched by title, and a test holds
+  them that way.
+- **An alert a source cannot describe may now be left unmapped on purpose, with the reason.** A
+  rule of `alert_types` either names the framework alert type its alerts carry, or declares
+  `unmapped` and says why — the two forms are exclusive, and the schema refuses a rule that is
+  both or neither. A source's correlation, attribution and containment records state a conclusion
+  about a Case rather than a behaviour on an entity, and no alert type is true of them; three such
+  titles are now recorded as decided rather than left looking like an oversight. The alert is
+  flagged exactly as before and still deduplicates, so nothing about the run changes: what changes
+  is that the maintainer's list of what to add no longer carries what was already settled.
+
 ## v0.4.1 (2026-09-21) — conforms to zerosoc-framework@b5f4966
 
 Two defects found running the method surface of `v0.4.0` in a host that checks every Note at both

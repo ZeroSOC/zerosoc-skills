@@ -40,6 +40,12 @@ checker = load("tools/check_run.py", "check_run")
 SHIPPED = ROOT / "skills" / "zerosoc-defender-xdr" / "source_profile.json"
 VERSION = json.loads(SHIPPED.read_text())["source"]["profile_version"]
 
+def _first_mapping(amap: dict[str, Any]) -> dict[str, Any]:
+    """The first shipped rule that names an alert type. Rules that declare a deliberate
+    non-mapping carry no ``alert_type``, and these tests are about the mapping form."""
+    return next(rule for rule in amap["rules"] if "alert_type" in rule)
+
+
 # the vendor renamed the remediation state of an evidence item: the whole fix, and nothing else
 RENAME = {
     "fields": {"evidence": {"remediation_status": "remediationState"}},
@@ -103,7 +109,7 @@ class LocalOverride(unittest.TestCase):
 
     def test_a_local_alert_type_rule_is_tried_before_the_shipped_ones(self) -> None:
         shipped = alert_types.load_map(str(SHIPPED))
-        taken = shipped["rules"][0]
+        taken = _first_mapping(shipped)
         local = {"alert_types": {"rules": [{"alert_type": "Policy violation", "domain": "Endpoint",
                                              "detector_ids": list(taken.get("detector_ids", [])),
                                              "title_patterns": [".*"]}]}}
@@ -115,7 +121,7 @@ class LocalOverride(unittest.TestCase):
 
     def test_a_new_title_is_one_small_rule_and_the_shipped_rule_keeps_following_upstream(self) -> None:
         shipped = alert_types.load_map(str(SHIPPED))
-        known = shipped["rules"][0]
+        known = _first_mapping(shipped)
         local = {"alert_types": {"rules": [{"alert_type": known["alert_type"], "domain": known["domain"],
                                              "title_patterns": ["^a title only this tenant raises$"]}]}}
         rules = alert_types.load_map(*profiles.resolved(str(Deployment(local).binding)))
@@ -136,6 +142,40 @@ class LocalOverride(unittest.TestCase):
         effective = Deployment(RENAME).profile()
         self.assertEqual(check_profiles.validate(effective, schema, schema, "p"), [])
         self.assertEqual(check_profiles.coherent(effective, "p"), [])
+
+    def test_an_alert_rule_is_one_form_or_the_other_and_never_both(self) -> None:
+        """A rule names the framework type its alerts carry, or says they are deliberately left
+        unmapped and why. A rule that does both says two different things about the same alerts,
+        and one that does neither says nothing the script can act on."""
+        schema = json.loads((ROOT / "capabilities" / "source_profile.schema.json").read_text())
+        rules = schema["properties"]["alert_types"]["properties"]["rules"]["items"]
+        for rule, expected in [
+            ({"alert_type": "Credential dumping", "domain": "Endpoint", "title_patterns": ["lsass"]}, ""),
+            ({"unmapped": True, "reason": "a conclusion, not a behaviour", "title_patterns": ["x"]}, ""),
+            ({"alert_type": "Credential dumping", "domain": "Endpoint", "unmapped": True,
+              "reason": "both at once", "title_patterns": ["x"]}, "fits none of"),
+            ({"unmapped": True, "title_patterns": ["x"]}, "fits none of"),
+            ({"unmapped": True, "reason": "", "title_patterns": ["x"]}, "fits none of"),
+            ({"unmapped": False, "reason": "not a non-mapping", "title_patterns": ["x"]}, "fits none of"),
+            ({"title_patterns": ["x"]}, "fits none of"),
+        ]:
+            with self.subTest(rule=rule):
+                problems = check_profiles.validate(rule, rules, schema, "r")
+                self.assertEqual(bool(problems), bool(expected), problems)
+                if expected:
+                    self.assertIn(expected, problems[0])
+
+    def test_a_deliberate_non_mapping_survives_an_override_and_is_named_by_its_reason(self) -> None:
+        local = {"alert_types": {"rules": [{"unmapped": True, "reason": "this tenant's own noise",
+                                            "title_patterns": ["^a title only this tenant raises$"]}]}}
+        deployment = Deployment(local)
+        rules = alert_types.load_map(*profiles.resolved(str(deployment.binding)))
+        built = alert_types.classify({"id": "A1", "title": "A title only this tenant raises"}, rules)
+        self.assertTrue(built["unmapped"])
+        self.assertEqual(built["unmapped_reason"], "this tenant's own noise")
+        self.assertIn("alert_types.rules[unmapped: this tenant's own noise]",
+                      deployment.profile()["source"]["override"]["paths"],
+                      "the run records what the override set, and names a non-mapping by its reason")
 
     def test_a_rename_the_case_map_does_not_follow_fails_the_check_of_the_binding(self) -> None:
         deployment = Deployment({"fields": RENAME["fields"]})
