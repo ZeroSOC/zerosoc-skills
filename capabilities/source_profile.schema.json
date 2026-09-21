@@ -231,7 +231,7 @@
     },
     "alert_types": {
       "type": "object",
-      "description": "The source's alerts in the framework's alert types. A detector id wins over any title match; then the first rule, in order, whose title pattern matches. A rule either names the framework alert type its alerts carry, or declares that they are deliberately left unmapped and says why.",
+      "description": "The source's alerts in the framework's alert types. A detector id wins over any title match; then the first rule, in order, whose title pattern matches. A rule either names the framework alert type its alerts carry, or declares that they are deliberately left unmapped and says why. What the type is for: the same alert type on the same entity counts once (Detection & Analysis §1.1), which is only deterministic when the type is, and an alert type that groups with the same behaviour reported under another vendor's name. What it is not for: choosing a playbook. The executor identifies the telemetry domain and the techniques the detection asserts point at the candidate alert types, before this map is read; an alert left unmapped changes neither.",
       "required": [
         "rules"
       ],

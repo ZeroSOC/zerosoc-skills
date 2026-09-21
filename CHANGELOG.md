@@ -5,7 +5,11 @@
 - **The alert-type map covers the alert titles four real incidents actually raised.** The map reads
   an alert, never the incident that holds it: measured over the alerts of whole incidents read from
   a lab tenant, 43 of 93 alerts across 13 distinct alert titles matched no rule and kept their own
-  title as their type, so they never reached a per-alert playbook section. Ten of the
+  title as their type. The cost is what the type is for: one behaviour reported under two of the
+  vendor's wordings counted twice instead of once (Detection & Analysis §1.1), and a ledger whose
+  `alert_type` is a vendor string groups with nothing seen under another vendor's name. Choosing a
+  playbook is not affected — that is done from the telemetry domain and the techniques the detection
+  asserts, before this map is read. Ten of the
   thirteen now map — two of them to `Remote execution / lateral movement`, an Endpoint alert type
   the framework did not have until it was added for exactly this (ZeroSOC/zerosoc-framework#71):
   lateral movement had one home, and its telemetry was the network rather than the host. Where a

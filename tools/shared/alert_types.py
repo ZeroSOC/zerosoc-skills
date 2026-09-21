@@ -7,6 +7,11 @@ Detection & Analysis §1.1: the same alert type on the same entity counts once. 
 deterministic when the alert type is: this script assigns it from the source profile (detector id first,
 then title pattern) and collapses same type + same entity to the strongest alert, listing what it merged.
 
+That counting, and an alert type that groups with the same behaviour under another vendor's name, are
+what the type is for. Choosing a playbook is not: the executor identifies the telemetry domain, and
+the techniques the detection asserts point at the candidate alert types (select_playbook.py
+--technique), both before this runs. An alert left unmapped changes neither.
+
   alert_types.py alerts.json --bindings zerosoc.capabilities.json   (reads the binding's "source_profiles")
 
 alerts.json: a list of {"id", "title", "detector_id"?, "entity", "severity"?, "confidence"?, "technique"?}.
