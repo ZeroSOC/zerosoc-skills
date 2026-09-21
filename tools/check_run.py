@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check a live run of the skills against the behaviour the release fixed. Standard library only.
 
-  check_run.py run/ [--map capabilities/alert_types.defender-xdr.json]
+  check_run.py run/ [--profile skills/zerosoc-defender-xdr/source_profile.json]
 
 A run is a directory holding what the executor produced, one file per artifact:
 
@@ -122,20 +122,20 @@ def check_inventory(report, run, ledger, label):
             report.ok(f"{label}: incompleteness is visible", evidence_inventory.note(fresh))
 
 
-def check_alert_map(report, run, mapping_path):
-    """The source's alerts against the deployment map: what it covers, and what it collapses."""
+def check_alert_map(report, run, profile_path):
+    """The source's alerts against its source profile: what it covers, and what it collapses."""
     alerts = read(run, "alerts.json")
     if alerts is None:
-        report.skip("alert types: mapped from the deployment map", "no alerts.json in the run")
+        report.skip("alert types: mapped from the source profile", "no alerts.json in the run")
         return None
-    if not mapping_path or not os.path.exists(mapping_path):
-        report.skip("alert types: mapped from the deployment map", "no alert-type map given")
+    if not profile_path or not os.path.exists(profile_path):
+        report.skip("alert types: mapped from the source profile", "no source profile given")
         return None
-    amap = alert_types.load_map(mapping_path)
+    amap = alert_types.load_map(profile_path)
     built = alert_types.build_alerts(alerts, amap)
     unmapped = sorted({str(a.get("source_title") or a.get("id")) for a in built if a.get("unmapped")})
     if unmapped:
-        report.note("alert types: source titles the map does not cover",
+        report.note("alert types: source titles the profile does not cover",
                     f"{len(unmapped)} to report on the ticket, with the detector id of each: " + "; ".join(unmapped))
     else:
         report.ok("alert types: every source title maps to a framework type")
@@ -175,7 +175,7 @@ def check_alert_ledger(report, ledger, label, source_titles=None):
     return findings
 
 
-def check_detection_metadata(report, run, ledger, label, note_name, mapping_path=None):
+def check_detection_metadata(report, run, ledger, label, note_name, profile_path=None):
     """Detection & Analysis §1.1: what the detection asserted is on the Case, and what it did not supply
     is a recorded gap.
 
@@ -187,10 +187,10 @@ def check_detection_metadata(report, run, ledger, label, note_name, mapping_path
     if not ledger:
         return report.skip(f"{label}: what the detection asserts is on the ledger", "no ledger in the run")
     binding = read(run, "zerosoc.capabilities.json")
-    if binding is not None and not binding.get("alert_type_map"):
+    if binding is not None and not binding.get("source_profiles"):
         return report.skip(f"{label}: what the detection asserts is on the ledger",
-                           "the binding names no alert-type map, so no field names are declared for this "
-                           "source: the assertions cannot be read and the deployment degrades explicitly")
+                           "the binding names no source profile, so nothing declares where this source's "
+                           "assertions live: they cannot be read and the deployment degrades explicitly")
     record = ledger.get("detection_metadata")
     if not record:
         return report.fail(f"{label}: what the detection asserts is on the ledger",
@@ -199,9 +199,9 @@ def check_detection_metadata(report, run, ledger, label, note_name, mapping_path
                            "the ledger carries no detection_metadata")
     alerts = read(run, "alerts.json")
     fresh = None
-    if alerts and mapping_path and os.path.exists(mapping_path):
-        amap = alert_types.load_map(mapping_path)
-        fresh = alert_metadata.build(alerts, amap, read(run, "evidence.json"))
+    if alerts and profile_path and os.path.exists(profile_path):
+        profile = alert_metadata.source_profile.load(profile_path)
+        fresh = alert_metadata.build(alerts, profile, read(run, "evidence.json"))
         claimed = {str(a.get("id")): a for a in record.get("alerts", [])}
         wrong = []
         for alert in fresh["alerts"]:
@@ -220,7 +220,7 @@ def check_detection_metadata(report, run, ledger, label, note_name, mapping_path
                      f"the {len(fresh['alerts'])} alerts as alert_metadata.py reads them",
                      "; ".join(wrong[:4]) if wrong else f"all {len(fresh['alerts'])} as recomputed")
     elif alerts:
-        report.skip(f"{label}: the assertions are the ones the alerts carry", "no alert-type map given")
+        report.skip(f"{label}: the assertions are the ones the alerts carry", "no source profile given")
     recorded = {str(g.get("data_source", "")).strip().lower() for g in ledger.get("visibility_gaps", [])
                 if isinstance(g, dict)}
     absent = sorted({a for alert in record.get("alerts", []) for a in alert.get("absent", [])})
@@ -349,21 +349,21 @@ def check_binding(report, run):
                  f"{len(unbound)} unbound, e.g. {unbound[0]}" if unbound else f"{checked} sources across the playbooks, none unbound")
 
 
-def main_for_test(run, mapping=None):
+def main_for_test(run, profile=None):
     """The checks on a run directory, for the repo's own tests: the exit code, output on stdout."""
-    return _run(run, mapping or os.path.join(ROOT, "capabilities", "alert_types.defender-xdr.json"))
+    return _run(run, profile or os.path.join(ROOT, "skills", "zerosoc-defender-xdr", "source_profile.json"))
 
 
-def _run(run, mapping):
+def _run(run, profile):
     report = Report()
     triage = read(run, "ledger.triage.json")
     investigation = read(run, "ledger.investigation.json")
 
     print("# triage")
     check_inventory(report, run, triage, "triage")
-    titles = check_alert_map(report, run, mapping)
+    titles = check_alert_map(report, run, profile)
     check_alert_ledger(report, triage, "triage", titles)
-    check_detection_metadata(report, run, triage, "triage", "triage_note.md", mapping)
+    check_detection_metadata(report, run, triage, "triage", "triage_note.md", profile)
     check_visibility_gaps(report, run, triage, "triage")
     check_decision(report, triage, None, "triage", triage_decide.decide)
 
@@ -371,7 +371,7 @@ def _run(run, mapping):
     check_inventory(report, run, investigation, "investigation")
     check_alert_ledger(report, investigation, "investigation", titles)
     check_detection_metadata(
-        report, run, investigation, "investigation", "investigation_note.md", mapping
+        report, run, investigation, "investigation", "investigation_note.md", profile
     )
     check_visibility_gaps(report, run, investigation, "investigation")
     result = check_timebox(report, investigation)
@@ -390,13 +390,13 @@ def _run(run, mapping):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("run", help="the directory holding the run's artifacts")
-    ap.add_argument("--map", default=os.path.join(ROOT, "capabilities", "alert_types.defender-xdr.json"))
+    ap.add_argument("--profile", default=os.path.join(ROOT, "skills", "zerosoc-defender-xdr", "source_profile.json"))
     a = ap.parse_args()
     if not os.path.isdir(a.run):
         print(f"not a directory: {a.run}", file=sys.stderr)
         return 2
 
-    return _run(a.run, a.map)
+    return _run(a.run, a.profile)
 
 
 if __name__ == "__main__":

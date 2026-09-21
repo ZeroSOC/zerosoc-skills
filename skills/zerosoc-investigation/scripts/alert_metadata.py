@@ -2,7 +2,7 @@
 """Read what the detection asserts about an Alert, before any enrichment. Standard library only.
 
   alert_metadata.py alerts.json --bindings zerosoc.capabilities.json [--evidence evidence.json] [--json]
-  alert_metadata.py alerts.json --map alert_types.<source>.json [--evidence evidence.json] [--json]
+  alert_metadata.py alerts.json --profile <source_profile.json> [--evidence evidence.json] [--json]
 
 Detection & Analysis §1.1: an Alert carries more than its entities and its type, and six of the things
 it carries are required inputs of triage, read before enrichment and recorded on the Case — the
@@ -10,20 +10,21 @@ technique identifiers, the threat name and family, the detection source and dete
 state of each entity, the source's description of the detection, and its recommended actions. This
 script extracts them, ledger-ready, and names what the source did not supply.
 
-The script knows no source. The deployment's alert-type map (the file the binding names under
-`alert_type_map`) declares, under `detection_metadata`, which of the source's fields carry each
-assertion, how its detection sources map onto OCSF analytic types, and what its remediation states mean:
+The script knows no source. The technology's **source profile** — the file the deployment's binding
+names under `source_profiles`, validated against `capabilities/source_profile.schema.json` — says
+where each assertion lives on this source's records, which OCSF analytic type each of its detection
+sources is, and what its remediation states mean:
 
-  "detection_metadata": {
-    "fields": {"techniques": "...", "threat_name": "...", "threat_family": "...",
-               "detection_source": "...", "detector_id": "...", "description": "...",
-               "recommended_actions": "..."},
-    "entity_fields": {"remediation_status": "...", "remediation_status_details": "..."},
+  "fields": {"alert": {"techniques": "...", "threat_name": "...", "threat_family": "...",
+                       "detection_source": "...", "detector_id": "...", "description": "...",
+                       "recommended_actions": "..."},
+             "evidence": {"remediation_status": "...", "remediation_status_details": "..."}},
+  "vocabularies": {
     "analytic_types": {"<the source's detection source>": {"type_id": <OCSF analytic type>, "type": "<its name>"}},
     "remediation_states": {"<the source's state>": {"neutralized": true, "status": "Success", "activity": "Evict"}}
   }
 
-A detection source the map does not list is OCSF analytic type Other (99), never guessed; a remediation
+A detection source the profile does not list is OCSF analytic type Other (99), never guessed; a remediation
 state it does not list is recorded as reported and treated as **not** neutralized, because a state
 nobody declared is not evidence that anything was stopped.
 
@@ -39,6 +40,8 @@ arrived, what ran before it was stopped, whether the same thing is elsewhere —
 import argparse, json, os, re, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import source_profile
+
 try:
     from select_playbook import ROOT as FRAMEWORK, candidates, technique_index
 except ImportError:  # the shared scripts are copied next to each other by tools/build_references.py
@@ -59,8 +62,9 @@ PREVENTS = {
 OTHER = {"type_id": 99, "type": "Other"}
 
 
-def spec_of(amap):
-    return (amap or {}).get("detection_metadata") or {}
+def spec_of(profile):
+    """Where this source's assertions live and what its words mean, out of the source profile."""
+    return source_profile.detection_spec(profile or {})
 
 
 def field(record, spec, name, group="fields"):
@@ -121,9 +125,9 @@ def dispositions(actions):
     return {"followed": followed, "set_aside": set_aside, "open": open_}
 
 
-def assertions(alert, amap, index=None):
+def assertions(alert, profile, index=None):
     """What one Alert asserts: the six inputs of §1.1, plus what the source did not supply."""
-    spec = spec_of(amap)
+    spec = spec_of(profile)
     techniques = [str(t).strip() for t in _list(field(alert, spec, "techniques"))]
     found = candidates(techniques, index) if (index is not None and candidates) else None
     name = field(alert, spec, "threat_name")
@@ -132,7 +136,7 @@ def assertions(alert, amap, index=None):
     analytic = (spec.get("analytic_types") or {}).get(str(source)) or OTHER if source else OTHER
     actions = _actions(field(alert, spec, "recommended_actions"))
     out = {
-        "id": field(alert, {"fields": (amap or {}).get("fields") or {}}, "id"),
+        "id": field(alert, spec, "uid") or field(alert, spec, "id"),
         "techniques": found["techniques"] if found else [{"id": t, "name": None, "rendered": t, "matched": None,
                                                           "categories": [], "alert_types": [], "domains": []}
                                                          for t in techniques],
@@ -167,14 +171,14 @@ def absent(assertion):
     return sorted(missing)
 
 
-def remediation(rows, amap):
+def remediation(rows, profile):
     """The remediation state the source reports per entity, one entry per entity it acted on.
 
     An entity the source left active carries no entry: §1.5 makes it the live part of the Case, and the
     absence of a remediation is not a state. A state the map does not declare is recorded as reported
     and is not treated as neutralized.
     """
-    spec = spec_of(amap)
+    spec = spec_of(profile)
     states = spec.get("remediation_states") or {}
     out = []
     for row in rows or []:
@@ -223,10 +227,10 @@ def gaps(built, evidence_read=False):
     return out
 
 
-def build(alerts, amap, evidence=None, index=None):
+def build(alerts, profile, evidence=None, index=None):
     """The Case's assertions, ledger-ready: per alert, then what they add up to for the Case."""
-    built = {"alerts": [assertions(a, amap, index) for a in alerts],
-             "remediation": remediation(evidence, amap)}
+    built = {"alerts": [assertions(a, profile, index) for a in alerts],
+             "remediation": remediation(evidence, profile)}
     seen, techniques = set(), []
     for alert in built["alerts"]:
         for t in alert["techniques"]:
@@ -287,25 +291,22 @@ def decision_notes(record, ledger=None):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("alerts")
-    ap.add_argument("--map")
-    ap.add_argument("--bindings", help="capability binding whose alert_type_map names the map, next to it")
+    ap.add_argument("--profile", help="the source profile of the technology these alerts come from")
+    ap.add_argument("--bindings", help="capability binding whose source_profiles names the profile, next to it")
+    ap.add_argument("--source", help="which profile, where the binding names more than one")
     ap.add_argument("--evidence", help="the evidence rows, for the remediation state the source reports per entity")
     ap.add_argument("--root", default=FRAMEWORK)
     ap.add_argument("--json", action="store_true")
     a = ap.parse_args()
-    path = a.map
-    if not path and a.bindings:
-        named = json.load(open(a.bindings, encoding="utf-8")).get("alert_type_map")
-        path = os.path.join(os.path.dirname(os.path.abspath(a.bindings)), named) if named else None
+    path = a.profile or (source_profile.named(a.bindings, a.source) if a.bindings else None)
     if not path:
-        ap.error("--map, or --bindings with an alert_type_map, is required")
-    with open(path, encoding="utf-8") as handle:
-        amap = json.load(handle)
+        ap.error("--profile, or --bindings with a source_profiles entry, is required")
+    profile = source_profile.load(path)
     evidence = json.load(open(a.evidence, encoding="utf-8")) if a.evidence else None
     if isinstance(evidence, dict):  # the output of evidence_inventory.py
         evidence = evidence.get("entities") or evidence.get("rows") or []
     index = technique_index(a.root) if (technique_index and a.root and os.path.isdir(a.root)) else None
-    built = build(json.load(open(a.alerts, encoding="utf-8")), amap, evidence, index)
+    built = build(json.load(open(a.alerts, encoding="utf-8")), profile, evidence, index)
     if a.json:
         print(json.dumps(built, indent=2, ensure_ascii=False))
         return 0  # the gaps are in the output; a caller reading JSON is not failed by them

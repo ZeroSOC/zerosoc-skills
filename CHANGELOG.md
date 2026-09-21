@@ -2,6 +2,21 @@
 
 ## Unreleased — conforms to zerosoc-framework@b5f4966
 
+- **A source profile: one versioned home for what a technology's records mean.** What this project
+  knew about Microsoft Defender XDR was spread over six files in three repositories, and two of them
+  had already drifted — each declared what the source's remediation states mean, and one knew only
+  the states that neutralize something, so a remediation the source *attempted and failed* was
+  silently nothing. `capabilities/source_profile.schema.json` declares the profile and
+  `tools/check_profiles.py` validates every one of them in CI. The first is
+  `skills/zerosoc-defender-xdr/source_profile.json`, a **tool skill** beside the method skills: where
+  each required input of §1.1 lives, what the source's words mean in the framework's and OCSF's
+  terms, the alert-type rules, the capability classes it answers with their limits, the query recipes,
+  the extension object it keeps on the Case — and `case_map`, every path of its records mapped to a
+  Case field or ignored with a reason. That block is executable: a test walks recorded documents and
+  fails on a key that is neither, so a field the vendor adds tomorrow is not silence. The binding names
+  profiles under `source_profiles`; `alert_type_map` and `capabilities/alert_types.defender-xdr.json`
+  are gone, absorbed whole.
+
 The framework pin moves 37 commits, from before the Case Schema was mapped natively to OCSF, and
 now sits on `main` at the merge of framework PR #66. The three skills were instructing an agent to
 produce Notes whose elements the framework no longer defines, and to hand on two fields the Case

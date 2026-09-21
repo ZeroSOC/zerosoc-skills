@@ -1,0 +1,380 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ZeroSOC/zerosoc-skills/capabilities/source_profile.schema.json",
+  "title": "ZeroSOC source profile",
+  "description": "What one security technology's records mean in the framework's terms: where each required input of Detection & Analysis \u00a71.1 lives, what the source's own words mean, where every field of its record lands on the Case, and which of the framework's questions it can answer. It changes when the framework changes. How to talk to the technology \u2014 authentication, endpoints, paging, query language, permissions \u2014 is not here: that changes when the vendor's API does and lives with the integration.",
+  "type": "object",
+  "required": [
+    "source",
+    "fields",
+    "vocabularies",
+    "alert_types",
+    "case_map",
+    "extension",
+    "capability_coverage"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "source": {
+      "type": "object",
+      "required": [
+        "id",
+        "vendor",
+        "product",
+        "profile_version"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The identifier a capability binding names this profile by."
+        },
+        "vendor": {
+          "type": "string"
+        },
+        "product": {
+          "type": "string",
+          "description": "The product name, as the Case's provenance records it."
+        },
+        "api": {
+          "type": "string",
+          "description": "The API and version these paths are read from."
+        },
+        "api_version": {
+          "type": "string"
+        },
+        "profile_version": {
+          "type": "string",
+          "description": "The date this profile was last true of the source."
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "fields": {
+      "type": "object",
+      "description": "Where each thing the framework needs lives on a record of this source. A path is dotted; [] steps into a list.",
+      "required": [
+        "case",
+        "alert",
+        "evidence"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "case": {
+          "$ref": "#/$defs/paths"
+        },
+        "alert": {
+          "$ref": "#/$defs/paths"
+        },
+        "evidence": {
+          "$ref": "#/$defs/paths"
+        }
+      }
+    },
+    "vocabularies": {
+      "type": "object",
+      "description": "The source's own words, in the framework's and OCSF's terms. A word absent from a vocabulary is recorded as the source said it and never guessed at.",
+      "required": [
+        "severity",
+        "status",
+        "analytic_types",
+        "remediation_states"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "severity": {
+          "$ref": "#/$defs/id_map"
+        },
+        "status": {
+          "$ref": "#/$defs/id_map"
+        },
+        "verdict": {
+          "$ref": "#/$defs/id_map"
+        },
+        "analytic_types": {
+          "type": "object",
+          "description": "Detection source -> the OCSF analytic type it is. One not listed is Other (99).",
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "type_id",
+              "type"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "type_id": {
+                "type": "integer"
+              },
+              "type": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "remediation_states": {
+          "type": "object",
+          "description": "What the source says it did to an entity. One not listed is recorded as reported and never treated as neutralized.",
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "neutralized"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "neutralized": {
+                "type": "boolean",
+                "description": "Whether the entity was taken out of play."
+              },
+              "status": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "OCSF Remediation Activity status."
+              },
+              "activity": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "OCSF Remediation Activity: Isolate, Evict, Restore. Null where the source did nothing to the entity."
+              },
+              "note": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "alert_types": {
+      "type": "object",
+      "description": "The source's alerts in the framework's alert types. A detector id wins over any title match; then the first rule, in order, whose title pattern matches.",
+      "required": [
+        "rules"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "fields": {
+          "$ref": "#/$defs/paths"
+        },
+        "rules": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "alert_type",
+              "domain"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "alert_type": {
+                "type": "string"
+              },
+              "domain": {
+                "type": "string"
+              },
+              "detector_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "title_patterns": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "case_map": {
+      "type": "array",
+      "description": "Every path of the source's record: where it lands on the Case, or why nothing reads it. This is the block that makes silence impossible \u2014 a field the vendor adds tomorrow is neither mapped nor ignored, and the completeness test fails.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Dotted path on the source's record; [] steps into a list."
+          },
+          "case": {
+            "type": "string",
+            "description": "Where it lands on the Case, as a dotted path of the Case Schema."
+          },
+          "ignored": {
+            "type": "string",
+            "description": "Why nothing reads it. A reason, never a blank."
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "extension": {
+      "type": "object",
+      "description": "The object this source keeps on the Case for what it states and the framework has no field for.",
+      "required": [
+        "key",
+        "properties"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "The Case attribute this source's object is under."
+        },
+        "description": {
+          "type": "string"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "type",
+              "from"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "string",
+                  "integer",
+                  "boolean"
+                ]
+              },
+              "from": {
+                "type": "string",
+                "description": "The path on the source's record it is read from."
+              },
+              "description": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "capability_coverage": {
+      "type": "object",
+      "description": "What of the framework's questions this source answers, and how well.",
+      "required": [
+        "capabilities"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "capabilities": {
+          "type": "object",
+          "description": "capability class -> what this source answers of it.",
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "answers"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "answers": {
+                "type": "string",
+                "description": "The question it answers, in the method's terms."
+              },
+              "limits": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "What it does not answer, or answers partly: the licence tier, the retention window, the field that is null."
+              },
+              "operation": {
+                "type": "string",
+                "description": "The integration's operation, where one name is stable enough to record."
+              }
+            }
+          }
+        },
+        "data_sources": {
+          "type": "object",
+          "description": "required_data_sources name (as a playbook writes it) -> whether this source answers it.",
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "queries": {
+      "type": "object",
+      "description": "Per question kind, the recipe that asks it of this tool.",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "asks"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "asks": {
+            "type": "string",
+            "description": "The question, in the method's terms."
+          },
+          "table": {
+            "type": "string"
+          },
+          "recipe": {
+            "type": "string",
+            "description": "The query, in the tool's own language, with the entity as a parameter."
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "paths": {
+      "type": "object",
+      "description": "name the framework uses -> path on the source's record.",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "id_map": {
+      "type": "object",
+      "description": "The source's word -> the framework's id and name.",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

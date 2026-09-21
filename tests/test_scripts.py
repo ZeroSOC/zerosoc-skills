@@ -16,10 +16,11 @@ evidence = load("tools/shared/evidence_inventory.py", "evidence_inventory")
 selector = load("tools/shared/select_playbook.py", "select_playbook")
 chain = load("tools/shared/process_chain.py", "process_chain")
 metadata = load("tools/shared/alert_metadata.py", "alert_metadata")
+profiles = load("tools/shared/source_profile.py", "source_profile")
 checker = load("tools/check_run.py", "check_run")
 
 CAPABILITIES = os.path.join(ROOT, "capabilities")
-XDR_MAP = os.path.join(CAPABILITIES, "alert_types.defender-xdr.json")
+XDR_PROFILE = os.path.join(ROOT, "skills", "zerosoc-defender-xdr", "source_profile.json")
 DFB_PROFILE = os.path.join(CAPABILITIES, "zerosoc.capabilities.defender-for-business.json")
 PLACEHOLDER_SOURCES = {"<telemetry source>"}
 FIXTURES = os.path.join(ROOT, "tests", "fixtures")
@@ -168,7 +169,7 @@ class LedgerDedup(unittest.TestCase):
 
 class AlertTypeMapping(unittest.TestCase):
     def setUp(self):
-        self.map = alert_types.load_map(XDR_MAP)
+        self.map = alert_types.load_map(XDR_PROFILE)
 
     def test_titles_map_to_framework_alert_types(self):
         for title, expected in [
@@ -395,7 +396,7 @@ class DetectionMetadata(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.spec = alert_types.load_map(XDR_MAP)
+        cls.spec = profiles.load(XDR_PROFILE)
         cls.index = selector.technique_index(os.path.join(ROOT, "framework"))
 
     def one(self, alert=None, **kw):
@@ -873,9 +874,10 @@ class RunCheck(unittest.TestCase):
         self.assertIn("FAIL  triage: the assertions are the ones the alerts carry", out)
         self.assertIn("T1486", out)
 
-    def test_a_deployment_without_an_alert_type_map_degrades_and_is_not_failed(self):
-        """§1.1 runs where the binding declares no field names for the source: the assertions
-        cannot be read at all, and the harness says so instead of failing the run for it."""
+    def test_a_deployment_without_a_source_profile_degrades_and_is_not_failed(self):
+        """§1.1 runs where the binding names no source profile: nothing declares where this
+        source's assertions live, so they cannot be read at all, and the harness says so instead of
+        failing the run for it."""
         base = self.run_dir(detection_metadata=None)
         with open(os.path.join(base, "zerosoc.capabilities.json"), "w", encoding="utf-8") as f:
             json.dump({"capabilities": {}, "data_sources": {}}, f)

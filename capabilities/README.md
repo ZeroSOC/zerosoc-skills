@@ -26,17 +26,27 @@ The binding file has two maps:
   each with the check it prevented. A gap does not change the Case's confidence.
 
 Two optional keys: `data_source_notes` (data source → why it is unavailable or limited; printed with the
-gap) and `alert_type_map` (the file name of the deployment's alert-type map).
+gap) and `source_profiles` (source identifier → the source profile of that technology).
 
-## Alert-type maps
+## Source profiles
 
-The framework counts the same alert type on the same entity once. An alert-type map makes that
-deterministic for one alert source: ordered rules from the source's detector id and alert title to a
-framework alert type and its telemetry domain. `scripts/alert_types.py` applies it when the ledger is
-built and reports the alerts no rule matches. [alert_types.defender-xdr.json](alert_types.defender-xdr.json)
-is the map for the XDR source of the profile above; every `alert_type` in a map must exist in the
-framework's `02-Taxonomy/alert_types.md` (the tests check it). Detector ids are added as they are
-observed: they make a rule exact where a title is ambiguous or localized.
+A **source profile** is one versioned home for what one technology's records mean in the framework's
+terms: where each required input of Detection & Analysis §1.1 lives, what the source's own words mean,
+where every field of a record lands on the Case, and which capability classes it answers. It is declared
+by [source_profile.schema.json](source_profile.schema.json), validated in CI by `tools/check_profiles.py`,
+and it lives with the tool skill of its technology — the Defender XDR one is
+`skills/zerosoc-defender-xdr/source_profile.json`.
+
+Its `alert_types` block is what makes "the same alert type on the same entity counts once"
+deterministic: ordered rules from the source's detector id and alert title to a framework alert type and
+its telemetry domain. `scripts/alert_types.py` applies it when the ledger is built and reports the alerts
+no rule matches. Every `alert_type` in a profile must exist in the framework's `02-Taxonomy/alert_types.md`
+(the tests check it). Detector ids are added as they are observed: they make a rule exact where a title is
+ambiguous or localized.
+
+Its `case_map` block is executable: a test walks recorded documents of the source and fails on any key
+that is neither mapped to a Case field nor ignored with a reason, so a field the vendor adds tomorrow is
+not silence.
 
 ## Where each assertion of a detection comes from
 

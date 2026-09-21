@@ -102,8 +102,8 @@ Read per alert: the playbook section the script prints.
    this framework pin, use the domain's alert catalog in
    [alert_types.md](references/framework/02-Taxonomy/alert_types.md) and apply §1.2–§1.5 directly.
 5. **Start the ledger.** Create `ledger.json` (format in `scripts/triage_decide.py`) with the
-   `evidence_inventory` object of step 2 and the `detection_metadata` of step 3. When the deployment ships an alert-type map (the binding's
-   `alert_type_map`), build the alerts with `python3 scripts/alert_types.py alerts.json --bindings zerosoc.capabilities.json --json`:
+   `evidence_inventory` object of step 2 and the `detection_metadata` of step 3. When the deployment names a source profile (the binding's
+   `source_profiles`), build the alerts with `python3 scripts/alert_types.py alerts.json --bindings zerosoc.capabilities.json --json`:
    it gives each alert its framework alert type (detector id first, then title) and collapses the same
    type on the same entity to the strongest alert, so the rule below is applied the same way every time;
    an alert it reports as unmapped keeps its title as type. Each independent

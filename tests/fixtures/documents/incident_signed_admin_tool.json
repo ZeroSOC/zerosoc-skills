@@ -1,0 +1,92 @@
+{
+  "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#security/incidents(alerts())/$entity",
+  "id": "4720",
+  "incidentWebUrl": "https://security.microsoft.com/incidents/4720?tid=11111111-2222-3333-4444-555555555555",
+  "redirectIncidentId": null,
+  "tenantId": "11111111-2222-3333-4444-555555555555",
+  "displayName": "'Trojan:Win32/Wacatac.B!ml' malware was detected on one endpoint",
+  "createdDateTime": "2026-09-15T08:12:40.1Z",
+  "lastUpdateDateTime": "2026-09-15T08:12:40.1Z",
+  "assignedTo": null,
+  "classification": "unknown",
+  "determination": "unknown",
+  "status": "active",
+  "severity": "medium",
+  "customTags": [],
+  "systemTags": [],
+  "comments": [],
+  "alerts": [
+    {
+      "id": "da637551227677560813_-118822931",
+      "providerAlertId": "da637551227677560813_-118822931",
+      "incidentId": "4720",
+      "status": "new",
+      "severity": "medium",
+      "classification": null,
+      "determination": null,
+      "serviceSource": "microsoftDefenderForEndpoint",
+      "detectionSource": "antivirus",
+      "productName": "Microsoft Defender for Endpoint",
+      "detectorId": "a1b2c3d4-0000-4000-8000-000000000007",
+      "tenantId": "11111111-2222-3333-4444-555555555555",
+      "title": "'Trojan:Win32/Wacatac.B!ml' malware was detected",
+      "description": "Malware and unwanted software are undesirable applications that perform annoying, disruptive, or harmful actions on affected machines. This detection is a machine-learning classification.",
+      "category": "Malware",
+      "mitreTechniques": [],
+      "createdDateTime": "2026-09-15T08:12:40.1Z",
+      "firstActivityDateTime": "2026-09-15T08:11:02Z",
+      "lastActivityDateTime": "2026-09-15T08:11:02Z",
+      "evidence": [
+        {
+          "@odata.type": "#microsoft.graph.security.deviceEvidence",
+          "mdeDeviceId": "7a1f0c3e9d2b4a5c6e7f8091a2b3c4d5e6f70812",
+          "deviceDnsName": "ws-lab-07.lab.local",
+          "osPlatform": "Windows11",
+          "verdict": "suspicious",
+          "remediationStatus": "none"
+        },
+        {
+          "@odata.type": "#microsoft.graph.security.userEvidence",
+          "userAccount": {
+            "accountName": "a.bianchi",
+            "domainName": "LAB",
+            "userPrincipalName": "a.bianchi@lab.local",
+            "azureAdUserId": "bbbbbbbb-cccc-dddd-eeee-ffffffffffff"
+          },
+          "verdict": "suspicious",
+          "remediationStatus": "none"
+        },
+        {
+          "@odata.type": "#microsoft.graph.security.fileEvidence",
+          "fileDetails": {
+            "fileName": "labadmin-inventory.exe",
+            "filePath": "C:\\Program Files\\LabTools",
+            "sha256": "9c2f0a1b4e6d8f70a2c4e6081a3c5e7f9b1d3f5a7c9e0b2d4f6a8c0e2b4d6f8a",
+            "signer": "LAB Internal Software Publisher",
+            "issuer": "LAB Enterprise CA"
+          },
+          "verdict": "suspicious",
+          "remediationStatus": "prevented"
+        },
+        {
+          "@odata.type": "#microsoft.graph.security.processEvidence",
+          "processId": 5120,
+          "processCreationDateTime": "2026-09-15T08:11:01.52Z",
+          "processCommandLine": "\"C:\\Program Files\\LabTools\\labadmin-inventory.exe\" --collect --upload",
+          "parentProcessId": 4416,
+          "parentProcessCreationDateTime": "2026-09-15T08:10:30.11Z",
+          "parentProcessImageFile": { "fileName": "explorer.exe", "filePath": "C:\\Windows" },
+          "imageFile": {
+            "fileName": "labadmin-inventory.exe",
+            "filePath": "C:\\Program Files\\LabTools",
+            "sha256": "9c2f0a1b4e6d8f70a2c4e6081a3c5e7f9b1d3f5a7c9e0b2d4f6a8c0e2b4d6f8a"
+          },
+          "userAccount": { "accountName": "a.bianchi", "domainName": "LAB", "userPrincipalName": "a.bianchi@lab.local" },
+          "mdeDeviceId": "7a1f0c3e9d2b4a5c6e7f8091a2b3c4d5e6f70812",
+          "verdict": "suspicious",
+          "remediationStatus": "prevented"
+        }
+      ]
+    }
+  ]
+}
