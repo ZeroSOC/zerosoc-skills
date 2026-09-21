@@ -20,7 +20,8 @@
       "master_uid": "redirectIncidentId",
       "alerts": "alerts",
       "comments": "comments",
-      "url": "incidentWebUrl"
+      "url": "incidentWebUrl",
+      "classification": "classification"
     },
     "alert": {
       "uid": "id",
@@ -193,6 +194,26 @@
         "id": 5,
         "name": "Closed",
         "note": "merged into another incident: the Case closes as a Duplicate of its master"
+      }
+    },
+    "verdict": {
+      "unknown": {
+        "id": 0,
+        "name": "Unknown",
+        "note": "the source has not classified the incident, which is how every incident starts and how many are left when they are resolved there"
+      },
+      "falsePositive": {
+        "id": 1,
+        "name": "False Positive"
+      },
+      "truePositive": {
+        "id": 2,
+        "name": "True Positive"
+      },
+      "informationalExpectedActivity": {
+        "id": 5,
+        "name": "Benign",
+        "note": "activity that was real and expected: the framework's Benign, authorized activity that legitimately matched the detection"
       }
     },
     "analytic_types": {

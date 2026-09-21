@@ -205,6 +205,13 @@ def lands(profile: dict[str, Any], case_schema: dict[str, Any], where: str) -> l
                 ok = _declared(target, case_schema, case_schema)
             if not ok:
                 problems.append(f"{where}: {entry['path']!r} lands on {target!r}, which the Case Schema does not declare")
+    # a vocabulary turns the source's word into a value of the Case: it has to be one the Case has
+    for name, field in (("severity", "severity_id"), ("status", "status_id"), ("verdict", "verdict_id")):
+        allowed = (case_schema.get("properties") or {}).get(field, {}).get("enum")
+        for word, held in (profile["vocabularies"].get(name) or {}).items():
+            if allowed is not None and held["id"] not in allowed:
+                problems.append(f"{where}: vocabularies.{name}.{word} is {held['id']}, which is no {field} "
+                                f"of the Case Schema ({', '.join(map(str, allowed))})")
     return problems
 
 

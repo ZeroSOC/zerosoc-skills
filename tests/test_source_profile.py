@@ -189,6 +189,20 @@ class Coherence(unittest.TestCase):
         schema = json.loads((ROOT / "capabilities" / "source_profile.schema.json").read_text())
         self.assertEqual(check_profiles.validate(self.profile, schema, schema, "p"), [])
 
+    def test_the_sources_classification_is_read_as_the_frameworks_verdict(self) -> None:
+        verdict = self.profile["vocabularies"]["verdict"]
+        self.assertEqual({word: held["id"] for word, held in verdict.items()},
+                         {"unknown": 0, "falsePositive": 1, "truePositive": 2, "informationalExpectedActivity": 5})
+        self.assertEqual(self.profile["fields"]["case"]["classification"], "classification")
+
+    def test_a_vocabulary_names_only_values_the_case_schema_has(self) -> None:
+        self.assertEqual(check_profiles.lands(self.profile, self.case_schema(), "p"), [])
+        self.profile["vocabularies"]["verdict"]["truePositive"]["id"] = 3
+        self.profile["vocabularies"]["severity"]["high"]["id"] = 9
+        found = "\n".join(check_profiles.lands(self.profile, self.case_schema(), "p"))
+        self.assertIn("vocabularies.verdict.truePositive", found)
+        self.assertIn("vocabularies.severity.high", found)
+
     def test_a_profile_missing_a_block_is_reported_not_crashed_on(self) -> None:
         import contextlib, io, tempfile
         del self.profile["case_map"]
