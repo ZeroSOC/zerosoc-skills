@@ -3,7 +3,7 @@ name: zerosoc-triage
 description: Triage a security alert under the ZeroSOC Framework (Phase 2.a). Selects the domain triage playbook, enriches the entities, tags every finding Malicious or Benign with a confidence, applies the coverage rule to decide Close (False Positive, Benign, Duplicate) or Promote, and produces a conformant Triage Note plus the Triage to Investigation contract. Use when an alert, a detection, a user report or any suspected-incident intake needs a disposition.
 license: Apache-2.0
 metadata:
-  version: "0.4.0"
+  version: "0.4.1"
   framework: "zerosoc-framework@b5f4966 (2026-09-21)"
   status: draft
   author: ZeroSOC

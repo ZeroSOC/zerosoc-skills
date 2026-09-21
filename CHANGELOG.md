@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased — conforms to zerosoc-framework@b5f4966
+## v0.4.1 (2026-09-21) — conforms to zerosoc-framework@b5f4966
+
+Two defects found running the method surface of `v0.4.0` in a host that checks every Note at both
+gates, which is what `note_elements.py` is for. Both are in the check and the packaging; the pin
+and the method are unchanged, and nothing an implementation calls has moved.
 
 - **A source the deployment cannot read is a visibility gap, not a Note nobody may write.**
   `note_elements.py` refused every Note of a deployment that declares no source profile: none of
