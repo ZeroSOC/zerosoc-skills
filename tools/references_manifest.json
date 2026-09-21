@@ -62,6 +62,11 @@
       "shared_scripts": [
         "select_playbook.py"
       ]
+    },
+    "zerosoc-defender-xdr": {
+      "files": [],
+      "globs": [],
+      "shared_scripts": []
     }
   }
 }

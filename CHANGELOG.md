@@ -16,6 +16,13 @@
   fails on a key that is neither, so a field the vendor adds tomorrow is not silence. The binding names
   profiles under `source_profiles`; `alert_type_map` and `capabilities/alert_types.defender-xdr.json`
   are gone, absorbed whole.
+- **The tool skill's other half: the expertise.** `skills/zerosoc-defender-xdr/SKILL.md` says which of
+  the framework's questions this source answers and what each answer is worth — that an absent
+  capability and an empty answer are indistinguishable in its data, so the binding is what tells them
+  apart; that its own verdict may be a human's or the product's and is weighed by nobody; that a
+  remediation state says what was done to one entity and never that the Case is explained; and the
+  traps that cost real runs, from a merge that moves an incident to one process listed twice because
+  two alerts described it differently. It cites the profile and restates none of it.
 
 The framework pin moves 37 commits, from before the Case Schema was mapped natively to OCSF, and
 now sits on `main` at the merge of framework PR #66. The three skills were instructing an agent to
