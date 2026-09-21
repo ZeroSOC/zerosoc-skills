@@ -123,7 +123,10 @@ per Case: the playbook the script prints.
     with detection and response actions, each entry timestamped in UTC with its event reference; the
     `timeline` of `process_chain.py --json` gives the process entries with their alerts as references).
     The timeline is not a field the Case stores: it is the Findings flagged `zerosoc:timeline`, rendered
-    in `first_seen_time` order. The Case's `start_time` opens at the earliest Alert and moves earlier
+    in `first_seen_time` order. Give each finding its `first_seen` (when the thing happened, never when the
+    finding was made) and `"timeline": true` where the narrative shows it; `python3 scripts/timeline.py ledger.json --json`
+    orders them, **derives T0** — the earliest Malicious `first_seen`; context may come before it — flags the one
+    entry that carries it, and fails a T0 no entry carries or a Malicious entry earlier than the T0 the Case states. The Case's `start_time` opens at the earliest Alert and moves earlier
     whenever a Malicious Finding cites an earlier event; on a confirmed Incident it is **T0**, the
     earliest confirmed malicious event. Confirm or assess `impact_id`, and whether the
     Incident is **significant** under NIS2 Article 23(3) and **cross-border**; run the **retrospective
@@ -152,6 +155,12 @@ per Case: the playbook the script prints.
     "None."); **Provenance**, with the preserved-evidence pointer once §3.3 preservation has happened.
     There is no Executed Queries element and no Evidence References element: a query that produced a
     Finding is that Finding's `analytic`, and the identifiers are cited with each Finding.
+    `python3 scripts/note_elements.py --kind investigation --note note.json` prints the elements in
+    order and checks the Note — the ledger, with one field per element beside it — against those rules. It renders the structure and runs the
+    checks; the content and the prose are yours ([rules/note-prose.md](rules/note-prose.md)). The rules
+    binding the two judgment steps are [rules/verify.md](rules/verify.md) (the hypotheses and the choice
+    of queries) and [rules/tag.md](rules/tag.md) (what the answers mean), given to any executor as they
+    stand (`$language` in them is the language the deployment writes in).
     Preserve evidence per §3.3.
 14. **Emit.** On a Confirmed Incident, the **Investigation → Response contract** of
     [Playbook Architecture §5](references/framework/04-Playbooks/playbook_architecture.md): the triage

@@ -39,6 +39,31 @@
   remediation state says what was done to one entity and never that the Case is explained; and the
   traps that cost real runs, from a merge that moves an incident to one process listed twice because
   two alerts described it differently. It cites the profile and restates none of it.
+- **The method surface moves here: rendering, the timeline and the rule text.** A rule the framework
+  changes should be a skills release and a pin bump; three of them needed a patch somewhere else as
+  well, because something else owned them. All three scripts read **the ledger** the decision rules
+  already run on, so nothing is copied into a second shape: a finding now also says the events it
+  rests on (`event_refs`), when the thing it reports happened (`first_seen`) and whether the
+  narrative shows it (`timeline`).
+  `select_playbook.py` returns the playbook's **candidate Incident Categories** in the playbook's
+  own order — for the alert type that fired, since a whole playbook has no "first" one and gives
+  them per alert type — reading the element whole where it wraps or lists.
+  `timeline.py` builds the **Case Timeline** and **derives T0**, the earliest Malicious
+  `first_seen`: context may come before it, a Malicious entry may not. It flags the one entry that
+  carries T0, reads ISO 8601 and epoch milliseconds alike, and fails a T0 no entry carries, a stated
+  T0 the findings contradict, and a finding placed by when it was made instead of when it happened.
+  `note_elements.py` prints the elements of a conformant Note **as the framework names them**, with
+  all it says each contains, and checks an assembled one: a side without a confidence, context with
+  one, a finding that cites no event, a technique code written bare anywhere in the Note — and
+  `T1114.003 (Name)` is not one — an Alert that renders nothing of what its detection asserted, a
+  recommendation followed that names no Finding, a gap that names no check. An element the framework
+  renames or adds is required under its new name **with no change to the script**, and one it cannot
+  read stops it. It renders the structure and runs the checks — the prose stays the executor's,
+  because a Note written by a template would be a form and the framework asks for an account.
+  And the **normative rule text** ships as skill content (`rules/*.md` in the triage and
+  investigation skills), in the framework's words and naming nothing the skills do not define, so a
+  human reading the skill and a model reading a prompt are held to one wording. `check_skills.py`
+  holds the rule files to what it holds a `SKILL.md` to.
 
 The framework pin moves 37 commits, from before the Case Schema was mapped natively to OCSF, and
 now sits on `main` at the merge of framework PR #66. The three skills were instructing an agent to

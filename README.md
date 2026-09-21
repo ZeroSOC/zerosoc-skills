@@ -44,6 +44,7 @@ sources are available. See [capabilities/](capabilities/README.md).
 skills/<name>/SKILL.md            the skill (Agent Skills spec)
 skills/<name>/references/         generated from framework/ — do not edit
 skills/<name>/scripts/            deterministic helpers, Python 3 standard library
+skills/<name>/rules/              the rules an executor is held to at a judgment step, in the framework's words
 skills/<name>/source_profile.json a tool skill's source profile: what one technology's records mean
 framework/                        the ZeroSOC Framework, git submodule pinned to a commit
 capabilities/                     capability classes, binding schema, example and reference bindings,

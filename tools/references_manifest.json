@@ -27,7 +27,8 @@
         "alert_types.py",
         "alert_metadata.py",
         "evidence_inventory.py",
-        "process_chain.py"
+        "process_chain.py",
+        "note_elements.py"
       ]
     },
     "zerosoc-investigation": {
@@ -47,7 +48,9 @@
         "alert_types.py",
         "alert_metadata.py",
         "evidence_inventory.py",
-        "process_chain.py"
+        "process_chain.py",
+        "note_elements.py",
+        "timeline.py"
       ]
     },
     "zerosoc-response": {
