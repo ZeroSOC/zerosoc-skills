@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check a live run of the skills against the behaviour the release fixed. Standard library only.
 
-  check_run.py run/ [--map capabilities/alert_types.defender-xdr.json]
+  check_run.py run/ [--profile skills/zerosoc-defender-xdr/source_profile.json]
 
 A run is a directory holding what the executor produced, one file per artifact:
 
@@ -12,7 +12,8 @@ A run is a directory holding what the executor produced, one file per artifact:
   ledger.investigation.json  the investigation ledger at the resolution   (optional)
   triage_note.md           the Triage Note                                 (optional)
   investigation_note.md    the Investigation Note                          (optional)
-  zerosoc.capabilities.json  the binding the run used
+  zerosoc.capabilities.json  the binding the run used, with the local override of the source
+                           profile beside it where the binding names one
 
 The checks are the ones a human cannot do by reading a transcript: every figure the run reported is
 recomputed from the artifacts it produced, so a ledger that states an inventory it never extracted, a
@@ -38,6 +39,7 @@ def load(rel, name):
 evidence_inventory = load("tools/shared/evidence_inventory.py", "evidence_inventory")
 alert_types = load("tools/shared/alert_types.py", "alert_types")
 alert_metadata = load("tools/shared/alert_metadata.py", "alert_metadata")
+source_profile = alert_metadata.source_profile
 triage_decide = load("skills/zerosoc-triage/scripts/triage_decide.py", "triage_decide")
 resolve_rule = load("skills/zerosoc-investigation/scripts/resolve.py", "resolve_rule")
 
@@ -122,20 +124,93 @@ def check_inventory(report, run, ledger, label):
             report.ok(f"{label}: incompleteness is visible", evidence_inventory.note(fresh))
 
 
-def check_alert_map(report, run, mapping_path):
-    """The source's alerts against the deployment map: what it covers, and what it collapses."""
+def override_of(run, profile_path):
+    """The local override the run's binding names for this profile's source, as a path in the run.
+
+    The override says itself which source it is for, so it is found by that and not by the key the
+    binding happens to file the source under. One that cannot be read is still the run's override:
+    it is returned, and reading the profile through it is what fails.
+    """
+    binding = read(run, "zerosoc.capabilities.json") or {}
+    named = binding.get("source_profile_overrides")
+    if not isinstance(named, dict) or not (profile_path and os.path.exists(profile_path)):
+        return None
+    source = source_profile.load(profile_path)["source"]["id"]
+    paths = [os.path.join(run, str(name)) for name in named.values()]
+    for path in paths:
+        try:
+            with open(path, encoding="utf-8") as handle:
+                if json.load(handle).get("overrides") == source:
+                    return path
+        except (OSError, ValueError, AttributeError):
+            continue
+    unread = [path for path in paths if not os.path.exists(path)]
+    return unread[0] if unread else (paths[0] if len(paths) == 1 else None)
+
+
+def effective_profile(run, profile_path):
+    """The profile as the run read it: the shipped one, with the run's override laid over it. An
+    override that cannot be read is check_source_profile's failure to report; the other checks go
+    on against the shipped profile."""
+    try:
+        return source_profile.load(profile_path, override_of(run, profile_path))
+    except (OSError, ValueError):
+        return source_profile.load(profile_path)
+
+
+def check_source_profile(report, run, ledger, label, profile_path, note_name):
+    """A run that read its source through a local override says so, on the ledger and in the Note's
+    Provenance. The record is recomputed from the override file the run holds, so a ledger cannot
+    pass one override off as another, or as none."""
+    check = f"{label}: the source profile the run read is on the ledger"
+    if not ledger:
+        return
+    override = override_of(run, profile_path)
+    recorded = ledger.get("source_profile")
+    held = recorded.get("override") if isinstance(recorded, dict) else None
+    if not override:
+        if held or (recorded is not None and not isinstance(recorded, dict)):
+            report.fail(check, "no override: the run's binding names none", f"the ledger records {recorded!r}")
+        return
+    try:
+        profile = source_profile.load(profile_path, override)
+    except OSError:
+        return report.fail(check, f"{os.path.basename(override)} in the run, beside the binding that names it",
+                           "the file is not in the run, so what the run read cannot be reproduced")
+    except ValueError as exc:
+        return report.fail(check, "an override the profile can be read through", str(exc))
+    fresh = source_profile.record(profile)
+    stated = fresh["source_profile"]["override"]
+    report.check(isinstance(held, dict) and held.get("sha256") == stated["sha256"], check,
+                 f"source_profile.override with sha256 {stated['sha256'][:12]}… ({stated['file']}: {stated['reason']})",
+                 f"sha256 {str(held.get('sha256'))[:12]}…" if isinstance(held, dict)
+                 else "no source_profile.override in the ledger")
+    if stated["stale"]:
+        report.note(check, source_profile.notes(profile)[-1])
+    said = f"{label}: the Note's Provenance names the override"
+    note = read(run, note_name)
+    if note is None:
+        return report.skip(said, f"no {note_name} in the run")
+    version = fresh["product"]["feature"]["version"]
+    report.check(version in note or stated["file"] in note, said,
+                 f"the profile version {version} or the override's file name {stated['file']}",
+                 "named" if version in note or stated["file"] in note else "the Note names neither")
+
+
+def check_alert_map(report, run, profile_path):
+    """The source's alerts against its source profile: what it covers, and what it collapses."""
     alerts = read(run, "alerts.json")
     if alerts is None:
-        report.skip("alert types: mapped from the deployment map", "no alerts.json in the run")
+        report.skip("alert types: mapped from the source profile", "no alerts.json in the run")
         return None
-    if not mapping_path or not os.path.exists(mapping_path):
-        report.skip("alert types: mapped from the deployment map", "no alert-type map given")
+    if not profile_path or not os.path.exists(profile_path):
+        report.skip("alert types: mapped from the source profile", "no source profile given")
         return None
-    amap = alert_types.load_map(mapping_path)
+    amap = source_profile.alert_rules(effective_profile(run, profile_path))
     built = alert_types.build_alerts(alerts, amap)
     unmapped = sorted({str(a.get("source_title") or a.get("id")) for a in built if a.get("unmapped")})
     if unmapped:
-        report.note("alert types: source titles the map does not cover",
+        report.note("alert types: source titles the profile does not cover",
                     f"{len(unmapped)} to report on the ticket, with the detector id of each: " + "; ".join(unmapped))
     else:
         report.ok("alert types: every source title maps to a framework type")
@@ -175,7 +250,7 @@ def check_alert_ledger(report, ledger, label, source_titles=None):
     return findings
 
 
-def check_detection_metadata(report, run, ledger, label, note_name, mapping_path=None):
+def check_detection_metadata(report, run, ledger, label, note_name, profile_path=None):
     """Detection & Analysis §1.1: what the detection asserted is on the Case, and what it did not supply
     is a recorded gap.
 
@@ -187,10 +262,10 @@ def check_detection_metadata(report, run, ledger, label, note_name, mapping_path
     if not ledger:
         return report.skip(f"{label}: what the detection asserts is on the ledger", "no ledger in the run")
     binding = read(run, "zerosoc.capabilities.json")
-    if binding is not None and not binding.get("alert_type_map"):
+    if binding is not None and not binding.get("source_profiles"):
         return report.skip(f"{label}: what the detection asserts is on the ledger",
-                           "the binding names no alert-type map, so no field names are declared for this "
-                           "source: the assertions cannot be read and the deployment degrades explicitly")
+                           "the binding names no source profile, so nothing declares where this source's "
+                           "assertions live: they cannot be read and the deployment degrades explicitly")
     record = ledger.get("detection_metadata")
     if not record:
         return report.fail(f"{label}: what the detection asserts is on the ledger",
@@ -199,9 +274,9 @@ def check_detection_metadata(report, run, ledger, label, note_name, mapping_path
                            "the ledger carries no detection_metadata")
     alerts = read(run, "alerts.json")
     fresh = None
-    if alerts and mapping_path and os.path.exists(mapping_path):
-        amap = alert_types.load_map(mapping_path)
-        fresh = alert_metadata.build(alerts, amap, read(run, "evidence.json"))
+    if alerts and profile_path and os.path.exists(profile_path):
+        profile = effective_profile(run, profile_path)
+        fresh = alert_metadata.build(alerts, profile, read(run, "evidence.json"))
         claimed = {str(a.get("id")): a for a in record.get("alerts", [])}
         wrong = []
         for alert in fresh["alerts"]:
@@ -220,7 +295,7 @@ def check_detection_metadata(report, run, ledger, label, note_name, mapping_path
                      f"the {len(fresh['alerts'])} alerts as alert_metadata.py reads them",
                      "; ".join(wrong[:4]) if wrong else f"all {len(fresh['alerts'])} as recomputed")
     elif alerts:
-        report.skip(f"{label}: the assertions are the ones the alerts carry", "no alert-type map given")
+        report.skip(f"{label}: the assertions are the ones the alerts carry", "no source profile given")
     recorded = {str(g.get("data_source", "")).strip().lower() for g in ledger.get("visibility_gaps", [])
                 if isinstance(g, dict)}
     absent = sorted({a for alert in record.get("alerts", []) for a in alert.get("absent", [])})
@@ -349,29 +424,31 @@ def check_binding(report, run):
                  f"{len(unbound)} unbound, e.g. {unbound[0]}" if unbound else f"{checked} sources across the playbooks, none unbound")
 
 
-def main_for_test(run, mapping=None):
+def main_for_test(run, profile=None):
     """The checks on a run directory, for the repo's own tests: the exit code, output on stdout."""
-    return _run(run, mapping or os.path.join(ROOT, "capabilities", "alert_types.defender-xdr.json"))
+    return _run(run, profile or os.path.join(ROOT, "skills", "zerosoc-defender-xdr", "source_profile.json"))
 
 
-def _run(run, mapping):
+def _run(run, profile):
     report = Report()
     triage = read(run, "ledger.triage.json")
     investigation = read(run, "ledger.investigation.json")
 
     print("# triage")
     check_inventory(report, run, triage, "triage")
-    titles = check_alert_map(report, run, mapping)
+    titles = check_alert_map(report, run, profile)
     check_alert_ledger(report, triage, "triage", titles)
-    check_detection_metadata(report, run, triage, "triage", "triage_note.md", mapping)
+    check_source_profile(report, run, triage, "triage", profile, "triage_note.md")
+    check_detection_metadata(report, run, triage, "triage", "triage_note.md", profile)
     check_visibility_gaps(report, run, triage, "triage")
     check_decision(report, triage, None, "triage", triage_decide.decide)
 
     print("\n# investigation")
     check_inventory(report, run, investigation, "investigation")
     check_alert_ledger(report, investigation, "investigation", titles)
+    check_source_profile(report, run, investigation, "investigation", profile, "investigation_note.md")
     check_detection_metadata(
-        report, run, investigation, "investigation", "investigation_note.md", mapping
+        report, run, investigation, "investigation", "investigation_note.md", profile
     )
     check_visibility_gaps(report, run, investigation, "investigation")
     result = check_timebox(report, investigation)
@@ -390,13 +467,13 @@ def _run(run, mapping):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("run", help="the directory holding the run's artifacts")
-    ap.add_argument("--map", default=os.path.join(ROOT, "capabilities", "alert_types.defender-xdr.json"))
+    ap.add_argument("--profile", default=os.path.join(ROOT, "skills", "zerosoc-defender-xdr", "source_profile.json"))
     a = ap.parse_args()
     if not os.path.isdir(a.run):
         print(f"not a directory: {a.run}", file=sys.stderr)
         return 2
 
-    return _run(a.run, a.map)
+    return _run(a.run, a.profile)
 
 
 if __name__ == "__main__":

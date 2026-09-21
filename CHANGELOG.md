@@ -2,6 +2,44 @@
 
 ## Unreleased — conforms to zerosoc-framework@b5f4966
 
+- **A source profile: one versioned home for what a technology's records mean.** What this project
+  knew about Microsoft Defender XDR was spread over six files in three repositories, and two of them
+  had already drifted — each declared what the source's remediation states mean, and one knew only
+  the states that neutralize something, so a remediation the source *attempted and failed* was
+  silently nothing. `capabilities/source_profile.schema.json` declares the profile and
+  `tools/check_profiles.py` validates every one of them in CI. The first is
+  `skills/zerosoc-defender-xdr/source_profile.json`, a **tool skill** beside the method skills: where
+  each required input of §1.1 lives, what the source's words mean in the framework's and OCSF's
+  terms, the alert-type rules, the capability classes it answers with their limits, the query recipes,
+  the extension object it keeps on the Case — and `case_map`, every path of its records mapped to a
+  Case field or ignored with a reason. That block is executable: a test walks sample documents of the source and
+  fails on a key that is neither, so a field the vendor adds tomorrow is not silence. The binding names
+  profiles under `source_profiles`; `alert_type_map` and `capabilities/alert_types.defender-xdr.json`
+  are gone, absorbed whole.
+- **A deployment may override the shipped profile locally.** After the source profile, a field the
+  vendor renames is fixed by a pull request here, a pin bump and a release of whatever runs the
+  skills — while the tenant stays broken, and the first hotfix outside the profile brings the
+  duplication straight back. The binding now names a local override under `source_profile_overrides`
+  (`capabilities/source_profile_override.schema.json`). It holds only what differs and is laid over the
+  shipped profile, so the rest keeps following it across pin bumps; the profile that results is held to
+  the same schema and coherence (`tools/check_profiles.py --bindings`). The shipped profile stays the
+  default. A local alert-type rule is tried before the shipped ones, which stay as they are, so a title
+  the shipped rules do not know is one small rule. A reader that takes the profile's JSON itself, and not through the loader, is given
+  the profile as the deployment reads it (`scripts/source_profile.py --effective`). A run read through
+  an override says so: `scripts/source_profile.py` prints the record for
+  the ledger and the source's entry for the Case's `provenance.products`, whose profile version carries
+  the override's digest, and `tools/check_run.py` fails a ledger that does not carry it and a Note whose
+  Provenance does not name it. An override
+  names the shipped version it was written against and is flagged stale — never refused — once the
+  shipped profile moves past it.
+- **The tool skill's other half: the expertise.** `skills/zerosoc-defender-xdr/SKILL.md` says which of
+  the framework's questions this source answers and what each answer is worth — that an absent
+  capability and an empty answer are indistinguishable in its data, so the binding is what tells them
+  apart; that its own verdict may be a human's or the product's and is weighed by nobody; that a
+  remediation state says what was done to one entity and never that the Case is explained; and the
+  traps that cost real runs, from a merge that moves an incident to one process listed twice because
+  two alerts described it differently. It cites the profile and restates none of it.
+
 The framework pin moves 37 commits, from before the Case Schema was mapped natively to OCSF, and
 now sits on `main` at the merge of framework PR #66. The three skills were instructing an agent to
 produce Notes whose elements the framework no longer defines, and to hand on two fields the Case

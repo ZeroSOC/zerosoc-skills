@@ -16,10 +16,11 @@ evidence = load("tools/shared/evidence_inventory.py", "evidence_inventory")
 selector = load("tools/shared/select_playbook.py", "select_playbook")
 chain = load("tools/shared/process_chain.py", "process_chain")
 metadata = load("tools/shared/alert_metadata.py", "alert_metadata")
+profiles = load("tools/shared/source_profile.py", "source_profile")
 checker = load("tools/check_run.py", "check_run")
 
 CAPABILITIES = os.path.join(ROOT, "capabilities")
-XDR_MAP = os.path.join(CAPABILITIES, "alert_types.defender-xdr.json")
+XDR_PROFILE = os.path.join(ROOT, "skills", "zerosoc-defender-xdr", "source_profile.json")
 DFB_PROFILE = os.path.join(CAPABILITIES, "zerosoc.capabilities.defender-for-business.json")
 PLACEHOLDER_SOURCES = {"<telemetry source>"}
 FIXTURES = os.path.join(ROOT, "tests", "fixtures")
@@ -168,7 +169,7 @@ class LedgerDedup(unittest.TestCase):
 
 class AlertTypeMapping(unittest.TestCase):
     def setUp(self):
-        self.map = alert_types.load_map(XDR_MAP)
+        self.map = alert_types.load_map(XDR_PROFILE)
 
     def test_titles_map_to_framework_alert_types(self):
         for title, expected in [
@@ -395,7 +396,7 @@ class DetectionMetadata(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.spec = alert_types.load_map(XDR_MAP)
+        cls.spec = profiles.load(XDR_PROFILE)
         cls.index = selector.technique_index(os.path.join(ROOT, "framework"))
 
     def one(self, alert=None, **kw):
@@ -730,6 +731,43 @@ class ProcessChainTelemetry(unittest.TestCase):
     def test_telemetry_of_unrelated_processes_is_not_pulled_into_the_chain(self):
         self.assertEqual(len(self.with_["nodes"]), 45, "only the ancestors of the Case's processes are added")
 
+    def test_the_script_itself_names_no_column_of_any_source(self):
+        with open(os.path.join(ROOT, "tools", "shared", "process_chain.py"), encoding="utf-8") as f:
+            text = f.read()
+        for spelling in ("InitiatingProcess", "ProcessCreationTime", "DeviceName", "initiatingprocess"):
+            self.assertNotIn(spelling, text, "a method script knows no source: the profile names its columns")
+
+    def test_without_a_profile_a_sources_own_column_names_are_not_known(self):
+        rows = [{"DeviceName": "WS-01", "ProcessId": 10, "ProcessCreationTime": "2026-09-13T12:00:00Z",
+                 "FileName": "parent.exe", "ProcessCommandLine": "parent.exe"}]
+        evidence = [{"type": "process", "name": "child.exe", "pid": 11, "created": "2026-09-13T12:00:01Z",
+                     "device": "ws-01", "parent_pid": 10, "parent_created": "2026-09-13T12:00:00Z",
+                     "parent_name": "parent.exe", "alert_ids": ["A"]}]
+        self.assertNotEqual(self.node(chain.build(evidence, rows), 10)["source"], "telemetry")
+        named = chain.columns_of(profiles.load(XDR_PROFILE))
+        self.assertEqual(self.node(chain.build(evidence, rows, named), 10)["source"], "telemetry")
+
+    def test_telemetry_that_fills_nothing_says_so(self):
+        import subprocess, sys, tempfile
+        base = tempfile.mkdtemp()
+        for name, document in (("evidence.json", [{"type": "process", "name": "c.exe", "pid": 11, "device": "ws-01",
+                                                    "created": "2026-09-13T12:00:01Z", "alert_ids": ["A"]}]),
+                               ("telemetry.json", [{"DeviceName": "WS-01", "ProcessId": 10,
+                                                     "ProcessCreationTime": "2026-09-13T12:00:00Z"}])):
+            with open(os.path.join(base, name), "w", encoding="utf-8") as f:
+                json.dump(document, f)
+        script = os.path.join(ROOT, "tools", "shared", "process_chain.py")
+        ran = subprocess.run([sys.executable, script, "evidence.json", "--telemetry", "telemetry.json"],
+                             cwd=base, capture_output=True, text=True)
+        self.assertIn("filled nothing", ran.stderr)
+        ran = subprocess.run([sys.executable, script, "evidence.json", "--telemetry", "telemetry.json",
+                              "--profile", XDR_PROFILE], cwd=base, capture_output=True, text=True)
+        self.assertNotIn("filled nothing", ran.stderr)
+
+    def test_the_profile_names_every_column_the_lineage_is_rebuilt_from(self):
+        lineage = profiles.telemetry_rows(profiles.load(XDR_PROFILE))["process_lineage"]
+        self.assertEqual(set(lineage), set(chain.LINEAGE))
+
     def test_source_column_names_are_accepted(self):
         rows = [{"DeviceName": "WS-01", "ProcessId": 11, "ProcessCreationTime": "2026-09-13T12:00:01Z",
                  "FileName": "child.exe", "ProcessCommandLine": "child.exe -run",
@@ -739,7 +777,7 @@ class ProcessChainTelemetry(unittest.TestCase):
         evidence = [{"type": "process", "name": "child.exe", "pid": 11, "created": "2026-09-13T12:00:01Z",
                      "device": "ws-01", "parent_pid": 10, "parent_created": "2026-09-13T12:00:00Z",
                      "parent_name": "parent.exe", "alert_ids": ["A"]}]
-        built = chain.build(evidence, rows)
+        built = chain.build(evidence, rows, chain.columns_of(profiles.load(XDR_PROFILE)))
         parent = self.node(built, 10)
         self.assertEqual((parent["source"], parent["command_lines"]), ("telemetry", ["parent.exe"]))
         self.assertEqual(parent["parent"]["pid"], 4, "the row's grandparent columns add one more level")
@@ -873,9 +911,10 @@ class RunCheck(unittest.TestCase):
         self.assertIn("FAIL  triage: the assertions are the ones the alerts carry", out)
         self.assertIn("T1486", out)
 
-    def test_a_deployment_without_an_alert_type_map_degrades_and_is_not_failed(self):
-        """§1.1 runs where the binding declares no field names for the source: the assertions
-        cannot be read at all, and the harness says so instead of failing the run for it."""
+    def test_a_deployment_without_a_source_profile_degrades_and_is_not_failed(self):
+        """§1.1 runs where the binding names no source profile: nothing declares where this
+        source's assertions live, so they cannot be read at all, and the harness says so instead of
+        failing the run for it."""
         base = self.run_dir(detection_metadata=None)
         with open(os.path.join(base, "zerosoc.capabilities.json"), "w", encoding="utf-8") as f:
             json.dump({"capabilities": {}, "data_sources": {}}, f)

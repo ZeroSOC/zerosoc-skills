@@ -60,7 +60,7 @@ per Case: the playbook the script prints.
    When it holds processes, rebuild the lineage with `python3 scripts/process_chain.py evidence.json --alerts alerts.json`
    (one chain per alert, each process under its ancestors; `--case` joins them into one chain per device, the
    view to score on). Where the bound endpoint class carries process telemetry, query the Case's devices and
-   window for process creations and pass them with `--telemetry telemetry.json`: the ancestors the alerts never
+   window for process creations and pass them with `--telemetry telemetry.json --bindings zerosoc.capabilities.json` (the source profile says what the source calls its columns): the ancestors the alerts never
    cited are reconstructed and marked as such. Where it carries alert evidence only, the chain stops at the
    first ancestor no alert cited: that is a **lineage gap**, it is recorded, and no hypothesis may rest on a
    lineage the evidence does not show. Command lines, their decodings and the remediation state of each process
@@ -71,7 +71,11 @@ per Case: the playbook the script prints.
    `detection_metadata` across and **refresh it at this gate**: alerts appended since triage bring their
    own assertions, and the remediation state changes while a Case is open. Re-run
    `python3 scripts/alert_metadata.py alerts.json --bindings zerosoc.capabilities.json --evidence evidence.json --json`
-   on the Case as it now is, keeping the dispositions already recorded on the recommended actions. Record `started_at`
+   on the Case as it now is, keeping the dispositions already recorded on the recommended actions. Carry
+   the ledger's `source_profile` object across too, and refresh it with
+   `python3 scripts/source_profile.py --bindings zerosoc.capabilities.json --json`: a local override of the
+   shipped profile in force now is recorded on the ledger and in the Case's `provenance.products`, and
+   named in the Note's Provenance. Record `started_at`
    (UTC) now, the Case `severity`, the `evidence_inventory` object of step 2, and `at` on every finding
    as it is added: the timebox is computed from these, not declared. Alert findings carry their
    `alert_type` and `entity`, so the same type on the same entity counts once in the score; alerts

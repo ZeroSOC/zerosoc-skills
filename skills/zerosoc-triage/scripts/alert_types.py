@@ -1,38 +1,39 @@
 #!/usr/bin/env python3
 """Map source alerts to the framework's alert types and build the ledger's alerts. Standard library only.
 
-  alert_types.py alerts.json --map alert_types.<source>.json [--json]
+  alert_types.py alerts.json --profile <source_profile.json> [--json]
 
 Detection & Analysis §1.1: the same alert type on the same entity counts once. That is only
-deterministic when the alert type is: this script assigns it from a deployment's map (detector id first,
+deterministic when the alert type is: this script assigns it from the source profile (detector id first,
 then title pattern) and collapses same type + same entity to the strongest alert, listing what it merged.
 
-  alert_types.py alerts.json --bindings zerosoc.capabilities.json   (reads the binding's "alert_type_map")
+  alert_types.py alerts.json --bindings zerosoc.capabilities.json   (reads the binding's "source_profiles")
 
 alerts.json: a list of {"id", "title", "detector_id"?, "entity", "severity"?, "confidence"?, "technique"?}.
-The map is a JSON file placed next to the capability binding of the deployment (see the repository's
-capabilities/ folder):
-{"source": "...", "fields": {"detector_id": "<the source's own field name>", ...},
- "rules": [{"alert_type": "<framework alert type>", "domain": "<telemetry domain>",
-            "detector_ids": ["..."], "title_patterns": ["<regex, case-insensitive>"]}]}
+The rules are the `alert_types` block of the technology's **source profile** (one versioned home for
+what its records mean, validated against capabilities/source_profile.schema.json):
+{"alert_types": {"fields": {"detector_id": "<the source's own field name>", ...},
+                 "rules": [{"alert_type": "<framework alert type>", "domain": "<telemetry domain>",
+                            "detector_ids": ["..."], "title_patterns": ["<regex, case-insensitive>"]}]}}
 "fields" lets the source's records be passed unrenamed; the script itself knows no source. An alert no
 rule matches keeps its normalized title as its type and is flagged "unmapped": it still deduplicates,
-and the flag tells the maintainer of the map what to add. Output: the "alerts" array of ledger.json
+and the flag tells the maintainer of the profile what to add. Output: the "alerts" array of ledger.json
 (format in triage_decide.py). Each entry also carries "alert_type" and "side": "Malicious", so the same
 entries seed the findings of resolve.py, where one type on one entity again counts once.
 """
 import argparse, json, os, re, sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import source_profile
+
 W = {"Low": 1, "Medium": 2, "High": 3}
 SEV2CONF = {"Informational": "Low", "Low": "Low", "Medium": "Medium", "High": "High", "Critical": "High"}
 
 
-def load_map(path):
-    m = json.load(open(path, encoding="utf-8"))
-    for rule in m.get("rules", []):
-        for pat in rule.get("title_patterns", []):
-            re.compile(pat)  # fail at load, not at the first alert
-    return m
+def load_map(path, override=None):
+    """The alert-type rules of the technology at ``path``: its source profile's own block, with the
+    deployment's local override laid over it where it names one."""
+    return source_profile.alert_rules(source_profile.load(path, override))
 
 
 def framework_alert_types(markdown):
@@ -50,7 +51,7 @@ def framework_alert_types(markdown):
 
 
 def _field(alert, amap, name):
-    """The canonical field, or the source's own name for it as the map declares under "fields"."""
+    """The canonical field, or the source's own name for it as the profile declares under "fields"."""
     value = alert.get(name)
     alias = (amap.get("fields") or {}).get(name)
     return value if value not in (None, "") or not alias else alert.get(alias)
@@ -111,22 +112,16 @@ def build_alerts(alerts, amap):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("alerts")
-    ap.add_argument("--map")
-    ap.add_argument("--bindings", help="capability binding whose alert_type_map names the map, next to it")
+    source_profile.add_arguments(ap)
     ap.add_argument("--json", action="store_true")
     a = ap.parse_args()
-    path = a.map
-    if not path and a.bindings:
-        named = json.load(open(a.bindings, encoding="utf-8")).get("alert_type_map")
-        path = os.path.join(os.path.dirname(os.path.abspath(a.bindings)), named) if named else None
-    if not path:
-        ap.error("--map, or --bindings with an alert_type_map, is required")
-    out = build_alerts(json.load(open(a.alerts, encoding="utf-8")), load_map(path))
+    profile = source_profile.from_arguments(ap, a)
+    out = build_alerts(json.load(open(a.alerts, encoding="utf-8")), source_profile.alert_rules(profile))
     if a.json:
         print(json.dumps(out, indent=2, ensure_ascii=False))
         return
     for x in out:
-        flag = "  UNMAPPED: add a rule to the map" if x["unmapped"] else ""
+        flag = "  UNMAPPED: add a rule to the source profile's alert_types" if x["unmapped"] else ""
         merged = f"  (counts once for {', '.join(x['merged_ids'])})" if len(x["merged_ids"]) > 1 else ""
         print(f"{x['id']}\t{x['type']}\t{x['entity']}\t{x['confidence']}{merged}{flag}")
     if any(x["unmapped"] for x in out):

@@ -1,0 +1,1505 @@
+{
+  "source": {
+    "id": "defender-xdr",
+    "vendor": "Microsoft",
+    "product": "Microsoft Defender XDR",
+    "api": "Microsoft Graph security API",
+    "api_version": "v1.0",
+    "profile_version": "2026-09-21",
+    "description": "An incident of this source is a Case: same identifier, its alerts the Case's alerts, its evidence the Case's observables."
+  },
+  "fields": {
+    "case": {
+      "uid": "id",
+      "title": "displayName",
+      "severity": "severity",
+      "status": "status",
+      "tenant": "tenantId",
+      "last_update_time": "lastUpdateDateTime",
+      "created_time": "createdDateTime",
+      "master_uid": "redirectIncidentId",
+      "alerts": "alerts",
+      "comments": "comments",
+      "url": "incidentWebUrl",
+      "classification": "classification"
+    },
+    "alert": {
+      "uid": "id",
+      "title": "title",
+      "severity": "severity",
+      "evidence": "evidence",
+      "first_activity_time": "firstActivityDateTime",
+      "last_activity_time": "lastActivityDateTime",
+      "created_time": "createdDateTime",
+      "product": "productName",
+      "techniques": "mitreTechniques",
+      "threat_name": "threatDisplayName",
+      "threat_family": "threatFamilyName",
+      "detection_source": "detectionSource",
+      "detector_id": "detectorId",
+      "description": "description",
+      "recommended_actions": "recommendedActions"
+    },
+    "evidence": {
+      "type": "@odata.type",
+      "verdict": "verdict",
+      "remediation_status": "remediationStatus",
+      "remediation_status_details": "remediationStatusDetails"
+    },
+    "telemetry_rows": {
+      "objects": {
+        "FileName": [
+          "process",
+          "name"
+        ],
+        "ProcessCommandLine": [
+          "process",
+          "cmd_line"
+        ],
+        "ProcessId": [
+          "process",
+          "pid"
+        ],
+        "InitiatingProcessFileName": [
+          "process",
+          "parent_process",
+          "name"
+        ],
+        "InitiatingProcessCommandLine": [
+          "process",
+          "parent_process",
+          "cmd_line"
+        ],
+        "SHA256": [
+          "file",
+          "hashes",
+          "sha256"
+        ],
+        "FileHash": [
+          "file",
+          "hashes",
+          "sha256"
+        ],
+        "FolderPath": [
+          "file",
+          "path"
+        ],
+        "DeviceName": [
+          "device",
+          "hostname"
+        ],
+        "DeviceId": [
+          "device",
+          "uid"
+        ],
+        "AccountName": [
+          "user",
+          "name"
+        ],
+        "AccountUpn": [
+          "user",
+          "name"
+        ],
+        "UserPrincipalName": [
+          "user",
+          "name"
+        ],
+        "RemoteIP": [
+          "dst_endpoint",
+          "ip"
+        ],
+        "RemotePort": [
+          "dst_endpoint",
+          "port"
+        ],
+        "RemoteUrl": [
+          "url",
+          "url_string"
+        ],
+        "Url": [
+          "url",
+          "url_string"
+        ],
+        "LocalIP": [
+          "src_endpoint",
+          "ip"
+        ],
+        "LocalPort": [
+          "src_endpoint",
+          "port"
+        ],
+        "IPAddress": [
+          "src_endpoint",
+          "ip"
+        ]
+      },
+      "times": [
+        "Timestamp",
+        "TimeGenerated",
+        "EventTime",
+        "createdDateTime",
+        "LastSeen"
+      ],
+      "uids": [
+        "ReportId",
+        "EventId",
+        "id",
+        "uid"
+      ],
+      "process_lineage": {
+        "device": "DeviceName",
+        "pid": "ProcessId",
+        "created": "ProcessCreationTime",
+        "name": "FileName",
+        "command_line": "ProcessCommandLine",
+        "parent_pid": "InitiatingProcessId",
+        "parent_created": "InitiatingProcessCreationTime",
+        "parent_name": "InitiatingProcessFileName",
+        "parent_command_line": "InitiatingProcessCommandLine",
+        "parent_parent_pid": "InitiatingProcessParentId",
+        "parent_parent_created": "InitiatingProcessParentCreationTime"
+      }
+    }
+  },
+  "vocabularies": {
+    "severity": {
+      "informational": {
+        "id": 1,
+        "name": "Informational"
+      },
+      "low": {
+        "id": 2,
+        "name": "Low"
+      },
+      "medium": {
+        "id": 3,
+        "name": "Medium"
+      },
+      "high": {
+        "id": 4,
+        "name": "High"
+      },
+      "unknown": {
+        "id": 1,
+        "name": "Informational",
+        "note": "the source says nothing; the Case starts at the bottom and triage sets it"
+      }
+    },
+    "status": {
+      "active": {
+        "id": 1,
+        "name": "New"
+      },
+      "inProgress": {
+        "id": 2,
+        "name": "In Progress"
+      },
+      "awaitingAction": {
+        "id": 3,
+        "name": "On Hold"
+      },
+      "resolved": {
+        "id": 4,
+        "name": "Resolved",
+        "note": "the source's own closure of its record; the Case is closed by its own verdict, and the two are not the same event"
+      },
+      "redirected": {
+        "id": 5,
+        "name": "Closed",
+        "note": "merged into another incident: the Case closes as a Duplicate of its master"
+      }
+    },
+    "verdict": {
+      "unknown": {
+        "id": 0,
+        "name": "Unknown",
+        "note": "the source has not classified the incident, which is how every incident starts and how many are left when they are resolved there"
+      },
+      "falsePositive": {
+        "id": 1,
+        "name": "False Positive"
+      },
+      "truePositive": {
+        "id": 2,
+        "name": "True Positive"
+      },
+      "informationalExpectedActivity": {
+        "id": 5,
+        "name": "Benign",
+        "note": "activity that was real and expected: the framework's Benign, authorized activity that legitimately matched the detection"
+      }
+    },
+    "analytic_types": {
+      "customDetection": {
+        "type_id": 1,
+        "type": "Rule"
+      },
+      "microsoftDefenderForCloud": {
+        "type_id": 1,
+        "type": "Rule"
+      },
+      "microsoftSentinel": {
+        "type_id": 1,
+        "type": "Rule"
+      },
+      "microsoft365Defender": {
+        "type_id": 2,
+        "type": "Behavioral"
+      },
+      "microsoftDefenderForCloudApps": {
+        "type_id": 2,
+        "type": "Behavioral"
+      },
+      "microsoftDefenderForEndpoint": {
+        "type_id": 2,
+        "type": "Behavioral"
+      },
+      "microsoftDefenderForIdentity": {
+        "type_id": 2,
+        "type": "Behavioral"
+      },
+      "microsoftDefenderForOffice365": {
+        "type_id": 2,
+        "type": "Behavioral"
+      },
+      "azureAdIdentityProtection": {
+        "type_id": 4,
+        "type": "Learning (ML/DL)"
+      },
+      "antivirus": {
+        "type_id": 5,
+        "type": "Fingerprinting"
+      },
+      "customTi": {
+        "type_id": 5,
+        "type": "Fingerprinting"
+      },
+      "smartScreen": {
+        "type_id": 5,
+        "type": "Fingerprinting"
+      },
+      "automatedInvestigation": {
+        "type_id": 99,
+        "type": "Other"
+      },
+      "manual": {
+        "type_id": 99,
+        "type": "Other"
+      }
+    },
+    "remediation_states": {
+      "prevented": {
+        "neutralized": true,
+        "status": "Success",
+        "activity": "Evict"
+      },
+      "blocked": {
+        "neutralized": true,
+        "status": "Success",
+        "activity": "Evict"
+      },
+      "remediated": {
+        "neutralized": true,
+        "status": "Success",
+        "activity": "Evict"
+      },
+      "quarantined": {
+        "neutralized": true,
+        "status": "Success",
+        "activity": "Isolate"
+      },
+      "isolated": {
+        "neutralized": true,
+        "status": "Success",
+        "activity": "Isolate"
+      },
+      "suspended": {
+        "neutralized": true,
+        "status": "Success",
+        "activity": "Isolate"
+      },
+      "active": {
+        "neutralized": false,
+        "status": "Unknown",
+        "activity": null
+      },
+      "none": {
+        "neutralized": false,
+        "status": "Unknown",
+        "activity": null
+      },
+      "notRemediated": {
+        "neutralized": false,
+        "status": "Failure",
+        "activity": null
+      },
+      "failed": {
+        "neutralized": false,
+        "status": "Failure",
+        "activity": null
+      },
+      "notFound": {
+        "neutralized": false,
+        "status": "Does Not Exist",
+        "activity": null
+      },
+      "unsupported": {
+        "neutralized": false,
+        "status": "Unsupported",
+        "activity": null
+      },
+      "running": {
+        "neutralized": false,
+        "status": "Unknown",
+        "activity": null
+      }
+    }
+  },
+  "alert_types": {
+    "fields": {
+      "detector_id": "detectorId"
+    },
+    "rules": [
+      {
+        "alert_type": "User-reported phishing",
+        "domain": "Email",
+        "detector_ids": [],
+        "title_patterns": [
+          "reported by user",
+          "user[- ]reported"
+        ]
+      },
+      {
+        "alert_type": "Inbox forwarding / redirect or hide rule",
+        "domain": "Email",
+        "detector_ids": [],
+        "title_patterns": [
+          "inbox (forwarding|manipulation|rule)",
+          "(forwarding|redirect)(/redirect)? rule",
+          "new-inboxrule",
+          "suspicious email forwarding",
+          "mail(box)? (redirect|forward)"
+        ]
+      },
+      {
+        "alert_type": "BEC impersonation / display-name spoof",
+        "domain": "Email",
+        "detector_ids": [],
+        "title_patterns": [
+          "(user|domain|brand|sender|mailbox) impersonation",
+          "impersonation (of|attempt)",
+          "display[- ]name spoof",
+          "business email compromise|\\bbec\\b"
+        ]
+      },
+      {
+        "alert_type": "Malicious attachment / URL delivered",
+        "domain": "Email",
+        "detector_ids": [],
+        "title_patterns": [
+          "malicious (url|attachment)",
+          "(malware|malicious file|phish).*(e-?mail|mail message|attachment)",
+          "e-?mail messages? containing",
+          "potentially malicious url click",
+          "removed after delivery",
+          "phish(ing)? (url|campaign|delivered)"
+        ]
+      },
+      {
+        "alert_type": "Ransomware mass-encryption",
+        "domain": "Endpoint",
+        "detector_ids": [],
+        "title_patterns": [
+          "ransomware behaviou?r",
+          "ransomware activity",
+          "files? (was|were) encrypted",
+          "mass (file )?encryption"
+        ]
+      },
+      {
+        "alert_type": "Mass file destruction / disk wipe",
+        "domain": "Endpoint",
+        "detector_ids": [],
+        "title_patterns": [
+          "shadow cop(y|ies)",
+          "vssadmin",
+          "(file )?backups? (were|was) deleted",
+          "inhibit system recovery",
+          "disk wip",
+          "mass file delet"
+        ]
+      },
+      {
+        "alert_type": "Credential dumping",
+        "domain": "Endpoint",
+        "detector_ids": [],
+        "title_patterns": [
+          "credential dump",
+          "credential memory read",
+          "lsass",
+          "credential theft",
+          "ntds",
+          "sam (database|registry) .*(dump|access)",
+          "mimikatz"
+        ]
+      },
+      {
+        "alert_type": "Security-tool / AMSI tampering",
+        "domain": "Endpoint",
+        "detector_ids": [],
+        "title_patterns": [
+          "tamper",
+          "attempt to turn off .*(antivirus|protection)",
+          "\\bamsi\\b",
+          "(antivirus|real-time protection|security (tool|software)) .*(disabled|turned off|stopped)",
+          "(event|security) log was cleared"
+        ]
+      },
+      {
+        "alert_type": "Persistence mechanism created",
+        "domain": "Endpoint",
+        "detector_ids": [],
+        "title_patterns": [
+          "scheduled task",
+          "suspicious service (registration|registered|creat|install)",
+          "(registry )?run key",
+          "autostart",
+          "anomaly detected in asep",
+          "persistence"
+        ]
+      },
+      {
+        "alert_type": "Outbound data spike",
+        "domain": "Network",
+        "detector_ids": [],
+        "title_patterns": [
+          "exfiltrat",
+          "unusual (outbound|upload|data transfer)",
+          "data (upload|transfer) (to|volume)"
+        ]
+      },
+      {
+        "alert_type": "C2 beaconing / known-bad destination",
+        "domain": "Network",
+        "detector_ids": [],
+        "title_patterns": [
+          "command[- ]and[- ]control|\\bc2\\b",
+          "beacon",
+          "connection to (a |an )?(malicious|known[- ]bad|suspicious) (domain|ip|url|destination)",
+          "network connection to a malicious"
+        ]
+      },
+      {
+        "alert_type": "Suspicious script / interpreter execution",
+        "domain": "Endpoint",
+        "detector_ids": [],
+        "title_patterns": [
+          "powershell",
+          "suspicious (script|command ?line|wscript|cscript|mshta|rundll32|regsvr32)",
+          "living[- ]off[- ]the[- ]land",
+          "encoded command",
+          "remote (shell|command|powershell)",
+          "suspicious remote activity"
+        ]
+      },
+      {
+        "alert_type": "Trusted software / updater anomalous behaviour",
+        "domain": "Endpoint",
+        "detector_ids": [],
+        "title_patterns": [
+          "dll (side|search)[- ]?(load|order)",
+          "signed (binary|executable).*(unusual|suspicious)",
+          "updater .*(anomal|suspicious)"
+        ]
+      },
+      {
+        "alert_type": "Ingress tool transfer to host",
+        "domain": "Endpoint",
+        "detector_ids": [],
+        "title_patterns": [
+          "tool transfer",
+          "(hack|attack) ?tool .*(download|drop|written)",
+          "suspicious (file )?download",
+          "certutil"
+        ]
+      },
+      {
+        "alert_type": "Malware / loader execution",
+        "domain": "Endpoint",
+        "detector_ids": [],
+        "title_patterns": [
+          "(malware|ransomware) (was )?(detected|prevented|blocked|found)",
+          "an active .* (malware|hacktool|backdoor|trojan)",
+          "malicious file",
+          "trojan",
+          "backdoor",
+          "hacktool",
+          "\\bloader\\b",
+          "suspicious (file|binary|executable|process)",
+          "process injection",
+          "unwanted software"
+        ]
+      },
+      {
+        "alert_type": "Impossible-travel / anomalous sign-in",
+        "domain": "Identity",
+        "detector_ids": [],
+        "title_patterns": [
+          "impossible travel",
+          "atypical travel",
+          "unfamiliar sign-?in",
+          "anonymous ip",
+          "anomalous (sign-?in|token)",
+          "(sign-?in|activity) from (a |an )?(malicious|suspicious|infrequent) (ip|country)",
+          "risky sign-?in"
+        ]
+      },
+      {
+        "alert_type": "Brute force / password spray",
+        "domain": "Identity",
+        "detector_ids": [],
+        "title_patterns": [
+          "password spray",
+          "brute[- ]?force",
+          "multiple failed (logon|login|sign-?in)",
+          "credential stuffing"
+        ]
+      },
+      {
+        "alert_type": "MFA fatigue / push bombing",
+        "domain": "Identity",
+        "detector_ids": [],
+        "title_patterns": [
+          "mfa (fatigue|bomb|spam)",
+          "push bomb",
+          "repeated mfa",
+          "suspicious mfa"
+        ]
+      },
+      {
+        "alert_type": "Legacy-auth sign-in",
+        "domain": "Identity",
+        "detector_ids": [],
+        "title_patterns": [
+          "legacy auth",
+          "basic auth"
+        ]
+      },
+      {
+        "alert_type": "OAuth app consent / token-session theft",
+        "domain": "Identity",
+        "detector_ids": [],
+        "title_patterns": [
+          "oauth",
+          "app(lication)? consent",
+          "consent grant",
+          "token (theft|replay|stolen)",
+          "session cookie",
+          "adversary[- ]in[- ]the[- ]middle|\\baitm\\b"
+        ]
+      },
+      {
+        "alert_type": "Privileged role / group grant",
+        "domain": "Identity",
+        "detector_ids": [],
+        "title_patterns": [
+          "(privileged|admin(istrator)?) (role|group)",
+          "added to (a )?(privileged|admin)",
+          "role assignment",
+          "elevation of privilege"
+        ]
+      },
+      {
+        "alert_type": "Internal scan / lateral movement",
+        "domain": "Network",
+        "detector_ids": [],
+        "title_patterns": [
+          "lateral movement",
+          "(network|port|internal) scan",
+          "network (service )?discovery",
+          "pass[- ]the[- ](hash|ticket)",
+          "smb .*(enumeration|scan)",
+          "anomalous account lookups"
+        ]
+      },
+      {
+        "alert_type": "DNS tunneling / suspicious DNS",
+        "domain": "Network",
+        "detector_ids": [],
+        "title_patterns": [
+          "dns tunnel",
+          "suspicious dns"
+        ]
+      },
+      {
+        "alert_type": "Unsanctioned SaaS app usage (Shadow IT / Shadow AI discovery)",
+        "domain": "Cloud",
+        "detector_ids": [],
+        "title_patterns": [
+          "unsanctioned (app|saas)",
+          "shadow (it|ai)",
+          "discovered app"
+        ]
+      },
+      {
+        "alert_type": "DLP violation (regulated data)",
+        "domain": "Data",
+        "detector_ids": [],
+        "title_patterns": [
+          "\\bdlp\\b",
+          "data loss prevention",
+          "sensitive (info|data).*(shared|sent|upload)"
+        ]
+      },
+      {
+        "alert_type": "Mass sensitive-file access by one principal",
+        "domain": "Data",
+        "detector_ids": [],
+        "title_patterns": [
+          "mass (download|file access)",
+          "unusual (volume of )?file (access|download)"
+        ]
+      },
+      {
+        "alert_type": "Ransom-note file dropped",
+        "domain": "Data",
+        "detector_ids": [],
+        "title_patterns": [
+          "ransom[- ]?note"
+        ]
+      },
+      {
+        "alert_type": "Web shell upload",
+        "domain": "Application",
+        "detector_ids": [],
+        "title_patterns": [
+          "web ?shell"
+        ]
+      }
+    ]
+  },
+  "case_map": [
+    {
+      "path": "id",
+      "case": "uid"
+    },
+    {
+      "path": "displayName",
+      "ignored": "the source's title for the incident; the Case's account is its Notes, and a title nobody wrote is not one"
+    },
+    {
+      "path": "severity",
+      "case": "severity_id"
+    },
+    {
+      "path": "status",
+      "case": "status_id"
+    },
+    {
+      "path": "createdDateTime",
+      "ignored": "when the source opened its record. The Case's start_time is when the adversary acted, which is the earliest alert activity, and its own lifecycle is in its events"
+    },
+    {
+      "path": "lastUpdateDateTime",
+      "case": "microsoft.last_update_time"
+    },
+    {
+      "path": "tenantId",
+      "case": "microsoft.tenant_id"
+    },
+    {
+      "path": "incidentWebUrl",
+      "case": "microsoft.incident_web_url"
+    },
+    {
+      "path": "classification",
+      "case": "microsoft.classification"
+    },
+    {
+      "path": "determination",
+      "case": "microsoft.determination"
+    },
+    {
+      "path": "assignedTo",
+      "case": "microsoft.assigned_to"
+    },
+    {
+      "path": "redirectIncidentId",
+      "case": "zerosoc.master_case_uid"
+    },
+    {
+      "path": "comments",
+      "ignored": "the analyst thread on the source's record. A writer of Notes to the source reads it so as not to write the same Note twice, and a comment is not Case data: the Case's account is its Notes"
+    },
+    {
+      "path": "comments[].comment",
+      "ignored": "one entry of the analyst thread: its text. A writer of Notes to the source reads the thread so as not to write the same Note twice; nothing of it lands on the Case"
+    },
+    {
+      "path": "comments[].createdByDisplayName",
+      "ignored": "who wrote the entry, as a display name — a person's or an application's. It is not an identity the Case can cite"
+    },
+    {
+      "path": "comments[].createdDateTime",
+      "ignored": "when the entry was written. With the entry it belongs to: on the source's thread, not on the Case"
+    },
+    {
+      "path": "description",
+      "ignored": "the source's own narrative of the incident, generated from its alerts. What §1.1 requires is each alert's description, which is read; the Case's account is its Notes"
+    },
+    {
+      "path": "summary",
+      "ignored": "the source's generated summary. Empty on every record observed at this licence tier, and listed so that the day the source fills it is a day somebody decides where it lands"
+    },
+    {
+      "path": "priorityScore",
+      "ignored": "the source's own 0–100 priority for its queue. The Case's severity is assessed by triage (§1.4), and a second, unexplained score beside it would be weighed by nobody"
+    },
+    {
+      "path": "lastModifiedBy",
+      "ignored": "who last changed the source's record, as a display name — a person's or an application's. Not an identity the Case can cite, and not a time a poller can resume from"
+    },
+    {
+      "path": "resolvingComment",
+      "ignored": "the remark left on the source's record when it was resolved there. The Case's closure is stated by its Note, which is what is written back"
+    },
+    {
+      "path": "customTags",
+      "ignored": "the operator's own tags on the source's record. Nothing in the framework reads them, and a deployment that wants them says so here rather than having them appear on a Case unexamined"
+    },
+    {
+      "path": "systemTags",
+      "ignored": "the source's own tags on the incident. Same: read by nothing, and recorded here so that a tag the vendor starts sending is not silence"
+    },
+    {
+      "path": "@odata.context",
+      "ignored": "the API's own envelope, not the record"
+    },
+    {
+      "path": "alerts",
+      "case": "finding_info_list[]"
+    },
+    {
+      "path": "alerts[].id",
+      "case": "finding_info_list[].uid"
+    },
+    {
+      "path": "alerts[].title",
+      "case": "finding_info_list[].title"
+    },
+    {
+      "path": "alerts[].description",
+      "case": "finding_info_list[].desc"
+    },
+    {
+      "path": "alerts[].severity",
+      "case": [
+        "finding_info_list[].related_events[].severity_id",
+        "finding_info_list[].tags[]"
+      ],
+      "note": "It lands twice. As the severity of the Detection Finding that represents the alert, the event the Alert Finding cites. And as that Finding's confidence (the zerosoc:confidence_id tag: Informational and Low give Low, Medium gives Medium, High and Critical give High) — a workaround, because this source states no confidence of its own for an alert. How bad and how sure are two measures, and the day the source states the second this entry stops borrowing the first."
+    },
+    {
+      "path": "alerts[].mitreTechniques",
+      "case": "finding_info_list[].attacks[].technique.uid"
+    },
+    {
+      "path": "alerts[].detectionSource",
+      "case": "finding_info_list[].analytic.type"
+    },
+    {
+      "path": "alerts[].detectorId",
+      "case": "finding_info_list[].analytic.uid"
+    },
+    {
+      "path": "alerts[].threatDisplayName",
+      "case": "finding_info_list[].traits[].values[]"
+    },
+    {
+      "path": "alerts[].threatFamilyName",
+      "case": "finding_info_list[].traits[].name"
+    },
+    {
+      "path": "alerts[].recommendedActions",
+      "case": "finding_info_list[].desc",
+      "note": "the source's own procedure. It reaches the Case as the disposition of each recommendation — the Finding a followed one produced, or the Finding that states why it was set aside — never as a block of text on the alert"
+    },
+    {
+      "path": "alerts[].firstActivityDateTime",
+      "case": "finding_info_list[].first_seen_time"
+    },
+    {
+      "path": "alerts[].lastActivityDateTime",
+      "case": "finding_info_list[].last_seen_time"
+    },
+    {
+      "path": "alerts[].createdDateTime",
+      "case": "finding_info_list[].created_time"
+    },
+    {
+      "path": "alerts[].productName",
+      "case": "zerosoc.provenance.products[].name"
+    },
+    {
+      "path": "alerts[].serviceSource",
+      "ignored": "which Defender workload raised the alert. detectionSource is the finer of the two and is what the analytic carries; this one is kept out rather than recorded twice"
+    },
+    {
+      "path": "alerts[].providerAlertId",
+      "ignored": "the workload's own id for the alert, before Defender gave it one. The Case cites the alert by the id Defender publishes, which is what a reader can open"
+    },
+    {
+      "path": "alerts[].incidentId",
+      "ignored": "the alert's back-reference to the incident: the Case is that incident, so the link is the Case's own uid"
+    },
+    {
+      "path": "alerts[].tenantId",
+      "ignored": "the tenant, already on the Case once from the incident; an alert of another tenant is not an alert of this Case"
+    },
+    {
+      "path": "alerts[].category",
+      "ignored": "the source's own kill-chain category. The framework's alert type comes from the alert_types rules of this profile and its Incident Category from the playbook, neither of which reads this"
+    },
+    {
+      "path": "alerts[].status",
+      "ignored": "the source's per-alert triage state. The Case has one status, and it is the executor's"
+    },
+    {
+      "path": "alerts[].classification",
+      "ignored": "the source's per-alert verdict. The Case's verdict is the executor's own, and the source's sits on the incident's extension where it is visible without being weighed"
+    },
+    {
+      "path": "alerts[].determination",
+      "ignored": "as classification: the source's per-alert determination"
+    },
+    {
+      "path": "alerts[].assignedTo",
+      "ignored": "the source's per-alert assignment. The Case has one assignee, and it is set by the method, not inherited from an alert"
+    },
+    {
+      "path": "alerts[].categories",
+      "ignored": "the source's kill-chain categories for the alert, as a list; category is the older single value. The framework's alert type comes from the alert_types rules, never from these"
+    },
+    {
+      "path": "alerts[].systemTags",
+      "ignored": "the source's own tags on the alert. As the incident's: read by nothing, and listed so that a tag that starts to carry meaning is noticed"
+    },
+    {
+      "path": "alerts[].comments",
+      "ignored": "the analyst thread of one alert. Notes are written to the incident's thread, and this one is read by nothing"
+    },
+    {
+      "path": "alerts[].investigationState",
+      "ignored": "the state of the source's own automated investigation of the alert. It says whether the product investigated, which bears on who wrote classification and determination; those are recorded and weighed by nobody, and so is this"
+    },
+    {
+      "path": "alerts[].actorDisplayName",
+      "ignored": "the threat actor the source attributes the alert to. Empty on every record observed at this licence tier, and listed so that the day the source fills it is a day somebody decides where it lands: an attribution is a lead for the Malicious hypothesis, as the threat family is"
+    },
+    {
+      "path": "alerts[].alertPolicyId",
+      "ignored": "the custom-detection policy behind the alert. detectorId identifies the detector for every alert, custom or not. Empty on every record observed at this licence tier, and listed so that the day the source fills it is a day somebody decides where it lands"
+    },
+    {
+      "path": "alerts[].alertWebUrl",
+      "ignored": "the portal's page for the alert. The Case cites the alert by its uid, and the link a reader follows is the incident's, on the extension object"
+    },
+    {
+      "path": "alerts[].incidentWebUrl",
+      "ignored": "the alert's copy of the incident's link: already on the Case once, from the incident"
+    },
+    {
+      "path": "alerts[].lastUpdateDateTime",
+      "ignored": "when the source last changed the alert. A poller resumes from the incident's own time, and the activity times are what the Case's timeline reads"
+    },
+    {
+      "path": "alerts[].resolvedDateTime",
+      "ignored": "when the alert was resolved on the source. The Case's own closure is the one that counts"
+    },
+    {
+      "path": "alerts[].additionalData",
+      "ignored": "a free-form bag the detector may fill. Empty on every alert observed; a key inside it arrives as a path of its own and is caught like any other"
+    },
+    {
+      "path": "alerts[].customDetails",
+      "ignored": "the custom detection's own key-value pairs. Empty on every alert observed; a key inside it arrives as a path of its own"
+    },
+    {
+      "path": "alerts[].evidence",
+      "case": "observables[]"
+    },
+    {
+      "path": "alerts[].evidence[].@odata.type",
+      "ignored": "the entity's kind, as the API types it. It selects which of the fields below are read and becomes the observable's type_id rather than a value of its own"
+    },
+    {
+      "path": "alerts[].evidence[].verdict",
+      "ignored": "the source's per-entity verdict. Read by the evidence inventory to show what the source thought; it is not a Finding of the Case, which weighs the evidence itself"
+    },
+    {
+      "path": "alerts[].evidence[].remediationStatus",
+      "case": "finding_info_list[].types[]"
+    },
+    {
+      "path": "alerts[].evidence[].remediationStatusDetails",
+      "case": "finding_info_list[].desc"
+    },
+    {
+      "path": "alerts[].evidence[].detectionStatus",
+      "ignored": "what the sensor did at the moment of detection: detected, blocked, prevented. It travels with the evidence row the inventory builds, and reaches the Case only inside a Finding that cites it; the state the method reads for §1.5 is remediationStatus"
+    },
+    {
+      "path": "alerts[].evidence[].createdDateTime",
+      "ignored": "when the source attached this evidence item to the alert — not when the entity acted. The activity times of the alert are what the timeline reads"
+    },
+    {
+      "path": "alerts[].evidence[].roles",
+      "ignored": "the part the source gives the entity in the alert. Empty on every item observed; detailedRoles is where the source writes it"
+    },
+    {
+      "path": "alerts[].evidence[].detailedRoles",
+      "ignored": "the part the source gives the entity in the alert, in its own words. Which entity a Finding is about is decided by the method from the evidence, not taken from a label"
+    },
+    {
+      "path": "alerts[].evidence[].tags",
+      "ignored": "the operator's own tags on the entity. Nothing in the framework reads them; a deployment that gives one a meaning records it in the SOC Knowledge Base"
+    },
+    {
+      "path": "alerts[].evidence[].mdeDeviceId",
+      "case": "observables[].value"
+    },
+    {
+      "path": "alerts[].evidence[].deviceDnsName",
+      "case": "observables[].value"
+    },
+    {
+      "path": "alerts[].evidence[].osPlatform",
+      "ignored": "the device's platform. Asset context the enrichment asks the source for at triage, where it is a Finding with its analytic, rather than an unattributed field on the Case"
+    },
+    {
+      "path": "alerts[].evidence[].hostName",
+      "ignored": "the device's short name, already in deviceDnsName, which the observable carries"
+    },
+    {
+      "path": "alerts[].evidence[].dnsDomain",
+      "ignored": "the device's DNS domain, already in deviceDnsName"
+    },
+    {
+      "path": "alerts[].evidence[].ntDomain",
+      "ignored": "the device's NT domain. Empty on every record observed at this licence tier, and listed so that the day the source fills it is a day somebody decides where it lands"
+    },
+    {
+      "path": "alerts[].evidence[].azureAdDeviceId",
+      "ignored": "the directory's id for the device. The device is identified by mdeDeviceId and its DNS name. Empty on every record observed at this licence tier, and listed so that the day the source fills it is a day somebody decides where it lands"
+    },
+    {
+      "path": "alerts[].evidence[].osBuild",
+      "ignored": "the device's OS build. Asset context: the enrichment asks the source for the device at triage, and what bears on the Case is stated there as a Finding, with its source"
+    },
+    {
+      "path": "alerts[].evidence[].version",
+      "ignored": "the device's OS version. Asset context: the enrichment asks the source for the device at triage, and what bears on the Case is stated there as a Finding, with its source"
+    },
+    {
+      "path": "alerts[].evidence[].healthStatus",
+      "ignored": "the sensor's health on the device. Asset context: the enrichment asks the source for the device at triage, and what bears on the Case is stated there as a Finding, with its source"
+    },
+    {
+      "path": "alerts[].evidence[].onboardingStatus",
+      "ignored": "whether the device is onboarded to the sensor. Asset context: the enrichment asks the source for the device at triage, and what bears on the Case is stated there as a Finding, with its source"
+    },
+    {
+      "path": "alerts[].evidence[].defenderAvStatus",
+      "ignored": "the state of the anti-malware engine on the device. Asset context: the enrichment asks the source for the device at triage, and what bears on the Case is stated there as a Finding, with its source"
+    },
+    {
+      "path": "alerts[].evidence[].riskScore",
+      "ignored": "the source's own risk level for the device. How much the asset matters comes from the SOC Knowledge Base; the source's score is read at enrichment and stated as a Finding where it bears"
+    },
+    {
+      "path": "alerts[].evidence[].rbacGroupId",
+      "ignored": "the source's device group, by id. An access-control detail of the source, read by nothing"
+    },
+    {
+      "path": "alerts[].evidence[].rbacGroupName",
+      "ignored": "the source's device group, by name. Empty on every record observed at this licence tier, and listed so that the day the source fills it is a day somebody decides where it lands"
+    },
+    {
+      "path": "alerts[].evidence[].firstSeenDateTime",
+      "ignored": "when the sensor first saw the device. Asset context: the enrichment asks the source for the device at triage, and what bears on the Case is stated there as a Finding, with its source"
+    },
+    {
+      "path": "alerts[].evidence[].lastIpAddress",
+      "ignored": "the device's last internal address. Asset context: the enrichment asks the source for the device at triage, and what bears on the Case is stated there as a Finding, with its source; an address an alert cites arrives as evidence of its own"
+    },
+    {
+      "path": "alerts[].evidence[].lastExternalIpAddress",
+      "ignored": "the device's last external address. As lastIpAddress: asset context, and never an observable the Case did not get from an alert"
+    },
+    {
+      "path": "alerts[].evidence[].ipInterfaces",
+      "ignored": "every address of the device's interfaces. As lastIpAddress: asset context, and never an observable the Case did not get from an alert"
+    },
+    {
+      "path": "alerts[].evidence[].loggedOnUsers",
+      "ignored": "who was logged on to the device when the alert fired. A lead for the identity pivot of the investigation, asked of the source then and stated as a Finding; not an observable by itself"
+    },
+    {
+      "path": "alerts[].evidence[].loggedOnUsers[].accountName",
+      "ignored": "the name of an account logged on to the device, as loggedOnUsers: a lead for the identity pivot, not an observable"
+    },
+    {
+      "path": "alerts[].evidence[].loggedOnUsers[].domainName",
+      "ignored": "the domain of an account logged on to the device, as loggedOnUsers"
+    },
+    {
+      "path": "alerts[].evidence[].resourceAccessEvents",
+      "ignored": "the resources the device reached. Empty on every item observed"
+    },
+    {
+      "path": "alerts[].evidence[].vmMetadata",
+      "ignored": "the cloud virtual machine behind the device, where it is one. Asset context: the enrichment asks the source for the device at triage, and what bears on the Case is stated there as a Finding, with its source"
+    },
+    {
+      "path": "alerts[].evidence[].vmMetadata.cloudProvider",
+      "ignored": "as vmMetadata: the cloud it runs in"
+    },
+    {
+      "path": "alerts[].evidence[].vmMetadata.resourceId",
+      "ignored": "as vmMetadata: the cloud's resource path"
+    },
+    {
+      "path": "alerts[].evidence[].vmMetadata.subscriptionId",
+      "ignored": "as vmMetadata: the subscription that holds it"
+    },
+    {
+      "path": "alerts[].evidence[].vmMetadata.vmId",
+      "ignored": "as vmMetadata: the virtual machine's own id"
+    },
+    {
+      "path": "alerts[].evidence[].ipAddress",
+      "case": "observables[].value"
+    },
+    {
+      "path": "alerts[].evidence[].countryLetterCode",
+      "ignored": "where the source geolocated the address. Geolocation is enrichment and reaches the Case as a Finding with what produced it"
+    },
+    {
+      "path": "alerts[].evidence[].location",
+      "ignored": "where the source places the address. Empty on every record observed at this licence tier, and listed so that the day the source fills it is a day somebody decides where it lands; geolocation is enrichment, as countryLetterCode"
+    },
+    {
+      "path": "alerts[].evidence[].stream",
+      "ignored": "the network stream the address or the account was seen in. Empty on every record observed at this licence tier, and listed so that the day the source fills it is a day somebody decides where it lands"
+    },
+    {
+      "path": "alerts[].evidence[].userAccount",
+      "case": "observables[].value"
+    },
+    {
+      "path": "alerts[].evidence[].userAccount.userPrincipalName",
+      "case": "observables[].value"
+    },
+    {
+      "path": "alerts[].evidence[].userAccount.accountName",
+      "case": "observables[].value"
+    },
+    {
+      "path": "alerts[].evidence[].userAccount.azureAdUserId",
+      "case": "observables[].value"
+    },
+    {
+      "path": "alerts[].evidence[].userAccount.domainName",
+      "ignored": "the account's domain, already in the principal name the observable carries"
+    },
+    {
+      "path": "alerts[].evidence[].userAccount.userSid",
+      "ignored": "the account's security identifier. It travels with the evidence row the inventory builds, and reaches the Case only inside a Finding that cites it: it tells a well-known system account from a person's, which the lineage of a process needs"
+    },
+    {
+      "path": "alerts[].evidence[].userAccount.displayName",
+      "ignored": "the account's display name. Empty on every record observed at this licence tier, and listed so that the day the source fills it is a day somebody decides where it lands; the observable is the principal name"
+    },
+    {
+      "path": "alerts[].evidence[].userAccount.activeDirectoryObjectGuid",
+      "ignored": "the on-premises directory's id for the account. Empty on every record observed at this licence tier, and listed so that the day the source fills it is a day somebody decides where it lands"
+    },
+    {
+      "path": "alerts[].evidence[].userAccount.tenantId",
+      "ignored": "the account's tenant. Empty on every record observed at this licence tier, and listed so that the day the source fills it is a day somebody decides where it lands; the Case carries the tenant once, from the incident"
+    },
+    {
+      "path": "alerts[].evidence[].userAccount.resourceAccessEvents",
+      "ignored": "the resources the account reached. Empty on every item observed"
+    },
+    {
+      "path": "alerts[].evidence[].fileDetails",
+      "case": "observables[].value"
+    },
+    {
+      "path": "alerts[].evidence[].fileDetails.sha256",
+      "case": "observables[].value"
+    },
+    {
+      "path": "alerts[].evidence[].fileDetails.fileName",
+      "case": "observables[].name"
+    },
+    {
+      "path": "alerts[].evidence[].fileDetails.filePath",
+      "ignored": "where the file was. It travels with the evidence row the inventory builds and with the evidence a Finding rests on; the observable is the hash, which is what a lookup takes"
+    },
+    {
+      "path": "alerts[].evidence[].fileDetails.signer",
+      "ignored": "the signature's subject. A check of who signed the file reads it from the evidence row and states it as a Finding, with the check that produced it"
+    },
+    {
+      "path": "alerts[].evidence[].fileDetails.issuer",
+      "ignored": "the signature's issuer, as signer: read by a check of who signed the file, and not carried unattributed"
+    },
+    {
+      "path": "alerts[].evidence[].fileDetails.sha1",
+      "ignored": "a second digest of the same file. It travels with the evidence row the inventory builds, and reaches the Case only inside a Finding that cites it, where it helps tell one file from another; the observable is the SHA-256, which every lookup of the method takes"
+    },
+    {
+      "path": "alerts[].evidence[].fileDetails.md5",
+      "ignored": "a third digest of the same file, often absent. The observable is the SHA-256"
+    },
+    {
+      "path": "alerts[].evidence[].fileDetails.sha256Ac",
+      "ignored": "the digest of the file's signature. Empty on every record observed at this licence tier, and listed so that the day the source fills it is a day somebody decides where it lands"
+    },
+    {
+      "path": "alerts[].evidence[].fileDetails.fileSize",
+      "ignored": "the file's size in bytes. Read by nothing"
+    },
+    {
+      "path": "alerts[].evidence[].fileDetails.filePublisher",
+      "ignored": "the publisher the source read from the file. As signer: a check of who signed a file states it as a Finding, and it is not carried unattributed"
+    },
+    {
+      "path": "alerts[].evidence[].processCommandLine",
+      "ignored": "the command line. Evidence a Finding rests on, kept where that Finding cites it, and never an observable: an observable is an entity that can be looked up"
+    },
+    {
+      "path": "alerts[].evidence[].processId",
+      "ignored": "the process id, meaningful only with the device and the creation time. The evidence row carries the three together"
+    },
+    {
+      "path": "alerts[].evidence[].processCreationDateTime",
+      "ignored": "with processId and the device, the identity of one process instance; on the evidence row, not on the Case as a field"
+    },
+    {
+      "path": "alerts[].evidence[].imageFile",
+      "case": "observables[].value"
+    },
+    {
+      "path": "alerts[].evidence[].imageFile.sha256",
+      "case": "observables[].value"
+    },
+    {
+      "path": "alerts[].evidence[].imageFile.fileName",
+      "case": "observables[].name"
+    },
+    {
+      "path": "alerts[].evidence[].imageFile.filePath",
+      "ignored": "the image's path: with the evidence row, as fileDetails.filePath"
+    },
+    {
+      "path": "alerts[].evidence[].imageFile.sha1",
+      "ignored": "as fileDetails.sha1: a second digest of the image, with the evidence row"
+    },
+    {
+      "path": "alerts[].evidence[].imageFile.md5",
+      "ignored": "a third digest of the process image, often absent, as fileDetails.md5. The observable is the SHA-256"
+    },
+    {
+      "path": "alerts[].evidence[].imageFile.sha256Ac",
+      "ignored": "the digest of the image's signature, as fileDetails.sha256Ac. Empty on every record observed at this licence tier"
+    },
+    {
+      "path": "alerts[].evidence[].imageFile.fileSize",
+      "ignored": "the process image's size in bytes, as fileDetails.fileSize. Read by nothing"
+    },
+    {
+      "path": "alerts[].evidence[].imageFile.filePublisher",
+      "ignored": "the publisher the source read from the process image, as fileDetails.filePublisher: stated as a Finding by a check of who signed it, never carried unattributed"
+    },
+    {
+      "path": "alerts[].evidence[].imageFile.signer",
+      "ignored": "the subject of the image's signature, as fileDetails.signer: read from the evidence row by a check of who signed the file"
+    },
+    {
+      "path": "alerts[].evidence[].imageFile.issuer",
+      "ignored": "the issuer of the image's signature, as fileDetails.issuer: read with the signer, not carried unattributed"
+    },
+    {
+      "path": "alerts[].evidence[].parentProcessId",
+      "ignored": "the parent, which the attack graph reads from the evidence rows; on the Case it is an edge, not a field"
+    },
+    {
+      "path": "alerts[].evidence[].parentProcessCreationDateTime",
+      "ignored": "with parentProcessId, the parent instance; on the evidence row"
+    },
+    {
+      "path": "alerts[].evidence[].parentProcessImageFile",
+      "ignored": "the parent's image, read with the parent instance on the evidence row"
+    },
+    {
+      "path": "alerts[].evidence[].parentProcessImageFile.fileName",
+      "ignored": "as parentProcessImageFile"
+    },
+    {
+      "path": "alerts[].evidence[].parentProcessImageFile.filePath",
+      "ignored": "as parentProcessImageFile"
+    },
+    {
+      "path": "alerts[].evidence[].parentProcessImageFile.sha256",
+      "ignored": "as parentProcessImageFile: read with the parent instance on the evidence row"
+    },
+    {
+      "path": "alerts[].evidence[].parentProcessImageFile.sha1",
+      "ignored": "as parentProcessImageFile: read with the parent instance on the evidence row"
+    },
+    {
+      "path": "alerts[].evidence[].parentProcessImageFile.md5",
+      "ignored": "as parentProcessImageFile: read with the parent instance on the evidence row"
+    },
+    {
+      "path": "alerts[].evidence[].parentProcessImageFile.sha256Ac",
+      "ignored": "as parentProcessImageFile: read with the parent instance on the evidence row"
+    },
+    {
+      "path": "alerts[].evidence[].parentProcessImageFile.fileSize",
+      "ignored": "as parentProcessImageFile: read with the parent instance on the evidence row"
+    },
+    {
+      "path": "alerts[].evidence[].parentProcessImageFile.filePublisher",
+      "ignored": "as parentProcessImageFile: read with the parent instance on the evidence row"
+    },
+    {
+      "path": "alerts[].evidence[].parentProcessImageFile.signer",
+      "ignored": "as parentProcessImageFile: read with the parent instance on the evidence row"
+    },
+    {
+      "path": "alerts[].evidence[].parentProcessImageFile.issuer",
+      "ignored": "as parentProcessImageFile: read with the parent instance on the evidence row"
+    },
+    {
+      "path": "alerts[].evidence[].registryHive",
+      "ignored": "the hive of a registry key or value the alert cites. It travels with the evidence row the inventory builds, and reaches the Case only inside a Finding that cites it: with registryKey it is the identity of one registry entity on one device"
+    },
+    {
+      "path": "alerts[].evidence[].registryKey",
+      "ignored": "the key's path under its hive. With registryHive, the identity of the registry entity on the evidence row"
+    },
+    {
+      "path": "alerts[].evidence[].registryValueName",
+      "ignored": "the name of the value under the key. With the key, on the evidence row"
+    },
+    {
+      "path": "alerts[].evidence[].registryValue",
+      "ignored": "the value's data. Evidence a Finding rests on, kept where that Finding cites it, and never an observable"
+    },
+    {
+      "path": "alerts[].evidence[].registryValueType",
+      "ignored": "the value's registry type. Read by nothing"
+    }
+  ],
+  "extension": {
+    "key": "microsoft",
+    "description": "What this source states about the incident and the framework has no field for. Nothing the framework carries is repeated here: that would be a mapping, not an extension.",
+    "properties": {
+      "incident_id": {
+        "type": "string",
+        "from": "id",
+        "description": "The source's identifier, which is also the Case's uid; kept so the extension reads whole on its own."
+      },
+      "incident_web_url": {
+        "type": "string",
+        "from": "incidentWebUrl",
+        "description": "Where an analyst opens the incident in the source's portal."
+      },
+      "tenant_id": {
+        "type": "string",
+        "from": "tenantId",
+        "description": "The tenant the incident belongs to; an incident of another tenant is not a Case of this deployment."
+      },
+      "status": {
+        "type": "string",
+        "from": "status",
+        "description": "The source's own status, in its own word."
+      },
+      "classification": {
+        "type": "string",
+        "from": "classification",
+        "description": "The source's own verdict, recorded and never weighed: the Case's verdict is the executor's."
+      },
+      "determination": {
+        "type": "string",
+        "from": "determination",
+        "description": "The source's own determination, on the same terms."
+      },
+      "assigned_to": {
+        "type": "string",
+        "from": "assignedTo",
+        "description": "Who owns the incident in the source; the Case's assignee is the executor's own."
+      },
+      "redirect_incident_id": {
+        "type": "string",
+        "from": "redirectIncidentId",
+        "description": "The master this incident was merged into."
+      },
+      "last_update_time": {
+        "type": "integer",
+        "from": "lastUpdateDateTime",
+        "description": "When the source last changed the record; a poller resumes from it."
+      }
+    }
+  },
+  "capability_coverage": {
+    "capabilities": {
+      "asset.cmdb": {
+        "answers": "What is this device: its platform, its risk and exposure, its tags and the value the operator gave it.",
+        "limits": [
+          "a device the endpoint sensor never onboarded is not here"
+        ],
+        "operation": "get_machine"
+      },
+      "identity.directory": {
+        "answers": "What this source knows about an account: the alerts it appears in and the devices it has used.",
+        "limits": [
+          "this source has no directory record of its own: the account's attributes come from the directory itself, not from here",
+          "an account outside the directory — a local account, a guest that never signed in — appears only where an alert named it"
+        ],
+        "operation": "get_user_alerts"
+      },
+      "malware.repository": {
+        "answers": "What the vendor knows about a file: its own verdict, its signer, and how widely it has been seen.",
+        "limits": [
+          "a hash the vendor has never seen returns no record, which is an answer and not a gap",
+          "prevalence is this tenant's and the vendor's, not the world's"
+        ],
+        "operation": "get_file_info"
+      },
+      "reputation.multi_engine": {
+        "answers": "What this source has seen of an address or a domain: the alerts it appears in and its prevalence here.",
+        "limits": [
+          "this is one vendor's sight of the indicator, not a multi-engine consensus: the class is named for what the method wants, and this source answers the narrower question",
+          "an address the tenant has never contacted has no statistics, which is not a verdict"
+        ],
+        "operation": "get_ip_statistics"
+      },
+      "cases.store": {
+        "answers": "Has this entity been in an incident before, and how were those incidents determined.",
+        "limits": [
+          "the source's own incident history only, bounded by its retention"
+        ],
+        "operation": "list_incidents"
+      },
+      "telemetry.endpoint": {
+        "answers": "What ran, what was written, what connected, on a device.",
+        "limits": [
+          "advanced hunting is not available on every licence tier",
+          "the hunting tables are retained for 30 days"
+        ],
+        "operation": "run_hunting_query"
+      },
+      "telemetry.identity": {
+        "answers": "Sign-ins and directory changes for an account.",
+        "limits": [
+          "identity tables are empty where the identity workload is not deployed"
+        ],
+        "operation": "run_hunting_query"
+      }
+    },
+    "data_sources": {
+      "EDR": true,
+      "EDR / endpoint process telemetry": true,
+      "Endpoint telemetry": true,
+      "Server EDR": true,
+      "EDR on web servers": true,
+      "Anti-virus / anti-malware": true,
+      "Identity provider sign-in logs": true,
+      "Directory audit logs": true,
+      "Directory / identity-provider audit logs": true,
+      "Identity Provider / directory audit logs": true,
+      "Email gateway logs": true,
+      "Email gateway / secure email gateway": true
+    }
+  },
+  "queries": {
+    "process_events": {
+      "asks": "What ran on this device, in this window?",
+      "table": "DeviceProcessEvents",
+      "recipe": "DeviceProcessEvents | where DeviceId =~ '{device}' or DeviceName =~ '{device}' | limit {limit}",
+      "limits": [
+        "30-day retention",
+        "advanced hunting is not on every licence tier"
+      ]
+    },
+    "file_events": {
+      "asks": "What was written, renamed or deleted on this device?",
+      "table": "DeviceFileEvents",
+      "recipe": "DeviceFileEvents | where DeviceId =~ '{device}' or SHA256 =~ '{hash}' | limit {limit}",
+      "limits": [
+        "30-day retention"
+      ]
+    },
+    "network_events": {
+      "asks": "What did this device connect to?",
+      "table": "DeviceNetworkEvents",
+      "recipe": "DeviceNetworkEvents | where RemoteIP =~ '{ip}' or LocalIP =~ '{ip}' | limit {limit}",
+      "limits": [
+        "30-day retention"
+      ]
+    },
+    "logon_events": {
+      "asks": "Who logged on to this device, and how?",
+      "table": "DeviceLogonEvents",
+      "recipe": "DeviceLogonEvents | where DeviceId =~ '{device}' or AccountUpn =~ '{user}' | limit {limit}",
+      "limits": [
+        "30-day retention"
+      ]
+    },
+    "registry_events": {
+      "asks": "What was written to the registry on this device?",
+      "table": "DeviceRegistryEvents",
+      "recipe": "DeviceRegistryEvents | where DeviceId =~ '{device}' | limit {limit}",
+      "limits": [
+        "30-day retention"
+      ]
+    },
+    "sign_ins": {
+      "asks": "Where did this account sign in from?",
+      "table": "AADSignInEventsBeta",
+      "recipe": "AADSignInEventsBeta | where AccountUpn =~ '{user}' | limit {limit}",
+      "limits": [
+        "the table is in preview and absent on lower tiers",
+        "sign-in retention is shorter than the endpoint tables on some licences"
+      ]
+    },
+    "email_messages": {
+      "asks": "What did this message do, and who else received it?",
+      "table": "EmailEvents",
+      "recipe": "EmailEvents | where SenderFromAddress =~ '{sender}' or NetworkMessageId =~ '{id}' | limit {limit}",
+      "limits": [
+        "needs the collaboration workload"
+      ]
+    },
+    "related_cases": {
+      "asks": "Has this entity been in an incident before?",
+      "recipe": "list_incidents(filter: lastUpdateDateTime ge {since})",
+      "limits": [
+        "the source's own incidents only"
+      ]
+    },
+    "directory_changes": {
+      "asks": "What changed on this account or group, and who changed it?",
+      "table": "IdentityDirectoryEvents",
+      "recipe": "IdentityDirectoryEvents | where AccountUpn =~ '{user}' or TargetAccountUpn =~ '{user}' | limit {limit}",
+      "limits": [
+        "needs the identity workload deployed against the domain controllers"
+      ]
+    }
+  }
+}
