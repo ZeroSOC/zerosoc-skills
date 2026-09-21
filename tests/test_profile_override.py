@@ -217,6 +217,54 @@ class LocalOverride(unittest.TestCase):
         self.assertEqual(check_profiles.shipped(json.loads(SHIPPED.read_text()), "p"), [])
 
 
+class WhereTheProfileIsFound(unittest.TestCase):
+    """A binding names its profile by the tool skill that holds it. A deployment's own copy beside
+    the binding wins; otherwise it is the one installed beside the skill that is running."""
+
+    NAMED = "zerosoc-defender-xdr/source_profile.json"
+
+    def binding(self, base: Path) -> Path:
+        path = base / "zerosoc.capabilities.json"
+        path.write_text(json.dumps({"capabilities": {}, "data_sources": {},
+                                    "source_profiles": {"defender-xdr": self.NAMED}}))
+        return path
+
+    def test_a_binding_anywhere_finds_the_profile_beside_the_skills(self) -> None:
+        binding = self.binding(Path(tempfile.mkdtemp()))
+        self.assertEqual(Path(profiles.resolved(str(binding))[0]).resolve(), SHIPPED.resolve())
+
+    def test_the_deployments_own_copy_beside_the_binding_wins(self) -> None:
+        base = Path(tempfile.mkdtemp())
+        own = base / self.NAMED
+        own.parent.mkdir()
+        own.write_text(SHIPPED.read_text())
+        self.assertEqual(Path(profiles.resolved(str(self.binding(base)))[0]), own)
+
+    def test_skills_copied_out_of_the_repository_still_find_it(self) -> None:
+        import shutil, subprocess
+        base = Path(tempfile.mkdtemp())
+        for skill in ("zerosoc-triage", "zerosoc-defender-xdr"):
+            shutil.copytree(ROOT / "skills" / skill, base / "installed" / skill,
+                            ignore=shutil.ignore_patterns("references", "__pycache__"))
+        work = base / "work"
+        work.mkdir()
+        (work / "alerts.json").write_text(json.dumps(
+            [{"id": "A1", "title": "Suspicious PowerShell command line", "entity": "ws-01", "severity": "high"}]))
+        ran = subprocess.run([sys.executable, str(base / "installed" / "zerosoc-triage" / "scripts" / "alert_types.py"),
+                              "alerts.json", "--bindings", str(self.binding(work)), "--json"],
+                             cwd=work, capture_output=True, text=True)
+        self.assertEqual(ran.returncode, 0, ran.stderr)
+        self.assertFalse(json.loads(ran.stdout)[0]["unmapped"])
+
+    def test_a_profile_found_nowhere_says_where_it_was_looked_for(self) -> None:
+        base = Path(tempfile.mkdtemp())
+        path = base / "zerosoc.capabilities.json"
+        path.write_text(json.dumps({"capabilities": {}, "data_sources": {},
+                                    "source_profiles": {"x": "no-such-skill/source_profile.json"}}))
+        with self.assertRaisesRegex(ValueError, "beside the binding.*beside the skills"):
+            profiles.resolved(str(path))
+
+
 class TheRunRecordsIt(unittest.TestCase):
     """The acceptance harness: a run that read its source through an override says so."""
 

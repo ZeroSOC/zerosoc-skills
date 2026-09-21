@@ -47,7 +47,7 @@
     },
     "source_profiles": {
       "type": "object",
-      "description": "source identifier -> the source profile of that technology (a path next to the binding file, or into a tool skill). A profile says what the source's records mean in the framework's terms; it is validated against source_profile.schema.json. A deployment that names none has no profile, which is a visibility gap and not an error.",
+      "description": "source identifier -> the source profile of that technology, named from the tool skill that holds it (\"<tool skill>/source_profile.json\"). It is looked for beside the binding file first, where a deployment's own copy wins, and then beside the installed skills. A profile says what the source's records mean in the framework's terms; it is validated against source_profile.schema.json. A deployment that names none has no profile, which is a visibility gap and not an error.",
       "additionalProperties": {
         "type": "string"
       }

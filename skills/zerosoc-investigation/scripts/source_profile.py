@@ -58,7 +58,8 @@ def resolved(bindings_path, source=None):
     """What the binding names for one source: the shipped profile and the local override, as paths
     beside the binding file.
 
-    ``source_profiles`` maps a source identifier to a file. With one profile and no source asked
+    ``source_profiles`` maps a source identifier to a file, named from the tool skill that holds it
+    (``_found`` says where it is looked for). With one profile and no source asked
     for, that profile is the deployment's; with several, the caller names which. A deployment that
     names none has no profile, which is a visibility gap and not an error. The override is None
     where the deployment names none, which is the default.
@@ -76,8 +77,31 @@ def resolved(bindings_path, source=None):
     if source not in profiles:
         raise ValueError(f"no source profile named {source!r} in {os.path.basename(bindings_path)}")
     beside = os.path.dirname(os.path.abspath(bindings_path))
-    return (os.path.join(beside, profiles[source]),
+    return (_found(profiles[source], beside, os.path.basename(bindings_path)),
             os.path.join(beside, overrides[source]) if source in overrides else None)
+
+
+def _skills_folder():
+    """The folder the skills are installed in, side by side: the one that holds the skill this
+    script runs from, or the repository's own when it runs from the shared sources."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    if os.path.basename(here) == "scripts":
+        return os.path.dirname(os.path.dirname(here))
+    return os.path.join(os.path.dirname(os.path.dirname(here)), "skills")
+
+
+def _found(named, beside, binding_name):
+    """Where the profile the binding names is. A profile lives with the tool skill of its
+    technology, so a binding names it from there — ``<tool skill>/source_profile.json`` — and it is
+    looked for beside the binding first, where a deployment's own copy wins, and then beside the
+    skills, where it was installed. The override is the deployment's own and is only ever beside
+    the binding."""
+    places = [os.path.join(beside, named), os.path.join(_skills_folder(), named)]
+    for place in places:
+        if os.path.exists(place):
+            return place
+    raise ValueError(f"{binding_name} names the source profile {named!r}, which is neither beside the "
+                     f"binding ({places[0]}) nor beside the skills ({places[1]})")
 
 
 def named(bindings_path, source=None):

@@ -36,7 +36,10 @@ terms: where each required input of Detection & Analysis §1.1 lives, what the s
 where every field of a record lands on the Case, and which capability classes it answers. It is declared
 by [source_profile.schema.json](source_profile.schema.json), validated in CI by `tools/check_profiles.py`,
 and it lives with the tool skill of its technology — the Defender XDR one is
-`skills/zerosoc-defender-xdr/source_profile.json`.
+`skills/zerosoc-defender-xdr/source_profile.json`. A binding names it from there,
+`"defender-xdr": "zerosoc-defender-xdr/source_profile.json"`, wherever the binding itself is kept: the
+profile is looked for beside the binding first, where a deployment's own copy wins, and then beside the
+installed skills, so installing the tool skill next to the method skills is all a deployment does.
 
 Its `alert_types` block is what makes "the same alert type on the same entity counts once"
 deterministic: ordered rules from the source's detector id and alert title to a framework alert type and

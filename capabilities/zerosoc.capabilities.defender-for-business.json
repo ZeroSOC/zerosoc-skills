@@ -152,6 +152,6 @@
     "Identity Provider / directory audit logs": "the tenant exposes it through the directory reporting API, but no tool bound in this profile reads it: bind telemetry.identity to make it available"
   },
   "source_profiles": {
-    "defender-xdr": "../skills/zerosoc-defender-xdr/source_profile.json"
+    "defender-xdr": "zerosoc-defender-xdr/source_profile.json"
   }
 }
