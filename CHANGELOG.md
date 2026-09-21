@@ -39,6 +39,21 @@
   remediation state says what was done to one entity and never that the Case is explained; and the
   traps that cost real runs, from a merge that moves an incident to one process listed twice because
   two alerts described it differently. It cites the profile and restates none of it.
+- **The method surface moves here: rendering, the timeline and the rule text.** A rule the framework
+  changes should be a skills release and a pin bump; three of them were a host patch as well.
+  `select_playbook.py` now returns the playbook's **candidate Incident Categories** in the
+  playbook's own order instead of leaving a host to scrape them out of the printed prose with a
+  regular expression of its own. `timeline.py` builds the **Case Timeline** and flags **exactly one
+  T0** — two detections of the same activity share its time and the first is the anchor — and fails
+  a timeline that states a T0 no entry carries or an entry earlier than it. `note_elements.py`
+  prints the elements of a conformant Note in order and **checks** an assembled one: a side without
+  a confidence, context with one, a finding that cites no event, a bare technique code, a
+  recommended action nobody answered, a gap that names no check. It renders the structure and runs
+  the checks — the Summary, the Rationale, each finding's wording and the deployment's language stay
+  the executor's, because a Note written by a template would be a form and the framework asks for an
+  account. And the **normative rule text** a host's prompts used to restate now ships as skill
+  content (`rules/*.md` in the triage and investigation skills), so a human reading the skill and a
+  model reading a prompt are held to one wording.
 
 The framework pin moves 37 commits, from before the Case Schema was mapped natively to OCSF, and
 now sits on `main` at the merge of framework PR #66. The three skills were instructing an agent to

@@ -79,6 +79,23 @@ def section(body, heading, level):
 
 TECHNIQUE = re.compile(r"\b(T\d{4}(?:\.\d{3})?)\b(?:\s*\(([^)]+)\))?")
 CATEGORY = re.compile(r"\b(IC-\d{2})\b")
+CANDIDATES = re.compile(r"\*\*Candidate Incident Categor(?:y|ies)[^*]*:\*\*([^\n]*)")
+
+
+def candidate_categories(text):
+    """The Incident Categories a playbook proposes for what was selected, in its own order.
+
+    The playbook states them in a labelled element, and the order is the playbook's: the first is
+    the one Investigation opens. A reader of the printed prose would have to scrape them out with
+    a regular expression of their own, which is a rule of the framework living in whoever scraped
+    it last; it is stated here once, beside the playbook that declares it.
+    """
+    out = []
+    for element in CANDIDATES.findall(text or ""):
+        for found in CATEGORY.findall(element):
+            if found not in out:
+                out.append(found)
+    return out
 
 
 def technique_index(root=ROOT):
@@ -235,6 +252,7 @@ def main():
     g = gaps(chosen["fields"], bindings)
     result = {
         "path": chosen["rel"], "version": chosen["fields"].get("last_updated", ""), "status": chosen["fields"].get("status", ""),
+        "candidate_incident_categories": candidate_categories(text),
         "required_data_sources": g,
         "visibility_gaps": [{"data_source": x["data_source"], "check_prevented": "(state the check this source would have supported)"} for x in g if x["status"] != "available"] if bindings else [],
         "text": text,
@@ -243,6 +261,8 @@ def main():
         print(json.dumps(result, indent=2, ensure_ascii=False))
         return
     print(f"# {chosen['rel']} (version {result['version']}, status {result['status']})")
+    if result["candidate_incident_categories"]:
+        print("candidate_incident_categories: " + ", ".join(result["candidate_incident_categories"]))
     print("required_data_sources:")
     for x in g:
         print(f"  - {x['data_source']}: {x['status']}" + (f" ({x['reason']})" if x.get("reason") else ""))

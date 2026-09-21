@@ -101,6 +101,9 @@ Read per alert: the playbook section the script prints.
    playbook is not recorded cannot be reproduced. When no playbook exists for the domain at
    this framework pin, use the domain's alert catalog in
    [alert_types.md](references/framework/02-Taxonomy/alert_types.md) and apply §1.2–§1.5 directly.
+   The rules you are held to while you run the checks are [rules/checks.md](rules/checks.md); a host
+   that prompts a model composes that text rather than restating it, so a human reading this skill and
+   a model reading the prompt are held to one wording.
 5. **Start the ledger.** Create `ledger.json` (format in `scripts/triage_decide.py`) with the
    `evidence_inventory` object of step 2 and the `detection_metadata` of step 3. When the deployment names a source profile (the binding's
    `source_profiles`), build the alerts with `python3 scripts/alert_types.py alerts.json --bindings zerosoc.capabilities.json --json`:
@@ -145,7 +148,13 @@ Read per alert: the playbook section the script prints.
    duplicate. Checklist before promoting or closing: can you say in one sentence, with evidence, why
    the activity is or is not suspicious? If not, gather more.
 10. **Write the Triage Note.** The Note renders the Case and holds no state of its own: everything it
-   shows is already on the Case, sampled at this gate. The canonical element list is
+   shows is already on the Case, sampled at this gate. `python3 scripts/note_elements.py --kind triage`
+   prints the elements in order and what each must contain, and `--note note.json` checks an assembled
+   Note against the framework's rules — a finding with a side and no confidence, one that cites no
+   event, a bare technique code, a recommended action nobody answered. The script renders the
+   **structure** and runs the **checks**; the Summary, the Rationale, each finding's wording and the
+   deployment's language are yours ([rules/note-prose.md](rules/note-prose.md)). A Note written by a
+   template would be a form, and the framework asks for an account. The canonical element list is
    [Detection & Analysis §1.6](references/framework/03-Processes/02-detection_and_analysis.md), and the
    order is part of it — **Classification** (severity, confidence, impact when known, the candidate
    categories, and the decision: Close or Promote, with `verdict_id` on a Close and the master Case id
