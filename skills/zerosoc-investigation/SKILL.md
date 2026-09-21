@@ -71,7 +71,11 @@ per Case: the playbook the script prints.
    `detection_metadata` across and **refresh it at this gate**: alerts appended since triage bring their
    own assertions, and the remediation state changes while a Case is open. Re-run
    `python3 scripts/alert_metadata.py alerts.json --bindings zerosoc.capabilities.json --evidence evidence.json --json`
-   on the Case as it now is, keeping the dispositions already recorded on the recommended actions. Record `started_at`
+   on the Case as it now is, keeping the dispositions already recorded on the recommended actions. Carry
+   the ledger's `source_profile` object across too, and refresh it with
+   `python3 scripts/source_profile.py --bindings zerosoc.capabilities.json --json`: a local override of the
+   shipped profile in force now is recorded on the ledger and in the Case's `provenance.products`, and
+   named in the Note's Provenance. Record `started_at`
    (UTC) now, the Case `severity`, the `evidence_inventory` object of step 2, and `at` on every finding
    as it is added: the timebox is computed from these, not declared. Alert findings carry their
    `alert_type` and `entity`, so the same type on the same entity counts once in the score; alerts

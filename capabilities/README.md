@@ -25,8 +25,9 @@ The binding file has two maps:
   playbook's requirements with this map and emits the **visibility gaps** that the Notes must record,
   each with the check it prevented. A gap does not change the Case's confidence.
 
-Two optional keys: `data_source_notes` (data source → why it is unavailable or limited; printed with the
-gap) and `source_profiles` (source identifier → the source profile of that technology).
+Three optional keys: `data_source_notes` (data source → why it is unavailable or limited; printed with the
+gap), `source_profiles` (source identifier → the source profile of that technology) and
+`source_profile_overrides` (source identifier → a [local override](#a-local-override) of that profile).
 
 ## Source profiles
 
@@ -47,6 +48,50 @@ ambiguous or localized.
 Its `case_map` block is executable: a test walks recorded documents of the source and fails on any key
 that is neither mapped to a Case field nor ignored with a reason, so a field the vendor adds tomorrow is
 not silence.
+
+### A local override
+
+The shipped profile is the default, and a deployment normally reads it as it is. When the source renames
+a field or adds a word before the shipped profile follows, the deployment does not wait for a release: it
+writes a **local override** beside its binding and names it under `source_profile_overrides`.
+
+```json
+{
+  "overrides": "defender-xdr",
+  "base_profile_version": "2026-09-21",
+  "reason": "the source renamed remediationStatus on evidence items; the fix to the shipped profile is tracked in <ticket>",
+  "profile": {
+    "fields": { "evidence": { "remediation_status": "remediationState" } },
+    "case_map": [
+      { "path": "alerts[].evidence[].remediationState", "case": "finding_info_list[].types[]" }
+    ]
+  }
+}
+```
+
+It is declared by [source_profile_override.schema.json](source_profile_override.schema.json) and holds
+**only what differs**, so everything else keeps following the shipped profile across pin bumps: objects
+are laid over the shipped ones key by key (`null` removes a key), an entry of `case_map` replaces the
+shipped entry of the same `path`, a rule of `alert_types` replaces the shipped rule of the same
+`alert_type` and a new rule is tried before the shipped ones, and any other list is replaced whole. It may
+not restate the `source` block. The profile that results is held to the same schema and the same
+coherence as a shipped one — check it before using it:
+
+```bash
+python3 tools/check_profiles.py --bindings zerosoc.capabilities.json
+```
+
+An override is **on the record of every run read through it**. `scripts/source_profile.py --bindings
+zerosoc.capabilities.json --json` prints the `source_profile` object for the ledger — the override's file
+name, digest, reason and the paths it sets — and the source's `product` entry for the Case's
+`provenance.products`, whose `feature.version` is the shipped profile's version followed by
+`+local.<digest>`. `tools/check_run.py` recomputes the digest from the override file in the run and fails
+a ledger that does not carry it.
+
+An override is a stopgap. It names the version of the shipped profile it was written against; once the
+shipped profile moves past that version the override is still read — a tenant does not break on a pin
+bump — and every script flags it **stale**: check whether the fix it stood in for has landed, and delete
+the override if it has.
 
 ## Where each assertion of a detection comes from
 

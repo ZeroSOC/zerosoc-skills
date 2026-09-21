@@ -30,9 +30,10 @@ W = {"Low": 1, "Medium": 2, "High": 3}
 SEV2CONF = {"Informational": "Low", "Low": "Low", "Medium": "Medium", "High": "High", "Critical": "High"}
 
 
-def load_map(path):
-    """The alert-type rules of the technology at ``path``: its source profile's own block."""
-    return source_profile.alert_rules(source_profile.load(path))
+def load_map(path, override=None):
+    """The alert-type rules of the technology at ``path``: its source profile's own block, with the
+    deployment's local override laid over it where it names one."""
+    return source_profile.alert_rules(source_profile.load(path, override))
 
 
 def framework_alert_types(markdown):
@@ -114,12 +115,17 @@ def main():
     ap.add_argument("--profile", help="the source profile of the technology these alerts come from")
     ap.add_argument("--bindings", help="capability binding whose source_profiles names the profile, next to it")
     ap.add_argument("--source", help="which profile, where the binding names more than one")
+    ap.add_argument("--override", help="with --profile: a local override to lay over it (a binding names its own)")
     ap.add_argument("--json", action="store_true")
     a = ap.parse_args()
-    path = a.profile or (source_profile.named(a.bindings, a.source) if a.bindings else None)
+    path, override = ((a.profile, a.override) if a.profile
+                      else source_profile.resolved(a.bindings, a.source) if a.bindings else (None, None))
     if not path:
         ap.error("--profile, or --bindings with a source_profiles entry, is required")
-    out = build_alerts(json.load(open(a.alerts, encoding="utf-8")), load_map(path))
+    profile = source_profile.load(path, override)
+    for note in source_profile.notes(profile):
+        print(note, file=sys.stderr)
+    out = build_alerts(json.load(open(a.alerts, encoding="utf-8")), source_profile.alert_rules(profile))
     if a.json:
         print(json.dumps(out, indent=2, ensure_ascii=False))
         return

@@ -49,6 +49,48 @@
         },
         "description": {
           "type": "string"
+        },
+        "override": {
+          "type": "object",
+          "description": "Written by the loader, never by hand: present when the deployment read this profile through a local override (the binding's source_profile_overrides), and what the run records about it. A profile that ships carries none.",
+          "required": [
+            "file",
+            "sha256",
+            "reason",
+            "base_profile_version",
+            "stale",
+            "paths"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "file": {
+              "type": "string",
+              "description": "The override's file name, beside the binding."
+            },
+            "sha256": {
+              "type": "string",
+              "description": "The digest of the override file as it was read."
+            },
+            "reason": {
+              "type": "string",
+              "description": "Why the deployment overrides the shipped profile, in its own words."
+            },
+            "base_profile_version": {
+              "type": "string",
+              "description": "The profile_version of the shipped profile the override was written against."
+            },
+            "stale": {
+              "type": "boolean",
+              "description": "The shipped profile has moved past that version: the fix the override stands in for may have landed."
+            },
+            "paths": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "What the override sets, as paths of this profile."
+            }
+          }
         }
       }
     },

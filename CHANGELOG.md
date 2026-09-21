@@ -16,6 +16,18 @@
   fails on a key that is neither, so a field the vendor adds tomorrow is not silence. The binding names
   profiles under `source_profiles`; `alert_type_map` and `capabilities/alert_types.defender-xdr.json`
   are gone, absorbed whole.
+- **A deployment may override the shipped profile locally.** After the source profile, a field the
+  vendor renames is fixed by a pull request here, a pin bump and a release of whatever hosts the
+  skills — while the tenant stays broken, and the first hotfix outside the profile brings the
+  duplication straight back. The binding now names a local override under `source_profile_overrides`
+  (`capabilities/source_profile_override.schema.json`). It holds only what differs and is laid over the
+  shipped profile, so the rest keeps following it across pin bumps; the profile that results is held to
+  the same schema and coherence (`tools/check_profiles.py --bindings`). The shipped profile stays the
+  default. A run read through an override says so: `scripts/source_profile.py` prints the record for
+  the ledger and the source's entry for the Case's `provenance.products`, whose profile version carries
+  the override's digest, and `tools/check_run.py` fails a ledger that does not carry it. An override
+  names the shipped version it was written against and is flagged stale — never refused — once the
+  shipped profile moves past it.
 - **The tool skill's other half: the expertise.** `skills/zerosoc-defender-xdr/SKILL.md` says which of
   the framework's questions this source answers and what each answer is worth — that an absent
   capability and an empty answer are indistinguishable in its data, so the binding is what tells them

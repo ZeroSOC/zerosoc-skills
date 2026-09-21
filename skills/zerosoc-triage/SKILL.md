@@ -106,7 +106,11 @@ Read per alert: the playbook section the script prints.
    `source_profiles`), build the alerts with `python3 scripts/alert_types.py alerts.json --bindings zerosoc.capabilities.json --json`:
    it gives each alert its framework alert type (detector id first, then title) and collapses the same
    type on the same entity to the strongest alert, so the rule below is applied the same way every time;
-   an alert it reports as unmapped keeps its title as type. Each independent
+   an alert it reports as unmapped keeps its title as type. Record which profile the source was read
+   through: `python3 scripts/source_profile.py --bindings zerosoc.capabilities.json --json` prints the
+   `source_profile` object for the ledger and the source's `product` entry for the Case's
+   `provenance.products`. A deployment that reads its source through a **local override** of the shipped
+   profile is recorded by it, and the Note's Provenance names the override and its reason. Each independent
    alert is the first Malicious finding at the tool's confidence, or at the level its severity maps to
    (Informational/Low → Low, Medium → Medium, High/Critical → High). Same type on the same entity counts
    once.

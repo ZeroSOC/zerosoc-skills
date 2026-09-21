@@ -11,9 +11,14 @@ is an error rather than a pass, so the schema cannot quietly outgrow the check.
 
 Standard library only. Exit 1 on any violation.
 
+A deployment that lays a local override over a shipped profile checks its binding: the override
+against its own schema, and the profile that results against the same schema and the same coherence
+as a shipped one, so an override cannot say less than the profile it stands in for.
+
 Usage:
-  python3 tools/check_profiles.py            # every skills/*/source_profile.json
-  python3 tools/check_profiles.py PATH ...   # these profiles
+  python3 tools/check_profiles.py                   # every skills/*/source_profile.json
+  python3 tools/check_profiles.py PATH ...          # these profiles
+  python3 tools/check_profiles.py --bindings PATH   # what this binding names, overrides laid over
 """
 from __future__ import annotations
 
@@ -25,6 +30,10 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 SCHEMA = ROOT / "capabilities" / "source_profile.schema.json"
+OVERRIDE_SCHEMA = ROOT / "capabilities" / "source_profile_override.schema.json"
+
+sys.path.insert(0, str(ROOT / "tools" / "shared"))
+import source_profile  # noqa: E402
 
 KNOWN = {
     "$schema", "$id", "$ref", "$defs", "title", "description",
@@ -142,23 +151,72 @@ def coherent(profile: dict[str, Any], where: str) -> list[str]:
     return problems
 
 
+def shipped(profile: dict[str, Any], where: str) -> list[str]:
+    """A profile on disk is a shipped one: the record of an override is written when a deployment
+    reads through one, and a file that already carries it would pass for a run that did."""
+    if "override" in profile.get("source", {}):
+        return [f"{where}: source.override is written by the loader when a deployment reads through "
+                "a local override; a profile file never carries one"]
+    return []
+
+
+def bound(binding: Path, schema: dict[str, Any], override_schema: dict[str, Any]) -> list[str]:
+    """Every profile a binding names, as the deployment reads it: its override laid over it."""
+    problems: list[str] = []
+    named = json.loads(binding.read_text(encoding="utf-8")).get("source_profiles") or {}
+    for source in sorted(named):
+        where = f"{binding.name}: {source}"
+        try:
+            path, override = source_profile.resolved(str(binding), source)
+            if override:
+                document = json.loads(Path(override).read_text(encoding="utf-8"))
+                found = validate(document, override_schema, override_schema, Path(override).name)
+                if found:
+                    problems += found
+                    print(f"{where}: {len(found)} problem(s) in the override")
+                    continue
+            profile = source_profile.load(path, override)
+        except (OSError, ValueError, re.error) as exc:
+            problems.append(f"{where}: {exc}")
+            print(f"{where}: cannot be read")
+            continue
+        found = validate(profile, schema, schema, where) or coherent(profile, where)
+        problems += found
+        state = "ok" if not found else f"{len(found)} problem(s)"
+        print(f"{where}: {state} ({len(profile['case_map'])} mapped paths"
+              + (f", read through {Path(override).name}" if override else ", as shipped") + ")")
+        for note in source_profile.notes(profile):
+            print(f"note: {note}")
+    return problems
+
+
 def main(argv: list[str]) -> int:
     schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
-    outgrown = supported(schema)
+    override_schema = json.loads(OVERRIDE_SCHEMA.read_text(encoding="utf-8"))
+    outgrown = supported(schema) + supported(override_schema, "override schema")
     for problem in outgrown:
         print(problem, file=sys.stderr)
     if outgrown:
         print("the schema has outgrown this validator; teach it the keyword or drop it", file=sys.stderr)
         return 1
-    profiles = [Path(a) for a in argv] or sorted(ROOT.glob("skills/*/source_profile.json"))
-    if not profiles:
-        print("no source profile found", file=sys.stderr)
-        return 1
     problems: list[str] = []
+    if argv[:1] == ["--bindings"]:
+        if len(argv) < 2:
+            print("--bindings takes the path of a capability binding", file=sys.stderr)
+            return 1
+        for binding in argv[1:]:
+            problems += bound(Path(binding), schema, override_schema)
+        profiles: list[Path] = []
+    else:
+        profiles = [Path(a) for a in argv] or sorted(ROOT.glob("skills/*/source_profile.json"))
+        if not profiles:
+            print("no source profile found", file=sys.stderr)
+            return 1
     for path in profiles:
         profile = json.loads(path.read_text(encoding="utf-8"))
         where = path.relative_to(ROOT) if path.is_relative_to(ROOT) else path
-        found = validate(profile, schema, schema, str(where)) or coherent(profile, str(where))
+        found = (validate(profile, schema, schema, str(where)) or coherent(profile, str(where))) \
+            + shipped(profile, str(where))
         problems += found
         state = "ok" if not found else f"{len(found)} problem(s)"
         print(f"{where}: {state} ({len(profile['case_map'])} mapped paths)")

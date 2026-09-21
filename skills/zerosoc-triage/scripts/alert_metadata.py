@@ -294,14 +294,18 @@ def main():
     ap.add_argument("--profile", help="the source profile of the technology these alerts come from")
     ap.add_argument("--bindings", help="capability binding whose source_profiles names the profile, next to it")
     ap.add_argument("--source", help="which profile, where the binding names more than one")
+    ap.add_argument("--override", help="with --profile: a local override to lay over it (a binding names its own)")
     ap.add_argument("--evidence", help="the evidence rows, for the remediation state the source reports per entity")
     ap.add_argument("--root", default=FRAMEWORK)
     ap.add_argument("--json", action="store_true")
     a = ap.parse_args()
-    path = a.profile or (source_profile.named(a.bindings, a.source) if a.bindings else None)
+    path, override = ((a.profile, a.override) if a.profile
+                      else source_profile.resolved(a.bindings, a.source) if a.bindings else (None, None))
     if not path:
         ap.error("--profile, or --bindings with a source_profiles entry, is required")
-    profile = source_profile.load(path)
+    profile = source_profile.load(path, override)
+    for note in source_profile.notes(profile):
+        print(note, file=sys.stderr)
     evidence = json.load(open(a.evidence, encoding="utf-8")) if a.evidence else None
     if isinstance(evidence, dict):  # the output of evidence_inventory.py
         evidence = evidence.get("entities") or evidence.get("rows") or []

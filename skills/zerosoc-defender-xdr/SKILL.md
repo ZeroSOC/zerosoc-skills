@@ -46,6 +46,13 @@ python3 alert_metadata.py alerts.json --bindings zerosoc.capabilities.json --evi
 **It settles what the records mean.** A field renamed by the vendor is one edit here; nothing else
 in the repository carries a second copy of it to drift from.
 
+**A deployment does not wait for that edit.** The shipped profile is the default; when the source
+changes before it does, the deployment lays a local override over it — a file beside the binding,
+named under `source_profile_overrides`, holding only what differs — and every run read through it
+records the override on its ledger and in the Case's provenance (`python3 source_profile.py
+--bindings zerosoc.capabilities.json --json`). The override is a stopgap that is flagged stale once
+the shipped profile moves on; the fix still belongs here.
+
 **It does not settle how to talk to the technology.** Authentication, endpoints, expansion, paging,
 permissions and the query language belong to the integration, and change when the vendor's API
 does rather than when the framework does.

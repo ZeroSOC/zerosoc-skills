@@ -12,5 +12,6 @@ jobs:
           python-version: "3.12"
       - run: python3 tools/check_skills.py
       - run: python3 tools/check_profiles.py
+      - run: python3 tools/check_profiles.py --bindings capabilities/zerosoc.capabilities.defender-for-business.json
       - run: python3 tools/build_references.py --check
       - run: python3 -m unittest discover -s tests -v
