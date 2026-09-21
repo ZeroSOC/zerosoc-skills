@@ -1,6 +1,27 @@
 # Changelog
 
-## Unreleased — conforms to zerosoc-framework@b5f4966
+## v0.4.0 (2026-09-21) — conforms to zerosoc-framework@b5f4966
+
+What one technology's records mean now has one versioned home, a deployment may override it locally,
+and the method surface the framework owns — the rendering, the Case Timeline, the normative rule text —
+ships here rather than in whatever runs the skills.
+
+**Breaking, for an implementation moving from `v0.3.0`:**
+
+- **`alert_type_map` and `--map` are gone.** The alert-type rules were absorbed whole into the source
+  profile, together with `capabilities/alert_types.defender-xdr.json`. A binding that still declares
+  `alert_type_map` is declaring a field nothing reads, and `tools/check_run.py` takes
+  `--profile <source_profile.json>` where it took `--map`.
+- **The binding names its profile as `zerosoc-defender-xdr/source_profile.json`.** Under
+  `source_profiles`, keyed by the source identifier the binding already uses, and resolved against the
+  tool skill installed beside the method skills — so a deployment installs the tool skill of each
+  technology it runs on. What a deployment reads differently goes in a local override named under
+  `source_profile_overrides`, not in fields of the binding.
+- **Findings on the ledger gained `event_refs`, `first_seen` and `timeline`.** The decision rules read
+  none of the three, so a `v0.3.0` ledger still decides the same way; the rest of the surface does read
+  them. `timeline.py` derives T0 from the earliest Malicious `first_seen` and shows only what `timeline`
+  flags, and `note_elements.py` fails a Finding that cites no event. A ledger written without them
+  yields a Case with no timeline and a Note that does not pass its own check.
 
 - **A source profile: one versioned home for what a technology's records mean.** What this project
   knew about Microsoft Defender XDR was spread over six files in three repositories, and two of them

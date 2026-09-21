@@ -3,7 +3,7 @@ name: zerosoc-investigation
 description: Investigate a promoted Case under the ZeroSOC Framework (Phase 2.b). Selects the Investigation and Response playbook by candidate Incident Category, verifies or retracts the triage findings, runs discriminating validation queries tagged Malicious or Benign with a confidence, resolves the verdict by score and coverage, and produces the Investigation Note plus the Investigation to Response contract or the closure verdict. Use for a Case promoted at triage or opened by threat hunting.
 license: Apache-2.0
 metadata:
-  version: "0.3.0"
+  version: "0.4.0"
   framework: "zerosoc-framework@b5f4966 (2026-09-21)"
   status: draft
   author: ZeroSOC
