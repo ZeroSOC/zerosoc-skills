@@ -1375,11 +1375,18 @@
       }
     },
     "data_sources": {
+      "EDR": true,
       "EDR / endpoint process telemetry": true,
-      "Endpoint file-system telemetry": true,
-      "Network connection telemetry": true,
-      "Identity / sign-in logs": true,
-      "Email / collaboration telemetry": true
+      "Endpoint telemetry": true,
+      "Server EDR": true,
+      "EDR on web servers": true,
+      "Anti-virus / anti-malware": true,
+      "Identity provider sign-in logs": true,
+      "Directory audit logs": true,
+      "Directory / identity-provider audit logs": true,
+      "Identity Provider / directory audit logs": true,
+      "Email gateway logs": true,
+      "Email gateway / secure email gateway": true
     }
   },
   "queries": {

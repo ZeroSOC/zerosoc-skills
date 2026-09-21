@@ -89,6 +89,25 @@ class SourceProfile(unittest.TestCase):
             shown |= paths_of(json.loads(document.read_text()))
         self.assertEqual(sorted({entry["path"] for entry in profile["case_map"]} - shown), [])
 
+    def test_every_data_source_a_profile_answers_is_one_a_playbook_asks_for(self) -> None:
+        """The names join a profile to a playbook's required_data_sources, so a name no playbook
+        writes joins nothing: it has to be the framework's own, letter for letter."""
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("select_playbook", ROOT / "tools" / "shared" / "select_playbook.py")
+        selector = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(selector)
+        asked: set[str] = set()
+        for skill in ("zerosoc-triage", "zerosoc-investigation", "zerosoc-response"):
+            for book in selector.load_playbooks(str(ROOT / "skills" / skill / "references" / "framework")):
+                required = book["fields"].get("required_data_sources") or []
+                asked.update([required] if isinstance(required, str) else required)
+        self.assertTrue(asked, "no playbook at this pin states a required data source")
+        for path, profile in self.profiles.items():
+            with self.subTest(profile=path.name):
+                named = set(profile["capability_coverage"].get("data_sources") or {})
+                self.assertTrue(named, "a profile that answers no data source joins no playbook")
+                self.assertEqual(sorted(named - asked), [])
+
     def test_an_added_field_is_caught(self) -> None:
         """The guard itself, run: a document with a key the profile does not name fails the same
         comparison the test above passes, rather than a comparison written for this test."""

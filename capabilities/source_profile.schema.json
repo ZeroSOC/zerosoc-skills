@@ -380,7 +380,7 @@
         },
         "data_sources": {
           "type": "object",
-          "description": "required_data_sources name (as a playbook writes it) -> whether this source answers it.",
+          "description": "required_data_sources name, exactly as a playbook writes it -> whether this source can answer it, with the query recipe or the alerts that do. What the source can answer is not what a deployment has: a licence tier without the telemetry tables answers none of the recipes, and it is the deployment's binding that says so.",
           "additionalProperties": {
             "type": "boolean"
           }
