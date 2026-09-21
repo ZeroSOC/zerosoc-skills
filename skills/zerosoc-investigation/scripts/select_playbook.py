@@ -79,7 +79,7 @@ def section(body, heading, level):
 
 TECHNIQUE = re.compile(r"\b(T\d{4}(?:\.\d{3})?)\b(?:\s*\(([^)]+)\))?")
 CATEGORY = re.compile(r"\b(IC-\d{2})\b")
-CANDIDATES = re.compile(r"\*\*Candidate Incident Categor(?:y|ies)[^*]*:\*\*([^\n]*)")
+CANDIDATES = re.compile(r"^(\s*)(?:[-*]\s+)?\*\*\[?Candidate Incident Categor[^\n]*?\*\*:?(.*)$", re.I)
 
 
 def candidate_categories(text):
@@ -88,13 +88,34 @@ def candidate_categories(text):
     The playbook states them in a labelled element, and the order is the playbook's: the first is
     the one Investigation opens. A reader of the printed prose would have to scrape them out with
     a regular expression of their own, which is a rule of the framework living in whoever scraped
-    it last; it is stated here once, beside the playbook that declares it.
+    it last; it is stated here once, beside the playbook that declares it. The element is read
+    whole: a line wrapped under its label, or a list under it, is still the element.
     """
-    out = []
-    for element in CANDIDATES.findall(text or ""):
-        for found in CATEGORY.findall(element):
+    out, lines = [], (text or "").splitlines()
+    for n, line in enumerate(lines):
+        label = CANDIDATES.match(line)
+        if not label:
+            continue
+        element = [label.group(2)]
+        for following in lines[n + 1:]:
+            deeper = len(following) - len(following.lstrip()) > len(label.group(1))
+            if not following.strip() or not deeper:
+                break  # a blank line, or the next element at the label's own depth
+            element.append(following)
+        for found in CATEGORY.findall(" ".join(element)):
             if found not in out:
                 out.append(found)
+    return out
+
+
+def categories_by_alert_type(body):
+    """Alert type -> the categories its section proposes, for a playbook selected whole: there is
+    no "first" category of a whole playbook, only of the alert type that fired."""
+    out = {}
+    for heading in re.findall(r"^###\s+(.+?)\s*$", body or "", re.M):
+        found = candidate_categories(section(body, heading, 3) or "")
+        if found:
+            out[heading] = found
     return out
 
 
@@ -252,17 +273,25 @@ def main():
     g = gaps(chosen["fields"], bindings)
     result = {
         "path": chosen["rel"], "version": chosen["fields"].get("last_updated", ""), "status": chosen["fields"].get("status", ""),
-        "candidate_incident_categories": candidate_categories(text),
+        # the first is the one Investigation opens, so they are given only for the alert type that fired
+        "candidate_incident_categories": candidate_categories(text) if a.alert_type else [],
         "required_data_sources": g,
         "visibility_gaps": [{"data_source": x["data_source"], "check_prevented": "(state the check this source would have supported)"} for x in g if x["status"] != "available"] if bindings else [],
         "text": text,
     }
+    if a.domain and not a.alert_type:
+        result["candidate_incident_categories_by_alert_type"] = categories_by_alert_type(chosen["body"])
+    if a.alert_type and not result["candidate_incident_categories"] and not text.startswith("(alert type"):
+        print(f"the section of '{a.alert_type}' in {chosen['rel']} proposes no Incident Category this can read: "
+              "read them from the section's text, and report the playbook", file=sys.stderr)
     if a.json:
         print(json.dumps(result, indent=2, ensure_ascii=False))
         return
     print(f"# {chosen['rel']} (version {result['version']}, status {result['status']})")
     if result["candidate_incident_categories"]:
         print("candidate_incident_categories: " + ", ".join(result["candidate_incident_categories"]))
+    for alert_type, found in (result.get("candidate_incident_categories_by_alert_type") or {}).items():
+        print(f"candidate_incident_categories [{alert_type}]: " + ", ".join(found))
     print("required_data_sources:")
     for x in g:
         print(f"  - {x['data_source']}: {x['status']}" + (f" ({x['reason']})" if x.get("reason") else ""))

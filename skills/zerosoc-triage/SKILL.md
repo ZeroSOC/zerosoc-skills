@@ -101,9 +101,8 @@ Read per alert: the playbook section the script prints.
    playbook is not recorded cannot be reproduced. When no playbook exists for the domain at
    this framework pin, use the domain's alert catalog in
    [alert_types.md](references/framework/02-Taxonomy/alert_types.md) and apply §1.2–§1.5 directly.
-   The rules you are held to while you run the checks are [rules/checks.md](rules/checks.md); a host
-   that prompts a model composes that text rather than restating it, so a human reading this skill and
-   a model reading the prompt are held to one wording.
+   The rules you are held to while you run the checks are [rules/checks.md](rules/checks.md), given to any
+   executor as they stand (`$language` in them is the language the deployment writes in).
 5. **Start the ledger.** Create `ledger.json` (format in `scripts/triage_decide.py`) with the
    `evidence_inventory` object of step 2 and the `detection_metadata` of step 3. When the deployment names a source profile (the binding's
    `source_profiles`), build the alerts with `python3 scripts/alert_types.py alerts.json --bindings zerosoc.capabilities.json --json`:
@@ -147,30 +146,25 @@ Read per alert: the playbook section the script prints.
    merged), set `duplicate_of` in the ledger, and never treat the same alert on a different entity as a
    duplicate. Checklist before promoting or closing: can you say in one sentence, with evidence, why
    the activity is or is not suspicious? If not, gather more.
-10. **Write the Triage Note.** The Note renders the Case and holds no state of its own: everything it
-   shows is already on the Case, sampled at this gate. `python3 scripts/note_elements.py --kind triage`
-   prints the elements in order and what each must contain, and `--note note.json` checks an assembled
-   Note against the framework's rules — a finding with a side and no confidence, one that cites no
-   event, a bare technique code, a recommended action nobody answered. The script renders the
-   **structure** and runs the **checks**; the Summary, the Rationale, each finding's wording and the
-   deployment's language are yours ([rules/note-prose.md](rules/note-prose.md)). A Note written by a
-   template would be a form, and the framework asks for an account. The canonical element list is
-   [Detection & Analysis §1.6](references/framework/03-Processes/02-detection_and_analysis.md), and the
-   order is part of it — **Classification** (severity, confidence, impact when known, the candidate
-   categories, and the decision: Close or Promote, with `verdict_id` on a Close and the master Case id
-   on a Duplicate); **Summary** (what happened and when, which entities were involved and who acted on
-   whom, and the root cause where found — how it is known and how sure you are, in prose, which is not
-   `confidence_id`); **Findings** (a table, alerts first, each with its tag, **what produced it** — the
-   check is the Finding's `analytic` — and the events it rests on by OCSF identifier; each **Alert** also
-   renders what its detection asserted: its techniques as `ID (Name)`, the threat name and family, the
-   detection source and detector, and the remediation state of each entity it names, with the
-   **disposition of the recommended actions** — each followed, with the Finding it produced, or set aside,
-   with the reason); **Rationale**
-   (the coverage rule applied in one or two sentences); **Case Timeline** (only the Findings flagged for
-   it, which at triage is usually none — write "None."); **Visibility Gaps** (or "None."); **Provenance**
-   (playbook path and version, executor classes, capability classes invoked, Case id).
-   There is no Actions Taken element and no References element: the check that produced a Finding is
-   rendered beside that Finding, and so are the events it cites.
+10. **Write the Triage Note.** The Note renders the Case and holds no state of its own: everything it shows is already
+   on the Case, sampled at this gate. `python3 scripts/note_elements.py --kind triage` prints the elements in order
+   and what each must contain, and `--note note.json` — the ledger with one field per element beside it — checks the
+   Note against the framework's rules. The script renders the **structure** and runs the **checks**; the prose is
+   yours ([rules/note-prose.md](rules/note-prose.md)). The canonical element list is [Detection & Analysis
+   §1.6](references/framework/03-Processes/02-detection_and_analysis.md), and the order is part of it —
+   **Classification** (severity, confidence, impact when known, the candidate categories, and the decision: Close or
+   Promote, with `verdict_id` on a Close and the master Case id on a Duplicate); **Summary** (what happened and when,
+   which entities were involved and who acted on whom, and the root cause where found — how it is known and how sure
+   you are, in prose, which is not `confidence_id`); **Findings** (a table, alerts first, each with its tag, **what
+   produced it** — the check is the Finding's `analytic` — and the events it rests on by OCSF identifier; each
+   **Alert** also renders what its detection asserted: its techniques as `ID (Name)`, the threat name and family, the
+   detection source and detector, and the remediation state of each entity it names, with the **disposition of the
+   recommended actions** — each followed, with the Finding it produced, or set aside, with the reason); **Rationale**
+   (the coverage rule applied in one or two sentences); **Case Timeline** (only the Findings flagged for it, which at
+   triage is usually none — write "None."); **Visibility Gaps** (or "None."); **Provenance** (playbook path and
+   version, executor classes, capability classes invoked, Case id). There is no Actions Taken element and no
+   References element: the check that produced a Finding is rendered beside that Finding, and so are the events it
+   cites.
    Name it `triage_note_<case-id>_<YYYYMMDD-HHMM>`.
    Technique codes are always `ID (Name)`: `scripts/alert_metadata.py` renders the ones the framework's
    tables name, and for the rest write the ATT&CK or ATLAS name — a bare identifier is not conformant.

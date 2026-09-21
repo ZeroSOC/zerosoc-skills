@@ -13,7 +13,8 @@ Ledger (JSON):
                                  asserts (§1.1), the remediation the source already performed, and the
                                  assertions it did not supply
   "findings": [{"id": "F1", "desc": "...", "side": "Malicious"|"Benign"|null, "confidence": "Low|Medium|High",
-                "covers": ["DF-1"], "artifact": "hash:...", "retracted": false}],
+                "covers": ["DF-1"], "artifact": "hash:...", "retracted": false,
+                "event_refs": ["<event id or link>"], "first_seen": "2026-09-14T14:55:41Z", "timeline": false}],
   "evidence_inventory": {"extracted": 31, "source_count": 31, "complete": true},
   "visibility_gaps": [{"data_source": "...", "check_prevented": "..."}],
   "duplicate_of": null | "CASE-0"
@@ -24,6 +25,9 @@ the techniques the detections named. The coverage rule itself is unchanged: what
 neutralized is reported with the decision and never weighed into it — a block is a response, not an
 explanation — and a recommended action the run has neither followed nor set aside with a reason leaves
 `decision_ready` false, so the rule is computed but not yet acted on.
+"event_refs" are the events a finding rests on, "first_seen" is when the thing it reports happened (not
+when the finding was made) and "timeline" flags it for the Case Timeline: this rule reads none of them, and
+note_elements.py and timeline.py read them from this same ledger.
 Findings with side null are context and do not score. A Benign finding with no "covers" covers every alert.
 Prints the decision, the coverage per alert, the confidence leaving triage and the verdict to record.
 """

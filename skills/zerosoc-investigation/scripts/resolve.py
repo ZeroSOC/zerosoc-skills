@@ -10,7 +10,8 @@ Ledger (JSON):
   "incident_category": "IC-02",
   "findings": [{"id": "F1", "desc": "...", "side": "Malicious"|"Benign"|null, "confidence": "Low|Medium|High",
                 "at": "2026-09-14T15:03:10Z", "artifact": "hash:...", "alert_type": "...", "entity": "...",
-                "retracted": false, "retraction_reason": "", "covered": false}],
+                "retracted": false, "retraction_reason": "", "covered": false,
+                "event_refs": ["<event id or link>"], "first_seen": "2026-09-14T14:55:41Z", "timeline": false}],
   "evidence_inventory": {"extracted": 31, "source_count": 31, "complete": true},
   "detection_metadata": {...},  what the detections asserted (§1.1), carried from triage and refreshed at
                                 this gate: the remediation state as it now stands, and the disposition of
@@ -18,6 +19,9 @@ Ledger (JSON):
   "visibility_gaps": [], "duplicate_of": null, "budget_exhausted": false,
   "timebox_minutes": null, "resolved_at": null, "timebox_expired": false
 }
+"at" is when the finding was made; "first_seen" is when the thing it reports happened, "event_refs" the
+events it rests on and "timeline" whether the Case Timeline shows it — this rule reads none of the three, and
+note_elements.py and timeline.py read them from this same ledger.
 "covered" on a Malicious finding means the Benign explanation accounts for it (§2.4 coverage). Findings
 that share an "artifact" on the same side count once, and so do alert findings of the same "alert_type"
 on the same "entity" (§1.1). The timebox is measured, not declared: elapsed time runs from "started_at"

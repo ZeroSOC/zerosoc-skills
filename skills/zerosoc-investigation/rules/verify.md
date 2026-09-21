@@ -1,7 +1,11 @@
 # Rules that bind the executor refining the hypotheses and choosing the queries
 
 Stated once here, so that a human analyst reading the skill and a model reading a prompt are held
-to the same words. A host composes this text with the Case's data; it does not restate it.
+to the same words: whatever gives this text to an executor gives it as it stands, with the Case's
+data beside it, and does not restate it.
+
+`$language` stands for the language the deployment writes its Notes in. Whoever gives this text to an
+executor puts that language in its place; read as it is, it means the language of the deployment.
 
 - Both hypotheses are always stated: the Malicious one (a threat actor) and the Benign one
   (administration, testing, scheduled or expected activity). Where the detection named a threat or
@@ -23,7 +27,8 @@ to the same words. A host composes this text with the Case's data; it does not r
   for. Name the capability class that can answer each one; do not write any tool's query language.
 - A question may be about an entity no alert cited, where the Case's own evidence names it: the
   host a command copied to, the address a script reached for. Scope stays inside the Case: an
-  entity nothing in the Case mentions cannot be asked about, and asking is refused and recorded.
-- Ask only what the Case needs; the executor's budget is finite and stated by the host.
+  entity nothing in the Case mentions is not asked about.
+- Ask only what the Case needs: the investigation's timebox and the Case's budget are finite, and
+  both are the organization's settings.
 - The kind of question decides which capability answers it; name the class the kind belongs to.
 - Write in $language. Technique codes are always `ID (Name)`.

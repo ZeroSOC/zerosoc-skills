@@ -32,42 +32,58 @@ def parse_frontmatter(text):
     return fm, fields, body
 
 
+def check_skill(base):
+    """The failures of one skill directory. Prints its one-line summary when it has a readable SKILL.md."""
+    failures, skill = [], os.path.basename(os.path.normpath(base))
+    path = os.path.join(base, "SKILL.md")
+    if not os.path.isfile(path):
+        return [f"{skill}: no SKILL.md"]
+    text = open(path, encoding="utf-8").read()
+    try:
+        fm, fields, body = parse_frontmatter(text)
+    except AssertionError as e:
+        return [f"{skill}: {e}"]
+    name = fields.get("name", "")
+    if name != skill: failures.append(f"{skill}: frontmatter name '{name}' != directory name")
+    if not NAME_RE.match(name) or len(name) > 64: failures.append(f"{skill}: invalid name '{name}'")
+    desc = fields.get("description", "").strip("'\"")
+    if not desc: failures.append(f"{skill}: missing description")
+    if len(desc) > 1024: failures.append(f"{skill}: description {len(desc)} chars > 1024")
+    for ch in FORBIDDEN_FM:
+        if ch in fm: failures.append(f"{skill}: frontmatter contains forbidden text '{ch}'")
+    n = len(body.splitlines())
+    if n > 500: failures.append(f"{skill}: body {n} lines > 500")
+    # the rule text a skill ships is read by the same executors as its body, and is held to the same
+    read = {"SKILL.md": body}
+    rules = os.path.join(base, "rules")
+    for fn in sorted(os.listdir(rules)) if os.path.isdir(rules) else []:
+        if fn.endswith(".md"):
+            read[f"rules/{fn}"] = open(os.path.join(rules, fn), encoding="utf-8").read()
+    for where, held in read.items():
+        for pat in FORBIDDEN_BODY:
+            for m in re.finditer(pat, held):
+                failures.append(f"{skill}: host-specific or non-public-safe text '{m.group(0)}' in {where}")
+        for m in re.finditer(r"\]\(((?:references|scripts|rules)/[^)#\s]+)", held):
+            if not os.path.exists(os.path.join(base, m.group(1))):
+                failures.append(f"{skill}: missing referenced path {m.group(1)} in {where}")
+        for m in re.finditer(r"`(scripts/[\w./-]+\.py)`|python3 (scripts/[\w./-]+\.py)", held):
+            rel = m.group(1) or m.group(2)
+            if not os.path.exists(os.path.join(base, rel)):
+                failures.append(f"{skill}: missing script {rel} in {where}")
+    for fn in sorted(os.listdir(rules)) if os.path.isdir(rules) else []:
+        if fn.endswith(".md") and f"rules/{fn}" not in body:
+            failures.append(f"{skill}: rules/{fn} is linked from nowhere in SKILL.md, so no executor is sent to it")
+    print(f"{skill}: ok ({n} body lines, description {len(desc)} chars)")
+    return failures
+
+
 def main():
     failures = []
     skills_dir = os.path.join(ROOT, "skills")
     for skill in sorted(os.listdir(skills_dir)):
         base = os.path.join(skills_dir, skill)
-        if not os.path.isdir(base):
-            continue  # packaged archives and stray files are not skills
-        path = os.path.join(base, "SKILL.md")
-        if not os.path.isfile(path):
-            failures.append(f"{skill}: no SKILL.md"); continue
-        text = open(path, encoding="utf-8").read()
-        try:
-            fm, fields, body = parse_frontmatter(text)
-        except AssertionError as e:
-            failures.append(f"{skill}: {e}"); continue
-        name = fields.get("name", "")
-        if name != skill: failures.append(f"{skill}: frontmatter name '{name}' != directory name")
-        if not NAME_RE.match(name) or len(name) > 64: failures.append(f"{skill}: invalid name '{name}'")
-        desc = fields.get("description", "").strip("'\"")
-        if not desc: failures.append(f"{skill}: missing description")
-        if len(desc) > 1024: failures.append(f"{skill}: description {len(desc)} chars > 1024")
-        for ch in FORBIDDEN_FM:
-            if ch in fm: failures.append(f"{skill}: frontmatter contains forbidden text '{ch}'")
-        n = len(body.splitlines())
-        if n > 500: failures.append(f"{skill}: body {n} lines > 500")
-        for pat in FORBIDDEN_BODY:
-            for m in re.finditer(pat, body):
-                failures.append(f"{skill}: host-specific or non-public-safe text '{m.group(0)}'")
-        for m in re.finditer(r"\]\(((?:references|scripts)/[^)#\s]+)", body):
-            if not os.path.exists(os.path.join(base, m.group(1))):
-                failures.append(f"{skill}: missing referenced path {m.group(1)}")
-        for m in re.finditer(r"`(scripts/[\w./-]+\.py)`|python3 (scripts/[\w./-]+\.py)", body):
-            rel = m.group(1) or m.group(2)
-            if not os.path.exists(os.path.join(base, rel)):
-                failures.append(f"{skill}: missing script {rel}")
-        print(f"{skill}: ok ({n} body lines, description {len(desc)} chars)")
+        if os.path.isdir(base):  # packaged archives and stray files are not skills
+            failures += check_skill(base)
     for dp, _, fns in os.walk(ROOT):
         if ".git" in dp or os.path.join(ROOT, "framework") in dp: continue
         for fn in fns:

@@ -5,26 +5,44 @@
 
 The framework says which elements a Note renders and in what order, and what makes one
 non-conformant (Detection & Analysis §1.6 and §2.5). That is **structure and conformance**, and it
-belongs with the method rather than in whatever host assembled the Note last.
+belongs with the method rather than with whatever assembled the Note last.
 
 What this script does **not** do is write the Note. The Summary, the Rationale, each Finding's
 wording and the deployment's language are the executor's: a Note produced by a template would be a
 form, and the framework asks for an account. The script renders the structure and runs the checks;
-the model renders the content.
+the executor renders the content.
 
 Without --note it prints the elements of that Note kind, in order, with what each must contain.
 With --note it also checks an assembled Note and exits 1 on any failure.
 
-note.json: the Note as the executor assembled it —
-{"kind": "triage", "language": "en", "classification": {...}, "summary": "...",
- "findings": [{"n": 1, "finding": "...", "tag": {"side": "malicious|benign|context",
-               "confidence_id": 1|2|3|null}, "event_refs": ["..."]}],
- "rationale": {"rationale": "..."}, "timeline": [...], "visibility_gaps": [{...}],
- "provenance": {...}, "detection_metadata": {...}}
+note.json is **the ledger with the prose beside it** — the ledger of triage_decide.py or resolve.py, so
+nothing is copied into a second shape, plus one field per element the framework names:
+
+{"kind": "triage",
+ "classification": {...}, "summary": "...", "rationale": "...", "provenance": {...},
+ "findings": [{"id": "F1", "desc": "...", "side": "Malicious"|"Benign"|null,
+               "confidence": "Low|Medium|High", "event_refs": ["<event id or link>"]}],
+ "alerts": [...], "detection_metadata": {...}, "visibility_gaps": [{"data_source", "check_prevented"}],
+ "timeline": [...], "reclassification_pivots": [...]}
+
+An element's field is the framework's own name for it, lower-cased and joined with underscores —
+"Visibility Gaps" is `visibility_gaps` — so an element the framework adds or renames is required under
+its new name with no change here. Two are shorter by habit: "Case Timeline" is `timeline` and
+"Re-classification Pivots" is `reclassification_pivots`. A finding with side null is context. A finding
+written as {"n", "finding", "tag": {"side", "confidence_id"}} is read too.
 """
 import argparse, json, os, re, sys
 
-TECHNIQUE_BARE = re.compile(r"\b(T\d{4}(?:\.\d{3})?)\b(?!\s*\()")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    from alert_metadata import actions_of, dispositions
+except ImportError:  # the shared script is copied next to this one by tools/build_references.py
+    actions_of = dispositions = None
+
+# a technique code that no "(Name)" follows. The code is taken whole — a sub-technique's ".003"
+# and a bold or code mark around it included — before the name is looked for, so that
+# "T1114.003 (Email Forwarding Rule)" is never read as a bare "T1114"
+TECHNIQUE_BARE = re.compile(r"(?<![\w.])((?:AML\.)?T\d{4}(?:\.\d{3})?)(?![\d.]*\d)(?![*`_]*\s*\()")
 HERE = os.path.dirname(os.path.abspath(__file__))
 FRAMEWORK = os.path.normpath(os.path.join(HERE, "..", "references", "framework"))
 METHOD = os.path.join("03-Processes", "02-detection_and_analysis.md")
@@ -33,25 +51,14 @@ SECTIONS = {"triage": "1.6 Triage Note", "investigation": "2.5 Investigation Not
 """Where the framework states the elements of each Note kind. The order and the words are read
 from there — the skills execute the framework's method and never restate it."""
 
-FIELDS = {
-    "classification": "classification",
-    "summary": "summary",
-    "findings": "findings",
-    "rationale": "rationale",
-    "case timeline": "timeline",
-    "re-classification pivots": "reclassification_pivots",
-    "visibility gaps": "visibility_gaps",
-    "provenance": "provenance",
-}
-"""The framework's name for an element, to the field a Note object carries it in. This binding is
-the skill's — the framework writes for a reader, and a Note travels as data."""
+SHORTER = {"case_timeline": "timeline", "re_classification_pivots": "reclassification_pivots"}
+"""The two elements whose field is shorter than the framework's name for them."""
 
-OPTIONAL = ("timeline", "visibility_gaps", "reclassification_pivots")
-"""Elements that render "None." when there is nothing: absent and empty are the same statement."""
+NUMBERED = re.compile(r"^\s*\d+\.\s+(.*)$")
+ELEMENT = re.compile(r"^\*\*(.+?)\*\*\s*[—–-]\s*(.*)$")
 
-ELEMENT = re.compile(r"^\s*\d+\.\s+\*\*(.+?)\*\*\s*[—-]\s*(.*)$")
-
-SIDES = ("malicious", "benign", "context")
+CONFIDENCE = {"low": 1, "medium": 2, "high": 3, "1": 1, "2": 2, "3": 3}
+PLACEHOLDER = "(state the check"  # what select_playbook.py prints where the executor states the check
 
 
 def _method(root):
@@ -76,67 +83,161 @@ def _section(body, heading):
     return out
 
 
+def _field(name):
+    slug = re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
+    return SHORTER.get(slug, slug)
+
+
 def elements(kind, root=FRAMEWORK):
     """The elements of a conformant Note of this kind, in the order the framework renders them.
 
-    Read from the framework itself, so the order and the words are the ones a human analyst reads
-    in the method rather than a copy that has to be kept in step with it.
+    Read from the framework itself, so the order, the names and the words are the ones an analyst
+    reads in the method. `renders` is everything the framework says the element contains, the
+    paragraphs under its numbered line included. A numbered line this cannot read as an element
+    stops the script: an element that silently left the list would leave the check with it.
     """
     found = []
     for line in _section(_method(root), SECTIONS[kind]):
-        matched = ELEMENT.match(line)
-        if not matched:
-            continue
-        name = re.sub(r"[`*]", "", matched.group(1)).strip()
-        field = FIELDS.get(name.lower())
-        if field:
-            found.append({"element": field, "name": name, "renders": matched.group(2).strip()})
+        numbered = NUMBERED.match(line)
+        if numbered:
+            matched = ELEMENT.match(numbered.group(1).strip())
+            if not matched:
+                raise SystemExit(f"the method's section {SECTIONS[kind]!r} has a numbered line this script cannot "
+                                 f"read as an element (**Name** — what it renders): {line.strip()[:80]!r}")
+            name = re.sub(r"[`*]", "", matched.group(1)).strip()
+            found.append({"element": _field(name), "name": name, "renders": matched.group(2).strip()})
+        elif found and line.startswith((" ", "\t")) and line.strip():
+            found[-1]["renders"] += " " + line.strip()
+        elif found and line.strip():
+            break  # the list is over: what follows is the section's own prose
     if not found:
         raise SystemExit(f"no elements found in the method's section {SECTIONS[kind]!r}")
+    for element in found:
+        # the framework's own words say which elements may have nothing to render: the ones it tells to
+        # write "None.", and the ones it introduces with "any" — any change, where there may be none
+        element["may_be_empty"] = '"None."' in element["renders"] or element["renders"].lower().startswith("any ")
     return found
+
+
+def _blank(value):
+    if isinstance(value, str):
+        return not value.strip()
+    if isinstance(value, dict):
+        return all(_blank(v) for v in value.values())
+    if isinstance(value, (list, tuple)):
+        return all(_blank(v) for v in value)
+    return value is None
+
+
+def _texts(value):
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for held in value.values():
+            yield from _texts(held)
+    elif isinstance(value, (list, tuple)):
+        for held in value:
+            yield from _texts(held)
+
+
+def _read(finding):
+    """One finding, from either shape: (label, text, side, confidence, event references)."""
+    tag = finding.get("tag") if isinstance(finding.get("tag"), dict) else {}
+    side = finding.get("side", tag.get("side"))
+    side = None if side is None or str(side).strip().lower() in ("", "context") else str(side).strip().lower()
+    stated = finding.get("confidence", tag.get("confidence_id"))
+    confidence = None if stated is None else CONFIDENCE.get(str(stated).strip().lower(), 0)
+    refs = finding.get("event_refs")
+    refs = [refs] if isinstance(refs, (str, dict)) else list(refs or [])
+    cited = [r for r in refs if (r.get("uid") if isinstance(r, dict) else str(r or "").strip())]
+    label = finding.get("id", finding.get("n", "?"))
+    return label, str(finding.get("desc") or finding.get("finding") or ""), side, confidence, cited
 
 
 def check(note, kind=None, root=FRAMEWORK):
     """What makes this Note non-conformant, in the framework's terms. Empty means conformant."""
+    if not isinstance(note, dict):
+        return [f"a Note is an object with one field per element; this is a {type(note).__name__}"]
     kind = kind or note.get("kind") or "triage"
     failures = []
-    for element in elements(kind, root):
-        if element["element"] in OPTIONAL:
-            continue  # an empty one renders "None."; absent is the same statement
-        if not note.get(element["element"]):
-            failures.append(
-                f"the Note renders no {element['name']}: the framework's {kind} Note requires it")
+    if note.get("kind") and note["kind"] != kind:
+        failures.append(f"the Note says it is a {note['kind']} Note and is checked as a {kind} Note")
+    listed = elements(kind, root)
+    for element in listed:
+        if not element["may_be_empty"] and _blank(note.get(element["element"])):
+            failures.append(f"the Note renders no {element['name']}: the framework's {kind} Note requires it")
 
-    for finding in note.get("findings") or []:
-        where = f"finding {finding.get('n', '?')}"
-        tag = finding.get("tag") or {}
-        side = str(tag.get("side") or "").lower()
-        if side not in SIDES:
-            failures.append(f"{where}: side is {tag.get('side')!r}; the framework has Malicious, Benign, or context")
-        elif side in ("malicious", "benign") and tag.get("confidence_id") is None:
-            failures.append(f"{where}: {side} with no confidence; a side without one is not a finding")
-        elif side == "context" and tag.get("confidence_id") is not None:
+    findings = note.get("findings")
+    if not isinstance(findings, list) or not all(isinstance(f, dict) for f in findings):
+        return failures + ["findings is a list of findings, each an object with its side, confidence and events"]
+    ids = set()
+    for finding in findings:
+        if isinstance(finding.get("tag"), str):
+            failures.append(f"finding {finding.get('id', finding.get('n', '?'))}: the tag is the text "
+                            f"{finding['tag']!r}; state \"side\" and \"confidence\" as the ledger does")
+            continue
+        label, _text, side, confidence, cited = _read(finding)
+        ids.add(str(label))
+        where = f"finding {label}"
+        if side not in (None, "malicious", "benign"):
+            failures.append(f"{where}: side is {side!r}; the framework has Malicious, Benign, or neither for context")
+        elif side and not confidence:
+            failures.append(f"{where}: {side} with no confidence (Low, Medium or High); a side without one is not a finding")
+        elif side is None and confidence is not None:
             failures.append(f"{where}: context carries a confidence; context bears on no hypothesis")
-        if not finding.get("event_refs"):
+        if not cited:
             failures.append(f"{where}: cites no event; a Finding without a traceable reference is not conformant")
-        for bare in TECHNIQUE_BARE.findall(str(finding.get("finding") or "")):
-            failures.append(f"{where}: technique {bare} is written bare; the framework writes ID (Name)")
 
-    for gap in note.get("visibility_gaps") or []:
-        if not str(gap.get("check_prevented") or "").strip():
+    # "whenever technique codes appear in a Note": every element's text, not the findings alone
+    for element in listed:
+        held = note.get(element["element"])
+        texts = [_read(f)[1] for f in findings] if element["element"] == "findings" else list(_texts(held))
+        for bare in sorted({b for text in texts for b in TECHNIQUE_BARE.findall(text)}):
+            failures.append(f"{element['name']}: technique {bare} is written bare; the framework writes ID (Name)")
+
+    gaps = [g for g in note.get("visibility_gaps") or [] if isinstance(g, dict)]
+    for gap in gaps:
+        prevented = str(gap.get("check_prevented") or "").strip()
+        if not prevented or prevented.startswith(PLACEHOLDER):
             failures.append(f"visibility gap {gap.get('data_source')!r} names no check it prevented")
 
-    record = note.get("detection_metadata") or {}
+    failures += _asserted(note, ids, {str(g.get("data_source", "")).strip().lower() for g in gaps})
+    return failures
+
+
+def _asserted(note, finding_ids, recorded_gaps):
+    """§1.6 item 3: each Alert Finding renders what its detection asserted, and the dispositions of
+    the recommended actions render with the Findings."""
+    failures = []
+    alerts = [a for a in note.get("alerts") or [] if isinstance(a, dict)]
+    record = note.get("detection_metadata")
+    if not isinstance(record, dict):
+        if alerts:
+            failures.append(f"the Note holds {len(alerts)} Alert(s) and no detection_metadata: each Alert Finding "
+                            "renders what its detection asserted (techniques, threat, source, remediation state)")
+        return failures
+    read = {str(a.get("id")) for a in record.get("alerts") or []}
+    for alert in alerts:
+        if str(alert.get("id")) not in read:
+            failures.append(f"alert {alert.get('id')} renders nothing of what its detection asserted")
     for alert in record.get("alerts") or []:
-        for action in alert.get("recommended_actions") or []:
-            state = str(action.get("disposition") or "").strip().lower().replace("_", " ")
-            if state == "followed":
-                continue
-            if state in ("set aside", "setaside", "rejected") and str(action.get("reason") or "").strip():
-                continue
-            failures.append(
-                f"recommended action {action.get('id')} of alert {alert.get('id')} is neither "
-                "followed nor set aside with a stated reason")
+        for technique in alert.get("techniques") or []:
+            rendered = str(technique.get("rendered") or technique.get("id") or "")
+            if TECHNIQUE_BARE.search(rendered):
+                failures.append(f"alert {alert.get('id')}: technique {rendered} is written bare; the framework writes ID (Name)")
+        for absent in alert.get("absent") or []:
+            if f"alert metadata: {absent}".lower() not in recorded_gaps:
+                failures.append(f"alert {alert.get('id')}: the source did not supply the {absent}, and no "
+                                "Visibility Gap says so with the check it prevented")
+    actions = actions_of(record) if actions_of else [a for alert in record.get("alerts") or []
+                                                     for a in alert.get("recommended_actions") or []]
+    state = dispositions(actions) if dispositions else {"open": [], "followed": []}
+    for action in actions:
+        if action.get("id") in state["open"]:
+            failures.append(f"recommended action {action.get('id')} is neither followed nor set aside with a stated reason")
+        elif action.get("id") in state["followed"] and str(action.get("finding") or "") not in finding_ids:
+            failures.append(f"recommended action {action.get('id')} was followed and names no Finding it produced: "
+                            "one followed renders as that Finding, naming the recommendation it came from")
     return failures
 
 
@@ -149,8 +250,12 @@ def main():
     a = ap.parse_args()
     out = {"kind": a.kind, "elements": elements(a.kind, a.root)}
     if a.note:
-        with open(a.note, encoding="utf-8") as handle:
-            out["failures"] = check(json.load(handle), a.kind, a.root)
+        try:
+            with open(a.note, encoding="utf-8") as handle:
+                held = json.load(handle)
+        except (OSError, ValueError) as exc:
+            ap.error(f"the Note cannot be read: {exc}")
+        out["failures"] = check(held, a.kind, a.root)
     if a.json:
         print(json.dumps(out, indent=2, ensure_ascii=False))
     else:
