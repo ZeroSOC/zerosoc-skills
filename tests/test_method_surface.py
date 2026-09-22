@@ -104,36 +104,34 @@ class TheMethodSurface(unittest.TestCase):
             note_elements.elements("triage", os.path.join(ROOT, "nowhere"))
 
     def test_a_conformant_note_passes(self):
-        self.assertEqual(note_elements.check(self.note(), root=self.ELEMENTS_ROOT)[0], [])
+        self.assertEqual(note_elements.check(self.note(), root=self.ELEMENTS_ROOT), [])
 
     def test_a_finding_with_a_side_and_no_confidence_fails(self):
         note = self.note()
         note["findings"][0]["tag"] = {"side": "malicious", "confidence_id": None}
 
-        self.assertTrue(any("no confidence" in f for f in note_elements.check(note, root=self.ELEMENTS_ROOT)[0]))
+        self.assertTrue(any("no confidence" in f for f in note_elements.check(note, root=self.ELEMENTS_ROOT)))
 
     def test_a_finding_that_cites_no_event_fails(self):
         note = self.note()
         note["findings"][0]["event_refs"] = []
 
-        self.assertTrue(any("cites no event" in f for f in note_elements.check(note, root=self.ELEMENTS_ROOT)[0]))
+        self.assertTrue(any("cites no event" in f for f in note_elements.check(note, root=self.ELEMENTS_ROOT)))
 
     def test_a_bare_technique_code_is_nothing_this_script_reports(self):
         """`ID (Name)` is guidance given to whoever writes the Note, not a property read back off
-        it. The check reported a bare code as an advisory and reported nothing else, which made an
+        it. The check reported a bare code separately so it could not refuse a Note, which made an
         executor answer for a spelling in a run whose Note was otherwise conformant."""
         note = self.note()
         note["findings"][0]["finding"] = "T1486 was observed"
-        failures, advisories = note_elements.check(note, root=self.ELEMENTS_ROOT)
 
-        self.assertEqual(failures, [])
-        self.assertEqual(advisories, [])
+        self.assertEqual(note_elements.check(note, root=self.ELEMENTS_ROOT), [])
 
     def test_context_that_carries_a_confidence_fails(self):
         note = self.note()
         note["findings"][0]["tag"] = {"side": "context", "confidence_id": 2}
 
-        self.assertTrue(any("context carries a confidence" in f for f in note_elements.check(note, root=self.ELEMENTS_ROOT)[0]))
+        self.assertTrue(any("context carries a confidence" in f for f in note_elements.check(note, root=self.ELEMENTS_ROOT)))
 
     def test_a_recommended_action_nobody_acted_on_is_not_a_failure(self):
         """§1.5: what a source recommends is indicative. A Note used to be refused until every
@@ -143,7 +141,7 @@ class TheMethodSurface(unittest.TestCase):
         note["detection_metadata"] = {"alerts": [{"id": "A1", "recommended_actions": [
             {"id": "RA1", "action": "Run a full scan", "disposition": None}]}]}
 
-        self.assertEqual(note_elements.check(note, root=self.ELEMENTS_ROOT)[0], [])
+        self.assertEqual(note_elements.check(note, root=self.ELEMENTS_ROOT), [])
 
     def test_a_recommendation_set_aside_with_a_reason_passes(self):
         note = self.note()
@@ -151,13 +149,13 @@ class TheMethodSurface(unittest.TestCase):
             {"id": "RA1", "action": "Run a full scan", "disposition": "set_aside",
              "reason": "the device was reimaged before triage opened"}]}]}
 
-        self.assertEqual(note_elements.check(note, root=self.ELEMENTS_ROOT)[0], [])
+        self.assertEqual(note_elements.check(note, root=self.ELEMENTS_ROOT), [])
 
     def test_a_gap_that_names_no_check_fails(self):
         note = self.note()
         note["visibility_gaps"] = [{"data_source": "EDR", "check_prevented": "  "}]
 
-        self.assertTrue(any("names no check" in f for f in note_elements.check(note, root=self.ELEMENTS_ROOT)[0]))
+        self.assertTrue(any("names no check" in f for f in note_elements.check(note, root=self.ELEMENTS_ROOT)))
 
     def test_the_rule_text_a_host_composes_lives_in_the_skill(self):
         for skill, names in (("zerosoc-triage", ("checks", "note-prose")),
@@ -210,10 +208,7 @@ def ledger_note(**changes):
 
 class TheNoteCheck(unittest.TestCase):
     def failures(self, note, kind="triage"):
-        return note_elements.check(note, kind, FRAMEWORK)[0]
-
-    def advisories(self, note, kind="triage"):
-        return note_elements.check(note, kind, FRAMEWORK)[1]
+        return note_elements.check(note, kind, FRAMEWORK)
 
     def test_a_note_in_the_ledgers_own_shape_is_conformant(self):
         self.assertEqual(self.failures(ledger_note()), [])
@@ -233,7 +228,6 @@ class TheNoteCheck(unittest.TestCase):
                 note["findings"][0]["desc"] = "T1114.003 observed"
             with self.subTest(where=where):
                 self.assertEqual(self.failures(note), [], where)
-                self.assertEqual(self.advisories(note), [], where)
 
     def test_a_side_needs_a_confidence_the_framework_has(self):
         for confidence in (None, 0, "Unknown", "certain"):
@@ -315,7 +309,7 @@ class TheNoteCheck(unittest.TestCase):
     def test_something_that_is_not_a_note_is_a_failure_and_not_a_traceback(self):
         for broken in ([], {"findings": "F1"}, ledger_note(findings=[{"id": "F1", "tag": "Malicious (High)"}])):
             with self.subTest(note=str(broken)[:40]):
-                self.assertTrue(note_elements.check(broken, "triage", FRAMEWORK)[0])
+                self.assertTrue(note_elements.check(broken, "triage", FRAMEWORK))
 
     def test_malformed_detection_metadata_is_a_failure_and_never_a_traceback(self):
         for name, held in (("techniques", ["T1486 (Data Encrypted for Impact)"]), ("recommended_actions", "Run a scan"),
@@ -366,7 +360,7 @@ class TheNoteCheck(unittest.TestCase):
         self.assertTrue(any("F1" in f and "says nothing" in f for f in self.failures(note)))
 
     def test_a_kind_the_framework_does_not_have_is_said(self):
-        self.assertTrue(note_elements.check(ledger_note(kind="bogus"), None, FRAMEWORK)[0])
+        self.assertTrue(note_elements.check(ledger_note(kind="bogus"), None, FRAMEWORK))
 
     def test_the_older_tag_shape_is_still_read(self):
         note = ledger_note(findings=[{"n": 1, "finding": "T1486 (Data Encrypted for Impact) was observed",
@@ -397,11 +391,11 @@ class AFrameworkChangeIsASkillsReleaseAndNothingElse(unittest.TestCase):
         root = self.served(rewrite)
         names = [e["element"] for e in note_elements.elements("triage", root)]
         self.assertEqual(names[-2:], ["provenance_and_custody", "lessons"])
-        failures = note_elements.check(ledger_note(), "triage", root)[0]
+        failures = note_elements.check(ledger_note(), "triage", root)
         self.assertTrue(any("Provenance and Custody" in f for f in failures))
         self.assertTrue(any("Lessons" in f for f in failures))
         note = ledger_note(provenance_and_custody={"case_uid": "4711"}, lessons="Tune the loader rule.")
-        self.assertEqual(note_elements.check(note, "triage", root)[0], [])
+        self.assertEqual(note_elements.check(note, "triage", root), [])
 
     def test_an_element_the_script_cannot_read_stops_it_rather_than_vanishing(self):
         root = self.served(lambda text: text.replace("3.  **Rationale** —", "3.  **Rationale:**", 1))
@@ -725,25 +719,25 @@ class ARecommendationIsAnsweredWhereItWasPublished(unittest.TestCase):
                     "reason": "no timeline in scope"}],
         })
 
-        self.assertEqual(note_elements.check(note, root=FRAMEWORK)[0], [])
+        self.assertEqual(note_elements.check(note, root=FRAMEWORK), [])
 
     def test_an_action_that_was_run_and_names_no_finding_says_which_alert(self):
         note = self.note({"A1": [{"id": "RA7", "action": "Submit the files", "disposition": "followed"}]})
 
-        failures = note_elements.check(note, root=FRAMEWORK)[0]
+        failures = note_elements.check(note, root=FRAMEWORK)
 
         self.assertTrue(any("alert A1" in f and "RA7" in f for f in failures), failures)
 
 
-class TheCheckAnswersWithBothLists(unittest.TestCase):
+class TheCheckAnswersTheSameShapeEveryWayOut(unittest.TestCase):
     """Two changes landed on the same function from two branches, and the merge left `_asserted`
     returning one list where `check()` unpacked two: every Note raised `ValueError` instead of
-    being checked. A test that calls it through the command line would have caught it."""
+    being checked. Every early return is walked here, whatever the shape of the answer is."""
 
-    def test_every_path_through_the_check_answers_with_failures_and_advisories(self):
+    def test_every_path_through_the_check_answers_with_a_list(self):
         for note in ([], {"kind": "nonesuch"}, ledger_note(), ledger_note(detection_metadata=None),
                      ledger_note(detection_metadata={"alerts": "not a list"})):
             with self.subTest(note=str(note)[:40]):
-                failures, advisories = note_elements.check(note, root=FRAMEWORK)
+                failures = note_elements.check(note, root=FRAMEWORK)
                 self.assertIsInstance(failures, list)
-                self.assertIsInstance(advisories, list)
+                self.assertTrue(all(isinstance(f, str) for f in failures))

@@ -13,10 +13,8 @@ form, and the framework asks for an account. The script renders the structure an
 the executor renders the content.
 
 Without --note it prints the elements of that Note kind, in order, with what each must contain.
-With --note it also checks an assembled Note and exits 1 on any failure. A **failure** is a
-conformance condition. What the framework states as a SHOULD is reported beside them as an
-**advisory**, which does not fail the Note; the framework states none this script can check, so
-the list comes back empty and the channel stays for the SHOULD that arrives next.
+With --note it also checks an assembled Note and exits 1 on any failure. A failure is a
+conformance condition: the framework's own words, read out of the method, and nothing else.
 
 note.json is **the ledger with the prose beside it** — the ledger of triage_decide.py or resolve.py, so
 nothing is copied into a second shape, plus one field per element the framework names:
@@ -169,31 +167,31 @@ def _read(finding):
 
 
 def check(note, kind=None, root=FRAMEWORK):
-    """What this Note does not meet, in the framework's terms, as (failures, advisories).
+    """What this Note does not meet, in the framework's terms.
 
-    A **failure** is a conformance condition: either the Note is not a Note of its kind, or the
-    Case cannot be read from it as decided — a Finding that cites no event, a side with no
-    confidence, a recommended action left without a disposition. A caller refuses a Note on one.
+    A failure is a conformance condition: either the Note is not a Note of its kind, or the Case
+    cannot be read from it as decided — a Finding that cites no event, a side with no confidence,
+    an element the framework requires and the Note does not render. A caller refuses a Note on one.
 
-    An **advisory** is what the framework states as a SHOULD. It is returned beside the failures
-    and never refuses the Note. No SHOULD is checked here today: how a Note spells a technique
-    identifier is guidance the executor is given where it writes the Note, not a property this
-    script reads back off it.
+    Nothing else is reported. The script checked one thing the framework states as a SHOULD — that
+    a technique be written `ID (Name)` — and reported it separately so it could not refuse a Note.
+    That is guidance given to whoever writes the Note, not a property to read back off it, and the
+    separate channel went with the last thing that used it.
 
-    Both lists empty means conformant, and well-formed with it.
+    An empty list means conformant, and well-formed with it.
     """
     if not isinstance(note, dict):
-        return [f"a Note is an object with one field per element; this is a {type(note).__name__}"], []
+        return [f"a Note is an object with one field per element; this is a {type(note).__name__}"]
     kind = kind or note.get("kind") or "triage"
     if kind not in SECTIONS:
-        return [f"the Note says it is a {kind!r} Note; the framework has {' and '.join(sorted(SECTIONS))} Notes"], []
-    failures, advisories = [], []
+        return [f"the Note says it is a {kind!r} Note; the framework has {' and '.join(sorted(SECTIONS))} Notes"]
+    failures = []
     if note.get("kind") and note["kind"] != kind:
         failures.append(f"the Note says it is a {note['kind']} Note and is checked as a {kind} Note")
 
     findings = note.get("findings") or []
     if not isinstance(findings, list) or not all(isinstance(f, dict) for f in findings):
-        return failures + ["findings is a list of findings, each an object with its side, confidence and events"], []
+        return failures + ["findings is a list of findings, each an object with its side, confidence and events"]
     alerts = [a for a in _listed(note.get("alerts")) if isinstance(a, dict)]
 
     listed = elements(kind, root)
@@ -234,16 +232,14 @@ def check(note, kind=None, root=FRAMEWORK):
         if not prevented or prevented.startswith(PLACEHOLDER):
             failures.append(f"visibility gap {gap.get('data_source')!r} names no check it prevented")
     recorded = {str(g.get("data_source", "")).strip().lower() for g in gaps if isinstance(g, dict)}
-    asserted, advised = _asserted(note, alerts, findings, ids, recorded)
-    return failures + asserted, advisories + advised
+    return failures + _asserted(note, alerts, findings, ids, recorded)
 
 
 def _asserted(note, alerts, findings, finding_ids, recorded_gaps):
     """§1.6: each Alert Finding renders what its detection asserted, and a recommended action the
     executor ran renders as the Finding it produced. Triage keeps the Case's alerts in "alerts";
-    investigation keeps them among its findings, each with its "alert_type". Returns
-    (failures, advisories), as check() does."""
-    failures, advisories = [], []
+    investigation keeps them among its findings, each with its "alert_type"."""
+    failures = []
     among = [f for f in findings if f.get("alert_type")]
     record = note.get("detection_metadata")
     if not isinstance(record, dict) or not isinstance(record.get("alerts", []), list) \
@@ -254,7 +250,7 @@ def _asserted(note, alerts, findings, finding_ids, recorded_gaps):
         elif alerts or among:
             failures.append(f"the Note holds {len(alerts) + len(among)} Alert(s) and no detection_metadata: each Alert "
                             "Finding renders what its detection asserted (techniques, threat, source, remediation state)")
-        return failures, advisories
+        return failures
     read = {str(a.get("id")) for a in record["alerts"]} if record.get("alerts") else set()
     # A deployment that declares no source profile reads nothing of §1.1 — there are no field names
     # to read it under — and alert_metadata.py answers with that as a visibility gap and no alerts.
@@ -300,7 +296,7 @@ def _asserted(note, alerts, findings, finding_ids, recorded_gaps):
                 failures.append(f"alert {alert_id}: recommended action {action.get('id')} was run and names no "
                                 "Finding it produced: one run renders as that Finding, naming the recommendation "
                                 "it came from")
-    return failures, advisories
+    return failures
 
 
 def main():
@@ -317,14 +313,12 @@ def main():
                 held = json.load(handle)
         except (OSError, ValueError) as exc:
             ap.error(f"the Note cannot be read: {exc}")
-        out["failures"], out["advisories"] = check(held, a.kind, a.root)
+        out["failures"] = check(held, a.kind, a.root)
     if a.json:
         print(json.dumps(out, indent=2, ensure_ascii=False))
     else:
         for n, element in enumerate(out["elements"], start=1):
             print(f"{n}. {element['name']} ({element['element']}) — {element['renders']}")
-        for advisory in out.get("advisories", []):
-            print(f"ADVICE: {advisory}", file=sys.stderr)
         for failure in out.get("failures", []):
             print(f"FAIL: {failure}", file=sys.stderr)
     return 1 if out.get("failures") else 0
