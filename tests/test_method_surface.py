@@ -140,7 +140,7 @@ class TheMethodSurface(unittest.TestCase):
         note["detection_metadata"] = {"alerts": [{"id": "A1", "recommended_actions": [
             {"id": "RA1", "action": "Run a full scan", "disposition": None}]}]}
 
-        self.assertEqual(note_elements.check(note, root=self.ELEMENTS_ROOT), [])
+        self.assertEqual(note_elements.check(note, root=self.ELEMENTS_ROOT)[0], [])
 
     def test_a_recommendation_set_aside_with_a_reason_passes(self):
         note = self.note()
@@ -721,3 +721,50 @@ class FromTheCommandLine(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ARecommendationIsAnsweredWhereItWasPublished(unittest.TestCase):
+    """A source numbers its procedure per alert, so "RA7" is one instruction on one alert and
+    another on the next. The check reads them per alert for that reason."""
+
+    def note(self, actions_by_alert):
+        return ledger_note(
+            alerts=[{"id": a, "type": "Malware / loader execution", "entity": "ws-01", "confidence": "High"}
+                    for a in actions_by_alert],
+            detection_metadata={"alerts": [
+                {"id": a, "absent": [], "techniques": [], "recommended_actions": held}
+                for a, held in actions_by_alert.items()
+            ]},
+        )
+
+    def test_an_answer_for_one_alerts_action_is_not_an_answer_for_anothers(self):
+        """Measured on a live 59-alert Case: the Note was refused for RA7 and RA11 while both had
+        been answered on the alerts that published them."""
+        note = self.note({
+            "A1": [{"id": "RA7", "action": "Submit the files", "disposition": "followed", "finding": "F1"}],
+            "A2": [{"id": "RA7", "action": "Check the timeline", "disposition": "set aside",
+                    "reason": "no timeline in scope"}],
+        })
+
+        self.assertEqual(note_elements.check(note, root=FRAMEWORK)[0], [])
+
+    def test_an_action_that_was_run_and_names_no_finding_says_which_alert(self):
+        note = self.note({"A1": [{"id": "RA7", "action": "Submit the files", "disposition": "followed"}]})
+
+        failures = note_elements.check(note, root=FRAMEWORK)[0]
+
+        self.assertTrue(any("alert A1" in f and "RA7" in f for f in failures), failures)
+
+
+class TheCheckAnswersWithBothLists(unittest.TestCase):
+    """Two changes landed on the same function from two branches, and the merge left `_asserted`
+    returning one list where `check()` unpacked two: every Note raised `ValueError` instead of
+    being checked. A test that calls it through the command line would have caught it."""
+
+    def test_every_path_through_the_check_answers_with_failures_and_advisories(self):
+        for note in ([], {"kind": "nonesuch"}, ledger_note(), ledger_note(detection_metadata=None),
+                     ledger_note(detection_metadata={"alerts": "not a list"})):
+            with self.subTest(note=str(note)[:40]):
+                failures, advisories = note_elements.check(note, root=FRAMEWORK)
+                self.assertIsInstance(failures, list)
+                self.assertIsInstance(advisories, list)

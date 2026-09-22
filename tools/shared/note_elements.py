@@ -274,8 +274,9 @@ def check(note, kind=None, root=FRAMEWORK):
 def _asserted(note, alerts, findings, finding_ids, recorded_gaps):
     """§1.6: each Alert Finding renders what its detection asserted, and a recommended action the
     executor ran renders as the Finding it produced. Triage keeps the Case's alerts in "alerts";
-    investigation keeps them among its findings, each with its "alert_type"."""
-    failures = []
+    investigation keeps them among its findings, each with its "alert_type". Returns
+    (failures, advisories), as check() does."""
+    failures, advisories = [], []
     among = [f for f in findings if f.get("alert_type")]
     record = note.get("detection_metadata")
     if not isinstance(record, dict) or not isinstance(record.get("alerts", []), list) \
@@ -315,7 +316,7 @@ def _asserted(note, alerts, findings, finding_ids, recorded_gaps):
                                 "Visibility Gap says so with the check it prevented")
         for action in _listed(alert.get("recommended_actions")):
             if isinstance(action, dict):
-                actions.append(action)
+                actions.append((alert.get("id"), action))
     # What a source recommends is indicative (§1.5). An action the executor RAN renders as the
     # Finding it produced, and is held to naming it. One it did not run is not a failure and not
     # an entry: a Note recording every published action as considered-and-irrelevant states the
@@ -323,12 +324,22 @@ def _asserted(note, alerts, findings, finding_ids, recorded_gaps):
     # opposite — every action answered — on sources that publish their procedure per alert, which
     # is how a Case of three alerts produced a Note of sixty-seven findings, six of which decided
     # it.
-    ran = dispositions(actions)["followed"] if dispositions else []
-    for action in actions:
-        if action.get("id") in ran and str(action.get("finding") or "") not in finding_ids:
-            failures.append(f"recommended action {action.get('id')} was run and names no Finding it produced: "
-                            "one run renders as that Finding, naming the recommendation it came from")
-    return failures
+    # Per alert, never across them: a source numbers its procedure per alert, so "RA7" is one
+    # instruction on one alert and another on the next. Keyed by the bare number, an answer given
+    # for one alert's RA7 was read as an answer for every alert's — and a live 59-alert Case whose
+    # Note was complete was refused for two recommendations that had each been answered where they
+    # were published.
+    by_alert = {}
+    for alert_id, action in actions:
+        by_alert.setdefault(alert_id, []).append(action)
+    for alert_id, held in by_alert.items():
+        ran = dispositions(held)["followed"] if dispositions else []
+        for action in held:
+            if action.get("id") in ran and str(action.get("finding") or "") not in finding_ids:
+                failures.append(f"alert {alert_id}: recommended action {action.get('id')} was run and names no "
+                                "Finding it produced: one run renders as that Finding, naming the recommendation "
+                                "it came from")
+    return failures, advisories
 
 
 def main():
