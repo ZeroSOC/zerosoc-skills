@@ -93,10 +93,10 @@ class TheMethodSurface(unittest.TestCase):
         found = self.elements("triage")
         names = [e["element"] for e in found]
 
-        self.assertEqual(names[0], "classification", "it comes first: a reader compares it directly")
+        self.assertEqual(names[0], "summary", "the account before the measures (§1.6)")
         self.assertEqual(names[-1], "provenance")
         self.assertIn("findings", names)
-        self.assertIn("what happened and when", found[1]["renders"], "the framework's own words")
+        self.assertIn("what happened and when", found[0]["renders"], "the framework's own words")
         self.assertIn("reclassification_pivots", [e["element"] for e in self.elements("investigation")])
 
     def test_a_missing_reference_tree_is_an_error_not_an_empty_list(self):
@@ -426,7 +426,7 @@ class AFrameworkChangeIsASkillsReleaseAndNothingElse(unittest.TestCase):
         self.assertEqual(note_elements.check(note, "triage", root)[0], [])
 
     def test_an_element_the_script_cannot_read_stops_it_rather_than_vanishing(self):
-        root = self.served(lambda text: text.replace("4.  **Rationale** —", "4.  **Rationale:**", 1))
+        root = self.served(lambda text: text.replace("3.  **Rationale** —", "3.  **Rationale:**", 1))
         with self.assertRaises(SystemExit) as stopped:
             note_elements.elements("triage", root)
         self.assertIn("Rationale", str(stopped.exception))
@@ -464,9 +464,10 @@ class AFrameworkChangeIsASkillsReleaseAndNothingElse(unittest.TestCase):
 
     def test_every_element_of_both_notes_is_read_at_this_pin(self):
         self.assertEqual([e["element"] for e in note_elements.elements("triage", FRAMEWORK)],
-                         ["classification", "summary", "findings", "rationale", "timeline", "visibility_gaps", "provenance"])
+                         ["summary", "classification", "rationale", "findings", "timeline",
+                          "visibility_gaps", "provenance"])
         self.assertEqual([e["element"] for e in note_elements.elements("investigation", FRAMEWORK)],
-                         ["classification", "summary", "findings", "rationale", "reclassification_pivots",
+                         ["summary", "classification", "rationale", "findings", "reclassification_pivots",
                           "timeline", "visibility_gaps", "provenance"])
 
 

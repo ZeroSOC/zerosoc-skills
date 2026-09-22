@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **The pin follows the framework to 8ec4878.** A Note renders **the account before the measures**:
+  Summary, Classification, Rationale, Findings, then the rest (ZeroSOC/zerosoc-framework#75). The
+  scripts read the order out of the method, so nothing here changed but the tests that read it
+  back — which is the property that release exercises. The Case Schema also declares
+  `ocsf_version`, so a Case written into another system's record says which OCSF release it was
+  written against.
+
 - **The Note check answers again.** #28 made `check()` return `(failures, advisories)` and #30
   rewrote the same function; merged one after the other, `_asserted` was left returning one list
   where `check()` unpacked two, so **every** Note raised `ValueError: not enough values to unpack`

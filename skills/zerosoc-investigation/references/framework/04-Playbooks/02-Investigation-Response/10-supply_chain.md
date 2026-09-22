@@ -21,7 +21,7 @@ required_data_sources:
   - Cloud & remote-access audit for vendor/MSP accounts
 status: draft
 ---
-<!-- generated from zerosoc-framework@80af9d768c9d : 04-Playbooks/02-Investigation-Response/10-supply_chain.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@8ec487858137 : 04-Playbooks/02-Investigation-Response/10-supply_chain.md — do not edit; regenerate with tools/build_references.py -->
 
 # 10-Supply-Chain Compromise Investigation & Response
 
