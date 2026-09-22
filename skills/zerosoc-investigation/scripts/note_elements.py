@@ -13,7 +13,11 @@ form, and the framework asks for an account. The script renders the structure an
 the executor renders the content.
 
 Without --note it prints the elements of that Note kind, in order, with what each must contain.
-With --note it also checks an assembled Note and exits 1 on any failure.
+With --note it also checks an assembled Note and exits 1 on any failure. A **failure** is a
+conformance condition. What the framework states as a SHOULD is reported beside them as an
+**advisory**, which does not fail the Note: how a Note spells an identifier is a property of how it
+reads, not of whether the Case was decided on evidence, and a Note refused over one is a Case
+decided by nobody.
 
 note.json is **the ledger with the prose beside it** — the ledger of triage_decide.py or resolve.py, so
 nothing is copied into a second shape, plus one field per element the framework names:
@@ -185,19 +189,32 @@ def _read(finding):
 
 
 def check(note, kind=None, root=FRAMEWORK):
-    """What makes this Note non-conformant, in the framework's terms. Empty means conformant."""
+    """What this Note does not meet, in the framework's terms, as (failures, advisories).
+
+    A **failure** is a conformance condition: either the Note is not a Note of its kind, or the
+    Case cannot be read from it as decided — a Finding that cites no event, a side with no
+    confidence, a recommended action left without a disposition. A caller refuses a Note on one.
+
+    An **advisory** is what the framework states as a SHOULD (§1.6, §2.5: technique codes SHOULD be
+    written as `ID (Name)`). It is returned beside the failures and never refuses the Note. The
+    difference is what the rule protects: a Note that cites T1059.001 without its name is harder to
+    read; it is not less true, less traceable or less decided, and discarding the Note discards the
+    Case's whole account of itself to fix a spelling.
+
+    Both lists empty means conformant, and well-formed with it.
+    """
     if not isinstance(note, dict):
-        return [f"a Note is an object with one field per element; this is a {type(note).__name__}"]
+        return [f"a Note is an object with one field per element; this is a {type(note).__name__}"], []
     kind = kind or note.get("kind") or "triage"
     if kind not in SECTIONS:
-        return [f"the Note says it is a {kind!r} Note; the framework has {' and '.join(sorted(SECTIONS))} Notes"]
-    failures = []
+        return [f"the Note says it is a {kind!r} Note; the framework has {' and '.join(sorted(SECTIONS))} Notes"], []
+    failures, advisories = [], []
     if note.get("kind") and note["kind"] != kind:
         failures.append(f"the Note says it is a {note['kind']} Note and is checked as a {kind} Note")
 
     findings = note.get("findings") or []
     if not isinstance(findings, list) or not all(isinstance(f, dict) for f in findings):
-        return failures + ["findings is a list of findings, each an object with its side, confidence and events"]
+        return failures + ["findings is a list of findings, each an object with its side, confidence and events"], []
     alerts = [a for a in _listed(note.get("alerts")) if isinstance(a, dict)]
 
     listed = elements(kind, root)
@@ -237,7 +254,8 @@ def check(note, kind=None, root=FRAMEWORK):
         else:
             texts = list(_texts(note.get(element["element"])))
         for bare in sorted({b for text in texts for b in _bare(text)}):
-            failures.append(f"{element['name']}: technique {bare} is written bare; the framework writes ID (Name)")
+            advisories.append(f"{element['name']}: technique {bare} is written bare; the framework says a Note "
+                              "SHOULD write ID (Name)")
 
     gaps = _listed(note.get("visibility_gaps"))
     for gap in gaps:
@@ -249,7 +267,8 @@ def check(note, kind=None, root=FRAMEWORK):
         if not prevented or prevented.startswith(PLACEHOLDER):
             failures.append(f"visibility gap {gap.get('data_source')!r} names no check it prevented")
     recorded = {str(g.get("data_source", "")).strip().lower() for g in gaps if isinstance(g, dict)}
-    return failures + _asserted(note, alerts, findings, ids, recorded)
+    asserted, advised = _asserted(note, alerts, findings, ids, recorded)
+    return failures + asserted, advisories + advised
 
 
 def _asserted(note, alerts, findings, finding_ids, recorded_gaps):
@@ -267,7 +286,7 @@ def _asserted(note, alerts, findings, finding_ids, recorded_gaps):
         elif alerts or among:
             failures.append(f"the Note holds {len(alerts) + len(among)} Alert(s) and no detection_metadata: each Alert "
                             "Finding renders what its detection asserted (techniques, threat, source, remediation state)")
-        return failures
+        return failures, advisories
     read = {str(a.get("id")) for a in record["alerts"]} if record.get("alerts") else set()
     # A deployment that declares no source profile reads nothing of §1.1 — there are no field names
     # to read it under — and alert_metadata.py answers with that as a visibility gap and no alerts.
@@ -287,8 +306,9 @@ def _asserted(note, alerts, findings, finding_ids, recorded_gaps):
         for technique in _listed(alert.get("techniques")):
             rendered = str((technique.get("rendered") or technique.get("id") or "") if isinstance(technique, dict) else technique)
             if _bare(rendered):
-                failures.append(f"alert {alert.get('id')}: technique {rendered} is written bare; the framework writes "
-                                "ID (Name) — a technique its tables do not hold is named as ATT&CK or ATLAS names it")
+                advisories.append(f"alert {alert.get('id')}: technique {rendered} is written bare; the framework says "
+                                  "a Note SHOULD write ID (Name) — a technique its tables do not hold is named as "
+                                  "ATT&CK or ATLAS names it")
         for absent in _listed(alert.get("absent")):
             if f"alert metadata: {absent}".lower() not in recorded_gaps:
                 failures.append(f"alert {alert.get('id')}: the source did not supply the {absent}, and no "
@@ -325,12 +345,14 @@ def main():
                 held = json.load(handle)
         except (OSError, ValueError) as exc:
             ap.error(f"the Note cannot be read: {exc}")
-        out["failures"] = check(held, a.kind, a.root)
+        out["failures"], out["advisories"] = check(held, a.kind, a.root)
     if a.json:
         print(json.dumps(out, indent=2, ensure_ascii=False))
     else:
         for n, element in enumerate(out["elements"], start=1):
             print(f"{n}. {element['name']} ({element['element']}) — {element['renders']}")
+        for advisory in out.get("advisories", []):
+            print(f"ADVICE: {advisory}", file=sys.stderr)
         for failure in out.get("failures", []):
             print(f"FAIL: {failure}", file=sys.stderr)
     return 1 if out.get("failures") else 0

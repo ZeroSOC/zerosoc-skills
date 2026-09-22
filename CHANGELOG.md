@@ -1,6 +1,33 @@
 # Changelog
 
-## Unreleased — conforms to zerosoc-framework@a5ef27c
+## Unreleased — conforms to zerosoc-framework@80af9d7
+
+- **The Note check reports advisories beside the failures, and only a failure refuses a Note.**
+  `note_elements.check()` returned one flat list and every entry in it was a gate condition,
+  whatever it was about. Most of them are: a Finding that cites no event, a side with no
+  confidence, a recommended action nobody dispositioned, an Alert that renders nothing of what its
+  detection asserted — each says the Case cannot be read as decided on evidence. Technique
+  rendering is not one of them. The framework states it as a SHOULD (§1.6, §2.5), and a Note that
+  cites `T1059.001` without its name is harder to read, not less true, less traceable or less
+  decided. Read as a conformance condition it did real damage: a host that refuses a Note discards
+  the Case's whole account of itself and runs triage again, and on a live incident the code that
+  triggered it was `T1055.011_x86.exe` — a file an Atomic Red Team test drops on disk, which is not
+  a citation at all. `check()` now returns `(failures, advisories)`; the CLI prints `ADVICE:` lines
+  beside the `FAIL:` ones, `--json` carries both lists, and the exit status still follows the
+  failures alone. A caller that wants to hold its Notes to the SHOULD can still fail its own build
+  on the advisories — what it can no longer do is throw a decided Case away over a spelling.
+  (ZeroSOC/zerosoc-skills#26, ZeroSOC/zerosoc-framework#73)
+
+- **A source profile declares the determinations each verdict admits.** A source may carry a
+  second axis beside its classification — what the activity *was*, not just whether it was real —
+  and an executor closing a Case in the source had nothing to read to know what it may write
+  there. `vocabularies.determination` names each word with the framework verdicts it may accompany;
+  `only` marks a verdict that admits a single word, which is not a choice to make. For the Defender
+  XDR profile a False Positive admits `notMalicious` and Insufficient Data `notEnoughDataToValidate`,
+  both `only`; a True Positive and a Benign are each offered several, and whoever closes the Case
+  picks the one that fits what was found. The checker holds the vocabulary to it: a verdict named
+  here is a verdict of the Case Schema, and a verdict cannot both admit one word and offer a choice.
+  The profile says what may be written; writing it is the host's.
 
 - **What a source recommends is indicative, and nothing enforces it any more.** Four places held a
   run to answering every recommended action the source published: `note_elements.py` refused a Note
