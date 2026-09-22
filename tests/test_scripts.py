@@ -372,23 +372,29 @@ class DecisionReadsWhatTheDetectionAsserts(unittest.TestCase):
         self.assertIn("what the detection asserts", " ".join(r["detection_notes"]))
         self.assertIn("alert_metadata.py", " ".join(r["detection_notes"]))
 
-    def test_a_recommendation_left_unread_holds_the_decision(self):
+    def test_a_recommendation_the_run_made_nothing_of_holds_nothing_up(self):
+        """§1.5: what a source recommends is indicative. It used to hold the decision until every
+        published action was followed or set aside with a reason, on sources that publish their
+        procedure per alert — which made the decision wait on a checklist rather than on evidence."""
         led = self.ledger()
         led["detection_metadata"]["alerts"][0]["recommended_actions"].append({"id": "RA2", "action": "Check other devices"})
-        r = triage.decide(led)
-        self.assertFalse(r["decision_ready"])
-        self.assertEqual(r["recommended_actions"]["open"], ["RA2"])
-        self.assertIn("RA2", " ".join(r["detection_notes"]))
-        self.assertEqual(r["decision"], "Close", "the coverage rule is unchanged; what changes is whether it may be acted on")
 
-    def test_set_aside_needs_a_reason_and_then_the_decision_is_ready(self):
+        r = triage.decide(led)
+
+        self.assertNotIn("decision_ready", r)
+        self.assertEqual(r["recommended_actions"]["open"], ["RA2"], "what nobody acted on is still reported")
+        self.assertEqual(r["decision"], "Close", "the coverage rule is unchanged")
+
+    def test_what_the_run_did_with_the_recommendations_is_still_reported(self):
+        """Reporting them is not requiring them: a reader of the decision is told what was run and
+        what was declined, and draws their own conclusion about what was left."""
         led = self.ledger()
         led["detection_metadata"]["alerts"][0]["recommended_actions"].append(
-            {"id": "RA2", "action": "Reset the user's password", "disposition": "set aside"})
-        self.assertFalse(triage.decide(led)["decision_ready"])
-        led["detection_metadata"]["alerts"][0]["recommended_actions"][-1]["reason"] = "no identity in scope"
+            {"id": "RA2", "action": "Reset the user's password", "disposition": "set aside",
+             "reason": "no identity in scope"})
+
         r = triage.decide(led)
-        self.assertTrue(r["decision_ready"])
+
         self.assertEqual(r["recommended_actions"], {"followed": ["RA1"], "set_aside": ["RA2"], "open": []})
 
     def test_a_neutralized_entity_is_recorded_and_never_taken_as_an_explanation(self):
@@ -972,18 +978,22 @@ class RunCheck(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("FAIL  triage: what the detection asserts is on the ledger", out)
 
-    def test_a_recommended_action_left_unread_fails_the_run(self):
-        run = self.run_dir()
+    def test_a_recommended_action_nobody_acted_on_is_reported_and_does_not_fail_the_run(self):
+        """§1.5: what a source recommends is indicative. This once failed the run; on a source that
+        publishes its procedure per alert that is a checklist rather than a check. What the run did
+        with them is reported, so a reader can see it, and nothing is required of it."""
         base = self.run_dir()
         with open(os.path.join(base, "ledger.triage.json"), encoding="utf-8") as f:
             ledger = json.load(f)
         ledger["detection_metadata"]["alerts"][0]["recommended_actions"].append({"id": "RA2", "action": "Check other devices"})
         with open(os.path.join(base, "ledger.triage.json"), "w", encoding="utf-8") as f:
             json.dump(ledger, f)
+
         code, out = self.check(base)
-        self.assertEqual(code, 1)
-        self.assertIn("FAIL  triage: every recommended action followed or set aside with a reason", out)
-        self.assertEqual(self.check(run)[0], 0, "the unchanged run still passes")
+
+        self.assertEqual(code, 0)
+        self.assertIn("note  triage: recommended actions", out)
+        self.assertIn("1 not acted on", out)
 
     def test_a_ledger_claiming_an_assertion_its_alerts_do_not_carry_fails(self):
         """The assertions are recomputed from the run's own alerts: the ledger does not get to

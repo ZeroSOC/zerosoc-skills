@@ -56,7 +56,7 @@ PREVENTS = {
     "threat name": "the threat or family name the Malicious hypothesis and the family-specific enrichment start from",
     "detection source": "how the Alert is weighed: a signature match and a model score are not the same evidence",
     "description": "what the detection fires on, which the False Positive conditions are judged against",
-    "recommended actions": "the source's own procedure for this detection, which is followed or set aside on the record",
+    "recommended actions": "the source's own procedure for this detection, indicative: the executor runs what bears on the Case",
     "remediation state": "whether the source already blocked, quarantined or removed each entity",
 }
 OTHER = {"type_id": 99, "type": "Other"}
@@ -108,10 +108,12 @@ def neutralized(record):
 
 
 def dispositions(actions):
-    """Which recommended actions were followed, which were set aside with a reason, which are still open.
+    """Which recommended actions the executor ran, which it declined with a stated reason, and
+    which it left alone.
 
-    §1.5: each is followed, or set aside with a **stated reason**. Set aside without one is not a
-    disposition, so it stays open and the Case is not decided on it.
+    §1.5: what a source recommends is indicative. One that was run produces a Finding like any
+    other check; one the executor left alone produces nothing, and is neither a failure nor an
+    entry on the Case. "open" is what nobody acted on — the ordinary case, not a debt.
     """
     followed, set_aside, open_ = [], [], []
     for action in actions or []:
@@ -272,10 +274,6 @@ def decision_notes(record, ledger=None):
     if missing:
         out.append("the source supplied no " + ", ".join(missing) +
                    ": record each as a visibility gap with the check it prevented, and never infer one from the alert title")
-    open_ = dispositions(actions_of(record))["open"]
-    if open_:
-        out.append("recommended actions still unread: " + ", ".join(str(i) for i in open_) +
-                   " — follow each, or set it aside with a stated reason, before the Case is decided")
     neutralized = [r for r in record.get("remediation", []) if r.get("neutralized")]
     if neutralized:
         out.append("the source already neutralized " + ", ".join(str(r.get("entity")) for r in neutralized) +

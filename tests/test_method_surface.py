@@ -132,12 +132,15 @@ class TheMethodSurface(unittest.TestCase):
 
         self.assertTrue(any("context carries a confidence" in f for f in note_elements.check(note, root=self.ELEMENTS_ROOT)[0]))
 
-    def test_a_recommended_action_nobody_answered_fails(self):
+    def test_a_recommended_action_nobody_acted_on_is_not_a_failure(self):
+        """§1.5: what a source recommends is indicative. A Note used to be refused until every
+        published action was answered — on a source that publishes its procedure per alert, which
+        is how a Case of three alerts produced a Note of sixty-seven findings."""
         note = self.note()
         note["detection_metadata"] = {"alerts": [{"id": "A1", "recommended_actions": [
             {"id": "RA1", "action": "Run a full scan", "disposition": None}]}]}
 
-        self.assertTrue(any("neither followed nor set aside" in f for f in note_elements.check(note, root=self.ELEMENTS_ROOT)[0]))
+        self.assertEqual(note_elements.check(note, root=self.ELEMENTS_ROOT), [])
 
     def test_a_recommendation_set_aside_with_a_reason_passes(self):
         note = self.note()
