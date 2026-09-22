@@ -312,9 +312,12 @@ class TheNoteCheck(unittest.TestCase):
                             for f in self.failures(note)))
 
     def test_the_findings_element_says_what_an_alert_finding_renders(self):
+        """The disposition of a recommended action is no longer among them: what the executor ran
+        renders as the Finding it produced, and what it did not run renders nowhere."""
         findings = next(e for e in note_elements.elements("triage", FRAMEWORK) if e["element"] == "findings")
-        for words in ("ID (Name)", "remediation state", "disposition of the recommended actions"):
+        for words in ("ID (Name)", "remediation state", "recommended action the executor ran"):
             self.assertIn(words, findings["renders"])
+        self.assertNotIn("disposition of the recommended actions", findings["renders"])
 
     def test_something_that_is_not_a_note_is_a_failure_and_not_a_traceback(self):
         for broken in ([], {"findings": "F1"}, ledger_note(findings=[{"id": "F1", "tag": "Malicious (High)"}])):

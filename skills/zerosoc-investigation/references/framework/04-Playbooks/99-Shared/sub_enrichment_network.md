@@ -5,7 +5,7 @@ last_updated: 2026-09-20
 license: Apache-2.0
 status: draft
 ---
-<!-- generated from zerosoc-framework@8ec487858137 : 04-Playbooks/99-Shared/sub_enrichment_network.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@25ac3ea17488 : 04-Playbooks/99-Shared/sub_enrichment_network.md — do not edit; regenerate with tools/build_references.py -->
 
 # Network Entity Enrichment
 
