@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+- **The Note check answers again.** #28 made `check()` return `(failures, advisories)` and #30
+  rewrote the same function; merged one after the other, `_asserted` was left returning one list
+  where `check()` unpacked two, so **every** Note raised `ValueError: not enough values to unpack`
+  instead of being checked. Nothing caught it because the tests that exercise the failing path go
+  through the module, and the two branches each passed on their own. A test now walks every path
+  through `check()` and asserts both lists come back, and the command-line tests cover the rest.
+
+- **A recommendation is answered where it was published.** The one check that remains — an action
+  the executor ran names the Finding it produced — read the actions of every alert as one list,
+  keyed by the number the source gave them. A source numbers its procedure **per alert**, so "RA7"
+  is one instruction on one alert and another on the next: an answer given for one alert's RA7 was
+  read as an answer for every alert's, and a live 59-alert Case whose Note was complete was refused
+  for two recommendations that had each been answered where they were published. The check now
+  reads them per alert, and names the alert when it refuses.
+
 ## Unreleased — conforms to zerosoc-framework@80af9d7
 
 - **The Note check reports advisories beside the failures, and only a failure refuses a Note.**
