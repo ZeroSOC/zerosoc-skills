@@ -118,13 +118,16 @@ class TheMethodSurface(unittest.TestCase):
 
         self.assertTrue(any("cites no event" in f for f in note_elements.check(note, root=self.ELEMENTS_ROOT)[0]))
 
-    def test_a_bare_technique_code_is_advised_and_does_not_fail_the_note(self):
+    def test_a_bare_technique_code_is_nothing_this_script_reports(self):
+        """`ID (Name)` is guidance given to whoever writes the Note, not a property read back off
+        it. The check reported a bare code as an advisory and reported nothing else, which made an
+        executor answer for a spelling in a run whose Note was otherwise conformant."""
         note = self.note()
         note["findings"][0]["finding"] = "T1486 was observed"
         failures, advisories = note_elements.check(note, root=self.ELEMENTS_ROOT)
 
-        self.assertTrue(any("written bare" in a for a in advisories))
-        self.assertEqual(failures, [], "the framework states the rendering as a SHOULD")
+        self.assertEqual(failures, [])
+        self.assertEqual(advisories, [])
 
     def test_context_that_carries_a_confidence_fails(self):
         note = self.note()
@@ -223,23 +226,14 @@ class TheNoteCheck(unittest.TestCase):
 
         self.assertEqual(self.failures(note), [])
 
-    def test_a_sub_technique_written_as_the_framework_writes_it_is_not_bare(self):
-        for written in ("T1114.003 (Email Forwarding Rule)", "T1021.002 (SMB/Windows Admin Shares)",
-                        "AML.T0051.000 (LLM Prompt Injection)", "**T1486** (Data Encrypted for Impact)",
-                        "`T1486` (Data Encrypted for Impact)"):
-            note = ledger_note()
-            note["findings"][0]["desc"] = f"Observed: {written}"
-            with self.subTest(written=written):
-                self.assertEqual(self.failures(note), [])
-
-    def test_a_bare_code_is_advised_wherever_the_note_writes_it(self):
+    def test_however_a_note_writes_a_technique_code_it_is_conformant(self):
         for where, note in (("finding", ledger_note()), ("summary", ledger_note(summary="T1486 was seen on ws-01")),
                             ("rationale", ledger_note(rationale="T1114.003 stands uncovered"))):
             if where == "finding":
                 note["findings"][0]["desc"] = "T1114.003 observed"
             with self.subTest(where=where):
-                self.assertTrue(any("written bare" in a for a in self.advisories(note)), where)
                 self.assertEqual(self.failures(note), [], where)
+                self.assertEqual(self.advisories(note), [], where)
 
     def test_a_side_needs_a_confidence_the_framework_has(self):
         for confidence in (None, 0, "Unknown", "certain"):
@@ -284,8 +278,7 @@ class TheNoteCheck(unittest.TestCase):
         self.assertTrue(any("what its detection asserted" in f for f in self.failures(note)))
         note = ledger_note()
         note["detection_metadata"]["alerts"][0]["techniques"][0]["rendered"] = "T1114.003"
-        self.assertTrue(any("written bare" in a for a in self.advisories(note)))
-        self.assertEqual(self.failures(note), [])
+        self.assertEqual(self.failures(note), [], "an unnamed technique is still what the detection asserted")
         note = ledger_note()
         note["detection_metadata"]["alerts"][0]["absent"] = ["threat name"]
         self.assertTrue(any("threat name" in f and "Visibility Gap" in f for f in self.failures(note)))
@@ -361,24 +354,6 @@ class TheNoteCheck(unittest.TestCase):
         empty = ledger_note(findings=[], alerts=[])
         del empty["detection_metadata"]
         self.assertTrue(any("Findings" in f for f in self.failures(empty)))
-
-    def test_a_code_in_a_link_is_an_address_and_not_a_bare_code(self):
-        for written in ("See [T1486 (Data Encrypted for Impact)](https://attack.example/techniques/T1486/).",
-                        "[T1114.003](https://attack.example/techniques/T1114/003/) (Email Forwarding Rule)",
-                        "T1486 (Data Encrypted for Impact): https://attack.example/techniques/T1486/"):
-            with self.subTest(written=written[:30]):
-                self.assertEqual(self.failures(ledger_note(summary=written)), [])
-
-    def test_a_bare_code_in_what_a_finding_renders_beside_its_text_is_advised(self):
-        for name in ("retraction_reason", "analytic"):
-            note = ledger_note()
-            note["findings"][0][name] = "T1486 refuted by the file listing"
-            with self.subTest(field=name):
-                self.assertTrue(any("written bare" in a for a in self.advisories(note)))
-        note = ledger_note()
-        note["alerts"][0]["technique"] = "T1003"
-        note["findings"][0]["artifact"] = "hash:T1486"
-        self.assertEqual(self.advisories(note), [], "the ledger's own codes are data, not the Note's prose")
 
     def test_a_required_element_holds_something_a_reader_can_read(self):
         for held in (True, 5, "None."):

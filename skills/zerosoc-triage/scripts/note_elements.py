@@ -15,9 +15,8 @@ the executor renders the content.
 Without --note it prints the elements of that Note kind, in order, with what each must contain.
 With --note it also checks an assembled Note and exits 1 on any failure. A **failure** is a
 conformance condition. What the framework states as a SHOULD is reported beside them as an
-**advisory**, which does not fail the Note: how a Note spells an identifier is a property of how it
-reads, not of whether the Case was decided on evidence, and a Note refused over one is a Case
-decided by nobody.
+**advisory**, which does not fail the Note; the framework states none this script can check, so
+the list comes back empty and the channel stays for the SHOULD that arrives next.
 
 note.json is **the ledger with the prose beside it** — the ledger of triage_decide.py or resolve.py, so
 nothing is copied into a second shape, plus one field per element the framework names:
@@ -43,11 +42,6 @@ try:
 except ImportError:  # the shared script is copied next to this one by tools/build_references.py
     dispositions = None
 
-# a technique code that no "(Name)" follows. The code is taken whole — a sub-technique's ".003"
-# and a bold or code mark around it included — before the name is looked for, so that
-# "T1114.003 (Email Forwarding Rule)" is never read as a bare "T1114"
-TECHNIQUE_BARE = re.compile(r"(?<![\w./])((?:AML\.)?T\d{4}(?:\.\d{3})?)(?![\d.]*\d)(?![*`_\]]*\s*\()")
-ADDRESS = re.compile(r"\]\([^)\s]*\)|https?://\S+")  # a link's target and a bare URL: an address, not prose
 HERE = os.path.dirname(os.path.abspath(__file__))
 FRAMEWORK = os.path.normpath(os.path.join(HERE, "..", "references", "framework"))
 METHOD = os.path.join("03-Processes", "02-detection_and_analysis.md")
@@ -151,26 +145,12 @@ def _blank(value):
     return True  # a number or a flag is not an element of a Note
 
 
-def _texts(value, depth=0):
-    if isinstance(value, str):
-        yield value
-    elif depth < 12 and isinstance(value, dict):
-        for held in value.values():
-            yield from _texts(held, depth + 1)
-    elif depth < 12 and isinstance(value, (list, tuple)):
-        for held in value:
-            yield from _texts(held, depth + 1)
-
-
 def _listed(value):
     """What a field that lists things holds, however it was written: one item is a list of one."""
     if value is None:
         return []
     return list(value) if isinstance(value, (list, tuple)) else [value]
 
-
-def _bare(text):
-    return TECHNIQUE_BARE.findall(ADDRESS.sub("]", str(text)))
 
 
 def _read(finding):
@@ -195,11 +175,10 @@ def check(note, kind=None, root=FRAMEWORK):
     Case cannot be read from it as decided — a Finding that cites no event, a side with no
     confidence, a recommended action left without a disposition. A caller refuses a Note on one.
 
-    An **advisory** is what the framework states as a SHOULD (§1.6, §2.5: technique codes SHOULD be
-    written as `ID (Name)`). It is returned beside the failures and never refuses the Note. The
-    difference is what the rule protects: a Note that cites T1059.001 without its name is harder to
-    read; it is not less true, less traceable or less decided, and discarding the Note discards the
-    Case's whole account of itself to fix a spelling.
+    An **advisory** is what the framework states as a SHOULD. It is returned beside the failures
+    and never refuses the Note. No SHOULD is checked here today: how a Note spells a technique
+    identifier is guidance the executor is given where it writes the Note, not a property this
+    script reads back off it.
 
     Both lists empty means conformant, and well-formed with it.
     """
@@ -244,18 +223,6 @@ def check(note, kind=None, root=FRAMEWORK):
             failures.append(f"{where}: context carries a confidence; context bears on no hypothesis")
         if not cited:
             failures.append(f"{where}: cites no event; a Finding without a traceable reference is not conformant")
-
-    # "whenever technique codes appear in a Note": every element's text. Of a finding, what the Note
-    # renders — its text, what produced it, why it was retracted — and not the ledger's own data
-    for element in listed:
-        if element["element"] == "findings":
-            texts = [t for f in findings for name in ("desc", "finding", "analytic", "retraction_reason")
-                     for t in _texts(f.get(name))]
-        else:
-            texts = list(_texts(note.get(element["element"])))
-        for bare in sorted({b for text in texts for b in _bare(text)}):
-            advisories.append(f"{element['name']}: technique {bare} is written bare; the framework says a Note "
-                              "SHOULD write ID (Name)")
 
     gaps = _listed(note.get("visibility_gaps"))
     for gap in gaps:
@@ -304,12 +271,6 @@ def _asserted(note, alerts, findings, finding_ids, recorded_gaps):
                         "what its detection asserted")
     actions = []
     for alert in record.get("alerts") or []:
-        for technique in _listed(alert.get("techniques")):
-            rendered = str((technique.get("rendered") or technique.get("id") or "") if isinstance(technique, dict) else technique)
-            if _bare(rendered):
-                advisories.append(f"alert {alert.get('id')}: technique {rendered} is written bare; the framework says "
-                                  "a Note SHOULD write ID (Name) — a technique its tables do not hold is named as "
-                                  "ATT&CK or ATLAS names it")
         for absent in _listed(alert.get("absent")):
             if f"alert metadata: {absent}".lower() not in recorded_gaps:
                 failures.append(f"alert {alert.get('id')}: the source did not supply the {absent}, and no "
