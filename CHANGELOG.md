@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **How a Note spells a technique is guidance, not a conformance check.** The check reported a bare
+  technique code as an advisory, because §1.6 states the `ID (Name)` rendering as a SHOULD. It goes
+  with the checks #30 removed: the framework is indicative about what an executor examines, and a
+  rule about how a Note spells an identifier it has already grounded in events is the same kind of
+  prescription in a smaller place. Measured on a live Case: 28 findings, every one grounded, every
+  Alert rendering what its detection asserted — and the only thing the check had to say was that
+  `T1053` appeared once without its name. The recommendation stays in the rule files and both
+  `SKILL.md`s, and `alert_metadata.py` still renders the names the framework's tables hold; nothing
+  reads the Note back to check the spelling. The advisory channel stays with no producer: #28 built
+  it for what the framework states as a SHOULD, and the next one needs somewhere to arrive.
+
 - **The pin follows the framework to 25ac3ea.** Two releases of the method, taken together.
 
   A Note renders **the account before the measures**: Summary, Classification, Rationale, Findings,
