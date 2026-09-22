@@ -151,8 +151,8 @@ Read per alert: the playbook section the script prints.
 10. **Write the Triage Note.** The Note renders the Case and holds no state of its own: everything it shows is already
    on the Case, sampled at this gate. `python3 scripts/note_elements.py --kind triage` prints the elements in order
    and what each must contain, and `--note note.json` — the ledger with one field per element beside it — checks the
-   Note against the framework's rules. It reports what the framework requires as **failures** and what it states as a
-   SHOULD as **advisories**, and only a failure means the Note may not be written. The script renders the
+   Note against the framework's rules. It reports what the framework requires as **failures**, and a failure is
+   the only thing it reports: the Note may not be written while one stands. The script renders the
    **structure** and runs the **checks**; the prose is
    yours ([rules/note-prose.md](rules/note-prose.md)). The canonical element list is [Detection & Analysis
    §1.6](references/framework/03-Processes/02-detection_and_analysis.md), and the order is part of it —
@@ -170,10 +170,9 @@ Read per alert: the playbook section the script prints.
    References element: the check that produced a Finding is rendered beside that Finding, and so are the events it
    cites.
    Name it `triage_note_<case-id>_<YYYYMMDD-HHMM>`.
-   Technique codes are always `ID (Name)`: `scripts/alert_metadata.py` renders the ones the framework's
-   tables name, and for the rest write the ATT&CK or ATLAS name. A code left bare does not refuse the Note —
-   §1.6 states the rendering as a SHOULD — but the check reports it as an advisory, and a Note that cites a
-   code it does not name is below standard.
+   Write technique codes as `ID (Name)`: `scripts/alert_metadata.py` renders the ones the framework's
+   tables name, and for the rest write the ATT&CK or ATLAS name. §1.6 states this as a SHOULD and it is
+   guidance to you here — nothing reads the Note back to check its spelling.
    Summarize evidence in the Note and never paste raw logs — what the Note summarizes, the Case
    keeps: the events each Finding rests on stay on the Case and the Note cites them
    ([Case Schema §3](references/framework/02-Taxonomy/case_schema.md)).
