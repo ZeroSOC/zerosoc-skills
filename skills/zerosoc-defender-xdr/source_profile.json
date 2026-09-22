@@ -229,6 +229,98 @@
         "note": "activity that was real and expected: the framework's Benign, authorized activity that legitimately matched the detection"
       }
     },
+    "determination": {
+      "multiStagedAttack": {
+        "verdict_ids": [
+          2
+        ],
+        "name": "Multistage attack"
+      },
+      "malware": {
+        "verdict_ids": [
+          2
+        ],
+        "name": "Malware"
+      },
+      "unwantedSoftware": {
+        "verdict_ids": [
+          2
+        ],
+        "name": "Unwanted software"
+      },
+      "phishing": {
+        "verdict_ids": [
+          2
+        ],
+        "name": "Phishing"
+      },
+      "compromisedAccount": {
+        "verdict_ids": [
+          2
+        ],
+        "name": "Compromised account"
+      },
+      "maliciousUserActivity": {
+        "verdict_ids": [
+          2
+        ],
+        "name": "Malicious user activity"
+      },
+      "apt": {
+        "verdict_ids": [
+          2
+        ],
+        "name": "APT"
+      },
+      "securityTesting": {
+        "verdict_ids": [
+          5
+        ],
+        "name": "Security testing"
+      },
+      "lineOfBusinessApplication": {
+        "verdict_ids": [
+          5
+        ],
+        "name": "Line-of-business application"
+      },
+      "confirmedActivity": {
+        "verdict_ids": [
+          5
+        ],
+        "name": "Confirmed activity"
+      },
+      "securityPersonnel": {
+        "verdict_ids": [
+          5
+        ],
+        "name": "Security personnel"
+      },
+      "notMalicious": {
+        "verdict_ids": [
+          1
+        ],
+        "name": "Not malicious",
+        "only": true,
+        "note": "the one determination a False Positive admits: the activity the detection reported was not there"
+      },
+      "notEnoughDataToValidate": {
+        "verdict_ids": [
+          7
+        ],
+        "name": "Not enough data to validate",
+        "only": true,
+        "note": "Insufficient Data: the checks could not be run or answered, and the record says so rather than claiming a verdict"
+      },
+      "other": {
+        "verdict_ids": [
+          2,
+          5
+        ],
+        "name": "Other",
+        "note": "a True Positive or a Benign whose kind none of the words above states"
+      }
+    },
     "analytic_types": {
       "customDetection": {
         "type_id": 1,

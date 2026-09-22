@@ -245,6 +245,37 @@ def lands(profile: dict[str, Any], case_schema: dict[str, Any], where: str) -> l
             if allowed is not None and held["id"] not in allowed:
                 problems.append(f"{where}: vocabularies.{name}.{word} is {held['id']}, which is no {field} "
                                 f"of the Case Schema ({', '.join(map(str, allowed))})")
+    problems += _determination(profile, case_schema, where)
+    return problems
+
+
+def _determination(profile: dict[str, Any], case_schema: dict[str, Any], where: str) -> list[str]:
+    """The source's account of what the activity was: each word names the verdicts it may be
+    written with, and a verdict that admits one word says so on that word alone.
+
+    An executor closing a Case in the source reads this to know what it may write. Two words
+    marked `only` for the same verdict, or one marked `only` beside others that offer themselves
+    for it, is a vocabulary that answers a closure with two answers — which is the one thing an
+    executor cannot do anything sensible with.
+    """
+    problems: list[str] = []
+    allowed = (case_schema.get("properties") or {}).get("verdict_id", {}).get("enum")
+    words = (profile["vocabularies"].get("determination") or {}).items()
+    for word, held in words:
+        for verdict in held["verdict_ids"]:
+            if allowed is not None and verdict not in allowed:
+                problems.append(f"{where}: vocabularies.determination.{word} names verdict {verdict}, which is "
+                                f"no verdict_id of the Case Schema ({', '.join(map(str, allowed))})")
+    for verdict in sorted({v for _w, held in words for v in held["verdict_ids"]}):
+        offered = [w for w, held in words if verdict in held["verdict_ids"]]
+        sole = [w for w in offered if (profile["vocabularies"]["determination"][w]).get("only")]
+        if sole and offered != sole:
+            problems.append(f"{where}: verdict {verdict} has vocabularies.determination.{sole[0]} marked `only` "
+                            f"and is also offered {', '.join(w for w in offered if w not in sole)}: a verdict "
+                            "admits one word or a choice of them, never both")
+        if len(sole) > 1:
+            problems.append(f"{where}: verdict {verdict} has {len(sole)} determinations marked `only` "
+                            f"({', '.join(sole)}); `only` says there is nothing to choose")
     return problems
 
 

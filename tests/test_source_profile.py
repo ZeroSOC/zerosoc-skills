@@ -195,6 +195,28 @@ class Coherence(unittest.TestCase):
                          {"unknown": 0, "falsePositive": 1, "truePositive": 2, "informationalExpectedActivity": 5})
         self.assertEqual(self.profile["fields"]["case"]["classification"], "classification")
 
+    def test_the_source_proposes_a_determination_for_each_verdict_it_can_be_closed_with(self) -> None:
+        """What an executor writing a closure into the source may say the activity WAS. A verdict
+        with one admissible word carries it marked `only` and is written without a choice being
+        made; the rest are proposed, and whoever closes the Case picks among them."""
+        determination = self.profile["vocabularies"]["determination"]
+        sole = {word: held["verdict_ids"] for word, held in determination.items() if held.get("only")}
+
+        self.assertEqual(sole, {"notMalicious": [1], "notEnoughDataToValidate": [7]})
+        for verdict in (2, 5):
+            offered = [w for w, held in determination.items() if verdict in held["verdict_ids"]]
+            self.assertGreater(len(offered), 1, f"verdict {verdict} proposes nothing to choose between")
+        self.assertEqual(check_profiles.lands(self.profile, self.case_schema(), "p"), [])
+
+    def test_a_verdict_admits_one_determination_or_a_choice_of_them_never_both(self) -> None:
+        self.profile["vocabularies"]["determination"]["other"]["verdict_ids"] = [1, 2, 5]
+        found = "\n".join(check_profiles.lands(self.profile, self.case_schema(), "p"))
+        self.assertIn("notMalicious", found)
+        self.assertIn("never both", found)
+        self.profile["vocabularies"]["determination"]["phishing"]["verdict_ids"] = [99]
+        self.assertIn("no verdict_id of the Case Schema",
+                      "\n".join(check_profiles.lands(self.profile, self.case_schema(), "p")))
+
     def test_a_vocabulary_names_only_values_the_case_schema_has(self) -> None:
         self.assertEqual(check_profiles.lands(self.profile, self.case_schema(), "p"), [])
         self.profile["vocabularies"]["verdict"]["truePositive"]["id"] = 3
