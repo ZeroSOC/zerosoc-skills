@@ -42,7 +42,12 @@ except ImportError:  # the shared script is copied next to this one by tools/bui
 # a technique code that no "(Name)" follows. The code is taken whole — a sub-technique's ".003"
 # and a bold or code mark around it included — before the name is looked for, so that
 # "T1114.003 (Email Forwarding Rule)" is never read as a bare "T1114"
-TECHNIQUE_BARE = re.compile(r"(?<![\w./])((?:AML\.)?T\d{4}(?:\.\d{3})?)(?![\d.]*\d)(?![*`_\]]*\s*\()")
+TECHNIQUE_BARE = re.compile(
+    r"(?<![\w./])((?:AML\.)?T\d{4}(?:\.\d{3})?)(?![\d.]*\d)(?![_-]|\.\w)(?![*`_\]]*\s*\()"
+)
+r"""A technique code written without its name. `(?![_-]|\.\w)` keeps a filename out of it:
+`T1105.txt`, `T1055.011_x86.exe` and `T1218.007_JScript.msi` are what Atomic Red Team tests drop on
+disk, and a Note that cites the file by name is not citing a technique."""
 ADDRESS = re.compile(r"\]\([^)\s]*\)|https?://\S+")  # a link's target and a bare URL: an address, not prose
 HERE = os.path.dirname(os.path.abspath(__file__))
 FRAMEWORK = os.path.normpath(os.path.join(HERE, "..", "references", "framework"))

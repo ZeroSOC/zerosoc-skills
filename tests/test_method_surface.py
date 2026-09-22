@@ -124,6 +124,30 @@ class TheMethodSurface(unittest.TestCase):
 
         self.assertTrue(any("written bare" in f for f in note_elements.check(note, root=self.ELEMENTS_ROOT)))
 
+    def test_a_file_named_after_a_technique_is_not_a_bare_technique_code(self):
+        """A test that drops `T1105.txt` on disk makes the filename evidence, and a Note that cites
+        the file by name is citing a file. Refusing the Note for it costs the Case everything over
+        a spelling rule that was never about spelling."""
+        for written in (
+            "the file T1105.txt was created",
+            "quarantined T1486.7z",
+            "T1059.001.dll",
+            "T1055.011_x86.exe was written to disk",   # Atomic Red Team names its artefacts
+            "ran T1218.007_JScript.msi",
+        ):
+            note = self.note()
+            note["findings"][0]["finding"] = written
+            with self.subTest(written=written):
+                failures = note_elements.check(note, root=self.ELEMENTS_ROOT)
+                self.assertEqual([f for f in failures if "written bare" in f], [])
+
+    def test_a_technique_code_ending_a_sentence_is_still_bare(self):
+        """The guard is for a filename, not for punctuation: a full stop after the code is prose."""
+        note = self.note()
+        note["findings"][0]["finding"] = "The actor used T1486."
+
+        self.assertTrue(any("written bare" in f for f in note_elements.check(note, root=self.ELEMENTS_ROOT)))
+
     def test_context_that_carries_a_confidence_fails(self):
         note = self.note()
         note["findings"][0]["tag"] = {"side": "context", "confidence_id": 2}
