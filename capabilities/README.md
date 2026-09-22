@@ -29,6 +29,37 @@ Three optional keys: `data_source_notes` (data source → why it is unavailable 
 gap), `source_profiles` (source identifier → the source profile of that technology) and
 `source_profile_overrides` (source identifier → a [local override](#a-local-override) of that profile).
 
+### Availability is an entitlement, not an empty result
+
+`data_sources` answers *whether the deployment is entitled to the source*, never whether that source
+happens to hold data today. The two come apart in both directions, and reading one for the other is a
+wrong answer rather than a missing one:
+
+- A source the deployment **has** can be empty because the thing it records has not happened. A table
+  that only fills when an automatic response acts is empty on every day nothing acted.
+- A source the deployment **does not have** can look identical. Where a licensing tier simply never
+  writes a source, querying it succeeds and returns nothing — the same nothing.
+
+So a deployment whose tier does not provide a source writes `false` and says why in
+`data_source_notes`. The executor then records a visibility gap naming the check it could not run, which
+is the honest outcome; an empty result read as "it did not happen" is a finding the evidence does not
+support, and §1.5 makes an absence a gap rather than an answer.
+
+This bears on **what a source already did**. Where a technology performs automatic containment, what it
+contained may be readable only from a source the lower tiers do not write. An executor that cannot read
+it does not conclude that nothing was contained: it records the gap, and the deployment's own console
+answers it.
+
+**This rule is one of four questions, and the narrowest.** Whether the deployment *has* a source says
+nothing about whether it is deployed across the scope the playbook assumes, whether it is logging
+correctly and in a shape the check can read, or whether it is configured to record the fields the check
+needs — process-creation logging without command-line capture is present, healthy, and silent on the
+question asked. A boolean in `data_sources` cannot express any of those, so `true` means "the deployment
+has this", never "this will answer". Treating it as the whole of data availability overstates it. The
+framework question is open in
+[zerosoc-framework#72](https://github.com/ZeroSOC/zerosoc-framework/issues/72); until it settles, this
+rule is a tactical correction to the one part that was being read wrongly.
+
 ## Source profiles
 
 A **source profile** is one versioned home for what one technology's records mean in the framework's
