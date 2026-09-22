@@ -253,8 +253,8 @@ def check(note, kind=None, root=FRAMEWORK):
 
 
 def _asserted(note, alerts, findings, finding_ids, recorded_gaps):
-    """§1.6 item 3: each Alert Finding renders what its detection asserted, and the dispositions of
-    the recommended actions render with the Findings. Triage keeps the Case's alerts in "alerts";
+    """§1.6: each Alert Finding renders what its detection asserted, and a recommended action the
+    executor ran renders as the Finding it produced. Triage keeps the Case's alerts in "alerts";
     investigation keeps them among its findings, each with its "alert_type"."""
     failures = []
     among = [f for f in findings if f.get("alert_type")]
@@ -296,15 +296,18 @@ def _asserted(note, alerts, findings, finding_ids, recorded_gaps):
         for action in _listed(alert.get("recommended_actions")):
             if isinstance(action, dict):
                 actions.append(action)
-            else:
-                failures.append(f"alert {alert.get('id')}: the recommended action {action!r} carries no disposition")
-    state = dispositions(actions) if dispositions else {"open": [a.get("id") for a in actions], "followed": []}
+    # What a source recommends is indicative (§1.5). An action the executor RAN renders as the
+    # Finding it produced, and is held to naming it. One it did not run is not a failure and not
+    # an entry: a Note recording every published action as considered-and-irrelevant states the
+    # source's checklist in place of the Case's own account of itself. This once required the
+    # opposite — every action answered — on sources that publish their procedure per alert, which
+    # is how a Case of three alerts produced a Note of sixty-seven findings, six of which decided
+    # it.
+    ran = dispositions(actions)["followed"] if dispositions else []
     for action in actions:
-        if action.get("id") in state["open"]:
-            failures.append(f"recommended action {action.get('id')} is neither followed nor set aside with a stated reason")
-        elif action.get("id") in state["followed"] and str(action.get("finding") or "") not in finding_ids:
-            failures.append(f"recommended action {action.get('id')} was followed and names no Finding it produced: "
-                            "one followed renders as that Finding, naming the recommendation it came from")
+        if action.get("id") in ran and str(action.get("finding") or "") not in finding_ids:
+            failures.append(f"recommended action {action.get('id')} was run and names no Finding it produced: "
+                            "one run renders as that Finding, naming the recommendation it came from")
     return failures
 
 

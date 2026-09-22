@@ -100,8 +100,9 @@ per Case: the playbook the script prints.
 6. **What the source already did is not coverage.** An entity the source blocked, quarantined or removed
    carries no side and no confidence at this gate either: it is an action the Case records, and the
    questions it leaves open — how the entity arrived, what ran before it was stopped, whether the same
-   thing is elsewhere — are exactly what the validation queries answer. A recommended action still unread
-   is followed or set aside with a stated reason before the Case resolves; `scripts/resolve.py` names both.
+   thing is elsewhere — are exactly what the validation queries answer. The source's recommended actions are
+   indicative (§1.5): run the ones that bear on the Case, record each you run as the Finding it produced,
+   and leave the rest alone.
 7. **Mark coverage.** When the Benign explanation accounts for a Medium or High Malicious finding, set
    `covered: true` on it; uncovered Low Malicious findings never block a Benign verdict, they lower its
    confidence and are listed as residual observations.

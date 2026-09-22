@@ -2,6 +2,19 @@
 
 ## Unreleased — conforms to zerosoc-framework@a5ef27c
 
+- **What a source recommends is indicative, and nothing enforces it any more.** Four places held a
+  run to answering every recommended action the source published: `note_elements.py` refused a Note
+  carrying one without a disposition, `triage_decide.py` printed `DECISION NOT READY` and withheld
+  `decision_ready`, `check_run.py` failed the run, and `alert_metadata.py` told the executor to go
+  back and answer them. All four are gone, following the framework's §1.5. A source publishes its
+  procedure on every alert it raises: measured on a live tenant, a 59-alert Case published 684
+  recommended actions — 107 distinct instructions — and a **three-alert** Case produced a Triage
+  Note of 67 findings, six of which decided it. What the executor **ran** is still held to naming
+  the Finding it produced; what it did not run is neither a failure nor an entry, because a line
+  recording that a recommendation was considered and found irrelevant is not evidence. The scripts
+  still **report** what was run, declined and left alone — reporting is not requiring, and a reader
+  of a decision can draw their own conclusion about what was left.
+
 - **The alert-type map covers the alert titles four real incidents actually raised.** The map reads
   an alert, never the incident that holds it: measured over the alerts of whole incidents read from
   a lab tenant, 43 of 93 alerts across 13 distinct alert titles matched no rule and kept their own

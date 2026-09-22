@@ -23,8 +23,8 @@ Alerts are the first Malicious findings at the tool's confidence, or at the leve
 The confidence leaving triage rises on independent alerts of different types **or techniques**, which are
 the techniques the detections named. The coverage rule itself is unchanged: what the source already
 neutralized is reported with the decision and never weighed into it — a block is a response, not an
-explanation — and a recommended action the run has neither followed nor set aside with a reason leaves
-`decision_ready` false, so the rule is computed but not yet acted on.
+explanation. What a source recommends is indicative (§1.5): a recommendation the run made nothing of
+holds nothing up.
 "event_refs" are the events a finding rests on, "first_seen" is when the thing it reports happened (not
 when the finding was made) and "timeline" flags it for the Case Timeline: this rule reads none of them, and
 note_elements.py and timeline.py read them from this same ledger.
@@ -124,8 +124,8 @@ def _decide(ledger):
 def decide(ledger):
     """The §1.5 decision, with the evidence inventory and what the detection asserts read at the gate.
 
-    The coverage rule is untouched by either: an incomplete inventory and an unread recommendation are
-    reported, and `decision_ready` says whether the decision may be acted on yet.
+    The coverage rule is untouched by either: an incomplete inventory is reported beside the
+    decision, and what the source recommends is indicative and holds nothing up.
     """
     r = _decide(ledger)
     inventory = inventory_note(ledger.get("evidence_inventory")) if inventory_note else None
@@ -139,7 +139,6 @@ def decide(ledger):
         r["neutralized_entities"] = neutralized(record)
         if record.get("candidate_incident_categories"):
             r["candidate_incident_categories"] = record["candidate_incident_categories"]
-    r["decision_ready"] = not r.get("recommended_actions", {}).get("open")
     return r
 
 
@@ -168,8 +167,6 @@ def main():
         print("Candidate Incident Categories from the techniques the detections named: " + ", ".join(r["candidate_incident_categories"]))
     if r.get("evidence_inventory_note"): print("Note: " + r["evidence_inventory_note"])
     for note in r.get("detection_notes", []): print("Note: " + note)
-    if not r.get("decision_ready"):
-        print("DECISION NOT READY: a recommended action is neither followed nor set aside with a reason (§1.5).")
 
 
 if __name__ == "__main__":

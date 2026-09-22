@@ -80,10 +80,12 @@ Read per alert: the playbook section the script prints.
      sub-technique falling back to its parent). One the framework's tables do not hold widens nothing,
      and is recorded on the Case and named in the Note rather than dropped or renamed.
    - Take the **threat name and family** to step 6: they direct the enrichment and seed the hypotheses.
-   - **Follow each recommended action, or set it aside with a stated reason**, and record the disposition
-     on the action: `"disposition": "followed"` with the finding it produced, tagged like any other check
-     on the evidence it returned, or `"disposition": "set aside"` with `"reason"`.
-     `scripts/triage_decide.py` refuses to call the decision ready while one is unread.
+   - **The recommended actions are indicative** (§1.5): read them as a set — the same instruction is
+     one instruction however many alerts published it — and **run the ones that bear on this Case**.
+     One you run is recorded on the action as `"disposition": "followed"` with the finding it produced,
+     tagged like any other check on the evidence it returned; one you decline for a stated reason is
+     recorded as `"disposition": "set aside"` with `"reason"`. One you simply do not act on is recorded
+     nowhere: a line saying a recommendation was considered and found irrelevant is not evidence.
    - Aim the checks of step 6 where the **remediation state** leaves them: at the entities the source left
      **active** first, and at what a block does not answer — how the entity arrived, what ran before it
      was stopped, whether the same thing is elsewhere. The state is recorded, never weighed (§1.5).
@@ -136,10 +138,8 @@ Read per alert: the playbook section the script prints.
    campaign-level Case with severity for the campaign scope.
 8. **Classify** (§1.4). Validate or override the source `severity_id` from asset criticality, identity
    privilege and blast radius, and state why. Record `impact_id` only when already known; never guess.
-9. **Decide** by the coverage rule: `python3 scripts/triage_decide.py ledger.json`. It prints
-   `DECISION NOT READY` while a recommended action of step 3 is neither followed nor set aside with a
-   reason, and it repeats what the source already neutralized, so that no Case is closed because
-   everything in it was blocked. The script closes
+9. **Decide** by the coverage rule: `python3 scripts/triage_decide.py ledger.json`. It repeats what the source already
+   neutralized, so that no Case is closed because everything in it was blocked. The script closes
    only when no Malicious finding exists beyond the alerts *and* the Benign findings cover every alert
    (a High alert only by a `Benign (High)` finding; a Low or Medium alert by Benign weights summing above
    its own); otherwise it promotes, including when there is no finding at all. It also computes the
@@ -197,8 +197,8 @@ Read per alert: the playbook section the script prints.
 ## Completion criteria
 
 Exactly one outcome recorded; the Triage Note conformant (every tagged Finding has an event reference,
-what each detection asserted rendered with its Alert, every recommended action followed or set aside with
-a reason, Visibility Gaps stated); on Promote the contract populated; on Close the verdict and its
+what each detection asserted rendered with its Alert, each recommended action you ran rendered as the
+Finding it produced, Visibility Gaps stated); on Promote the contract populated; on Close the verdict and its
 emission done.
 A Note whose Findings lack event references, or a close that leaves an alert uncovered, is
 non-conformant and voids the run.
