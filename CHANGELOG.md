@@ -10,8 +10,13 @@
   Alert rendering what its detection asserted — and the only thing the check had to say was that
   `T1053` appeared once without its name. The recommendation stays in the rule files and both
   `SKILL.md`s, and `alert_metadata.py` still renders the names the framework's tables hold; nothing
-  reads the Note back to check the spelling. The advisory channel stays with no producer: #28 built
-  it for what the framework states as a SHOULD, and the next one needs somewhere to arrive.
+  reads the Note back to check the spelling.
+
+- **The check answers with failures and nothing else.** With the technique advisory gone nothing
+  produced an advisory, so the second list was a channel with no source. `check()` and `_asserted()`
+  answer with a list; the CLI prints `FAIL:` lines and no `ADVICE:` lines. #28 added the split so a
+  SHOULD could be reported without refusing a Note, and the one SHOULD it carried is now guidance
+  given where the Note is written.
 
 - **The pin follows the framework to 25ac3ea.** Two releases of the method, taken together.
 
