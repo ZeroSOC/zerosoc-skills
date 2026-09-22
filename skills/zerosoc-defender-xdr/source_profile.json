@@ -809,7 +809,7 @@
     },
     {
       "path": "description",
-      "ignored": "the source's own narrative of the incident, generated from its alerts. What §1.1 requires is each alert's description, which is read; the Case's account is its Notes"
+      "case": "microsoft.description"
     },
     {
       "path": "summary",
@@ -1392,6 +1392,11 @@
         "type": "string",
         "from": "status",
         "description": "The source's own status, in its own word."
+      },
+      "description": {
+        "type": "string",
+        "from": "description",
+        "description": "The source's own narrative of the incident, seeded from the alert that raised it. It says what the incident is about in the source's words, which the per-alert descriptions do not give on their own, so triage reads it as an input the source asserts. It is the source's account and never the Case's: the Case's account is its Notes."
       },
       "classification": {
         "type": "string",
