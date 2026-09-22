@@ -104,38 +104,40 @@ class TheMethodSurface(unittest.TestCase):
             note_elements.elements("triage", os.path.join(ROOT, "nowhere"))
 
     def test_a_conformant_note_passes(self):
-        self.assertEqual(note_elements.check(self.note(), root=self.ELEMENTS_ROOT), [])
+        self.assertEqual(note_elements.check(self.note(), root=self.ELEMENTS_ROOT)[0], [])
 
     def test_a_finding_with_a_side_and_no_confidence_fails(self):
         note = self.note()
         note["findings"][0]["tag"] = {"side": "malicious", "confidence_id": None}
 
-        self.assertTrue(any("no confidence" in f for f in note_elements.check(note, root=self.ELEMENTS_ROOT)))
+        self.assertTrue(any("no confidence" in f for f in note_elements.check(note, root=self.ELEMENTS_ROOT)[0]))
 
     def test_a_finding_that_cites_no_event_fails(self):
         note = self.note()
         note["findings"][0]["event_refs"] = []
 
-        self.assertTrue(any("cites no event" in f for f in note_elements.check(note, root=self.ELEMENTS_ROOT)))
+        self.assertTrue(any("cites no event" in f for f in note_elements.check(note, root=self.ELEMENTS_ROOT)[0]))
 
-    def test_a_bare_technique_code_fails(self):
+    def test_a_bare_technique_code_is_advised_and_does_not_fail_the_note(self):
         note = self.note()
         note["findings"][0]["finding"] = "T1486 was observed"
+        failures, advisories = note_elements.check(note, root=self.ELEMENTS_ROOT)
 
-        self.assertTrue(any("written bare" in f for f in note_elements.check(note, root=self.ELEMENTS_ROOT)))
+        self.assertTrue(any("written bare" in a for a in advisories))
+        self.assertEqual(failures, [], "the framework states the rendering as a SHOULD")
 
     def test_context_that_carries_a_confidence_fails(self):
         note = self.note()
         note["findings"][0]["tag"] = {"side": "context", "confidence_id": 2}
 
-        self.assertTrue(any("context carries a confidence" in f for f in note_elements.check(note, root=self.ELEMENTS_ROOT)))
+        self.assertTrue(any("context carries a confidence" in f for f in note_elements.check(note, root=self.ELEMENTS_ROOT)[0]))
 
     def test_a_recommended_action_nobody_answered_fails(self):
         note = self.note()
         note["detection_metadata"] = {"alerts": [{"id": "A1", "recommended_actions": [
             {"id": "RA1", "action": "Run a full scan", "disposition": None}]}]}
 
-        self.assertTrue(any("neither followed nor set aside" in f for f in note_elements.check(note, root=self.ELEMENTS_ROOT)))
+        self.assertTrue(any("neither followed nor set aside" in f for f in note_elements.check(note, root=self.ELEMENTS_ROOT)[0]))
 
     def test_a_recommendation_set_aside_with_a_reason_passes(self):
         note = self.note()
@@ -143,13 +145,13 @@ class TheMethodSurface(unittest.TestCase):
             {"id": "RA1", "action": "Run a full scan", "disposition": "set_aside",
              "reason": "the device was reimaged before triage opened"}]}]}
 
-        self.assertEqual(note_elements.check(note, root=self.ELEMENTS_ROOT), [])
+        self.assertEqual(note_elements.check(note, root=self.ELEMENTS_ROOT)[0], [])
 
     def test_a_gap_that_names_no_check_fails(self):
         note = self.note()
         note["visibility_gaps"] = [{"data_source": "EDR", "check_prevented": "  "}]
 
-        self.assertTrue(any("names no check" in f for f in note_elements.check(note, root=self.ELEMENTS_ROOT)))
+        self.assertTrue(any("names no check" in f for f in note_elements.check(note, root=self.ELEMENTS_ROOT)[0]))
 
     def test_the_rule_text_a_host_composes_lives_in_the_skill(self):
         for skill, names in (("zerosoc-triage", ("checks", "note-prose")),
@@ -202,10 +204,21 @@ def ledger_note(**changes):
 
 class TheNoteCheck(unittest.TestCase):
     def failures(self, note, kind="triage"):
-        return note_elements.check(note, kind, FRAMEWORK)
+        return note_elements.check(note, kind, FRAMEWORK)[0]
+
+    def advisories(self, note, kind="triage"):
+        return note_elements.check(note, kind, FRAMEWORK)[1]
 
     def test_a_note_in_the_ledgers_own_shape_is_conformant(self):
         self.assertEqual(self.failures(ledger_note()), [])
+
+    def test_a_filename_that_carries_a_technique_code_does_not_discard_the_case(self):
+        """What refused a Case on a live incident: `T1055.011_x86.exe`, a file an Atomic Red Team
+        test drops on disk, read as a citation by a presentation rule that failed the Note. Read as
+        a citation it still is, and it is advice now: the Case keeps its account of itself."""
+        note = ledger_note(summary="ws-01 executed T1055.011_x86.exe from the user's Downloads folder")
+
+        self.assertEqual(self.failures(note), [])
 
     def test_a_sub_technique_written_as_the_framework_writes_it_is_not_bare(self):
         for written in ("T1114.003 (Email Forwarding Rule)", "T1021.002 (SMB/Windows Admin Shares)",
@@ -216,13 +229,14 @@ class TheNoteCheck(unittest.TestCase):
             with self.subTest(written=written):
                 self.assertEqual(self.failures(note), [])
 
-    def test_a_bare_code_is_caught_wherever_the_note_writes_it(self):
+    def test_a_bare_code_is_advised_wherever_the_note_writes_it(self):
         for where, note in (("finding", ledger_note()), ("summary", ledger_note(summary="T1486 was seen on ws-01")),
                             ("rationale", ledger_note(rationale="T1114.003 stands uncovered"))):
             if where == "finding":
                 note["findings"][0]["desc"] = "T1114.003 observed"
             with self.subTest(where=where):
-                self.assertTrue(any("written bare" in f for f in self.failures(note)), where)
+                self.assertTrue(any("written bare" in a for a in self.advisories(note)), where)
+                self.assertEqual(self.failures(note), [], where)
 
     def test_a_side_needs_a_confidence_the_framework_has(self):
         for confidence in (None, 0, "Unknown", "certain"):
@@ -267,7 +281,8 @@ class TheNoteCheck(unittest.TestCase):
         self.assertTrue(any("what its detection asserted" in f for f in self.failures(note)))
         note = ledger_note()
         note["detection_metadata"]["alerts"][0]["techniques"][0]["rendered"] = "T1114.003"
-        self.assertTrue(any("written bare" in f for f in self.failures(note)))
+        self.assertTrue(any("written bare" in a for a in self.advisories(note)))
+        self.assertEqual(self.failures(note), [])
         note = ledger_note()
         note["detection_metadata"]["alerts"][0]["absent"] = ["threat name"]
         self.assertTrue(any("threat name" in f and "Visibility Gap" in f for f in self.failures(note)))
@@ -301,7 +316,7 @@ class TheNoteCheck(unittest.TestCase):
     def test_something_that_is_not_a_note_is_a_failure_and_not_a_traceback(self):
         for broken in ([], {"findings": "F1"}, ledger_note(findings=[{"id": "F1", "tag": "Malicious (High)"}])):
             with self.subTest(note=str(broken)[:40]):
-                self.assertTrue(note_elements.check(broken, "triage", FRAMEWORK))
+                self.assertTrue(note_elements.check(broken, "triage", FRAMEWORK)[0])
 
     def test_malformed_detection_metadata_is_a_failure_and_never_a_traceback(self):
         for name, held in (("techniques", ["T1486 (Data Encrypted for Impact)"]), ("recommended_actions", "Run a scan"),
@@ -348,16 +363,16 @@ class TheNoteCheck(unittest.TestCase):
             with self.subTest(written=written[:30]):
                 self.assertEqual(self.failures(ledger_note(summary=written)), [])
 
-    def test_a_bare_code_in_what_a_finding_renders_beside_its_text_is_caught(self):
+    def test_a_bare_code_in_what_a_finding_renders_beside_its_text_is_advised(self):
         for name in ("retraction_reason", "analytic"):
             note = ledger_note()
             note["findings"][0][name] = "T1486 refuted by the file listing"
             with self.subTest(field=name):
-                self.assertTrue(any("written bare" in f for f in self.failures(note)))
+                self.assertTrue(any("written bare" in a for a in self.advisories(note)))
         note = ledger_note()
         note["alerts"][0]["technique"] = "T1003"
         note["findings"][0]["artifact"] = "hash:T1486"
-        self.assertEqual(self.failures(note), [], "the ledger's own codes are data, not the Note's prose")
+        self.assertEqual(self.advisories(note), [], "the ledger's own codes are data, not the Note's prose")
 
     def test_a_required_element_holds_something_a_reader_can_read(self):
         for held in (True, 5, "None."):
@@ -370,7 +385,7 @@ class TheNoteCheck(unittest.TestCase):
         self.assertTrue(any("F1" in f and "says nothing" in f for f in self.failures(note)))
 
     def test_a_kind_the_framework_does_not_have_is_said(self):
-        self.assertTrue(note_elements.check(ledger_note(kind="bogus"), None, FRAMEWORK))
+        self.assertTrue(note_elements.check(ledger_note(kind="bogus"), None, FRAMEWORK)[0])
 
     def test_the_older_tag_shape_is_still_read(self):
         note = ledger_note(findings=[{"n": 1, "finding": "T1486 (Data Encrypted for Impact) was observed",
@@ -401,11 +416,11 @@ class AFrameworkChangeIsASkillsReleaseAndNothingElse(unittest.TestCase):
         root = self.served(rewrite)
         names = [e["element"] for e in note_elements.elements("triage", root)]
         self.assertEqual(names[-2:], ["provenance_and_custody", "lessons"])
-        failures = note_elements.check(ledger_note(), "triage", root)
+        failures = note_elements.check(ledger_note(), "triage", root)[0]
         self.assertTrue(any("Provenance and Custody" in f for f in failures))
         self.assertTrue(any("Lessons" in f for f in failures))
         note = ledger_note(provenance_and_custody={"case_uid": "4711"}, lessons="Tune the loader rule.")
-        self.assertEqual(note_elements.check(note, "triage", root), [])
+        self.assertEqual(note_elements.check(note, "triage", root)[0], [])
 
     def test_an_element_the_script_cannot_read_stops_it_rather_than_vanishing(self):
         root = self.served(lambda text: text.replace("4.  **Rationale** —", "4.  **Rationale:**", 1))

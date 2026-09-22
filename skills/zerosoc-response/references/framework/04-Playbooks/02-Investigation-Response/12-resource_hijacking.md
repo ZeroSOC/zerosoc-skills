@@ -20,7 +20,7 @@ required_data_sources:
   - Model-API usage logs
 status: draft
 ---
-<!-- generated from zerosoc-framework@a5ef27cbdbd7 : 04-Playbooks/02-Investigation-Response/12-resource_hijacking.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@80af9d768c9d : 04-Playbooks/02-Investigation-Response/12-resource_hijacking.md — do not edit; regenerate with tools/build_references.py -->
 
 # 12-Resource Hijacking / Cryptojacking Investigation & Response
 

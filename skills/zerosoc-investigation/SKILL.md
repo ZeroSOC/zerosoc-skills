@@ -156,7 +156,9 @@ per Case: the playbook the script prints.
     There is no Executed Queries element and no Evidence References element: a query that produced a
     Finding is that Finding's `analytic`, and the identifiers are cited with each Finding.
     `python3 scripts/note_elements.py --kind investigation --note note.json` prints the elements in
-    order and checks the Note — the ledger, with one field per element beside it — against those rules. It renders the structure and runs the
+    order and checks the Note — the ledger, with one field per element beside it — against those rules, reporting
+    what §2.5 requires as **failures** and what it states as a SHOULD (the technique rendering) as **advisories**:
+    only a failure means the Note may not be written. It renders the structure and runs the
     checks; the content and the prose are yours ([rules/note-prose.md](rules/note-prose.md)). The rules
     binding the two judgment steps are [rules/verify.md](rules/verify.md) (the hypotheses and the choice
     of queries) and [rules/tag.md](rules/tag.md) (what the answers mean), given to any executor as they

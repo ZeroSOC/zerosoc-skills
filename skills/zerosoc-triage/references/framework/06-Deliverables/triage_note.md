@@ -5,7 +5,7 @@ last_updated: 2026-09-20
 license: Apache-2.0
 status: draft
 ---
-<!-- generated from zerosoc-framework@a5ef27cbdbd7 : 06-Deliverables/triage_note.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@80af9d768c9d : 06-Deliverables/triage_note.md — do not edit; regenerate with tools/build_references.py -->
 
 # Triage Note
 
