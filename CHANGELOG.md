@@ -18,6 +18,17 @@
   on the advisories — what it can no longer do is throw a decided Case away over a spelling.
   (ZeroSOC/zerosoc-skills#26, ZeroSOC/zerosoc-framework#73)
 
+- **A source profile declares the determinations each verdict admits.** A source may carry a
+  second axis beside its classification — what the activity *was*, not just whether it was real —
+  and an executor closing a Case in the source had nothing to read to know what it may write
+  there. `vocabularies.determination` names each word with the framework verdicts it may accompany;
+  `only` marks a verdict that admits a single word, which is not a choice to make. For the Defender
+  XDR profile a False Positive admits `notMalicious` and Insufficient Data `notEnoughDataToValidate`,
+  both `only`; a True Positive and a Benign are each offered several, and whoever closes the Case
+  picks the one that fits what was found. The checker holds the vocabulary to it: a verdict named
+  here is a verdict of the Case Schema, and a verdict cannot both admit one word and offer a choice.
+  The profile says what may be written; writing it is the host's.
+
 - **The alert-type map covers the alert titles four real incidents actually raised.** The map reads
   an alert, never the incident that holds it: measured over the alerts of whole incidents read from
   a lab tenant, 43 of 93 alerts across 13 distinct alert titles matched no rule and kept their own

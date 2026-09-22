@@ -173,6 +173,38 @@
         "verdict": {
           "$ref": "#/$defs/id_map"
         },
+        "determination": {
+          "type": "object",
+          "description": "The source's own account of WHAT the activity was, beside its verdict. Each word names the verdicts it may accompany, so an executor closing a Case in the source proposes only the words that verdict admits; `only` marks a verdict that admits one word, which is not a choice to make. A source with no such axis declares nothing here.",
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "verdict_ids"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "verdict_ids": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                },
+                "minItems": 1,
+                "description": "The framework verdicts this word may be written with."
+              },
+              "name": {
+                "type": "string",
+                "description": "The word as the source's own interface shows it."
+              },
+              "only": {
+                "type": "boolean",
+                "description": "This is the one word those verdicts admit: it is written without asking."
+              },
+              "note": {
+                "type": "string"
+              }
+            }
+          }
+        },
         "analytic_types": {
           "type": "object",
           "description": "Detection source -> the OCSF analytic type it is. One not listed is Other (99).",
