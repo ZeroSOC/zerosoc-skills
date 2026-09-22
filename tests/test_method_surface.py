@@ -93,10 +93,10 @@ class TheMethodSurface(unittest.TestCase):
         found = self.elements("triage")
         names = [e["element"] for e in found]
 
-        self.assertEqual(names[0], "classification", "it comes first: a reader compares it directly")
+        self.assertEqual(names[0], "summary", "the account before the measures (§1.6)")
         self.assertEqual(names[-1], "provenance")
         self.assertIn("findings", names)
-        self.assertIn("what happened and when", found[1]["renders"], "the framework's own words")
+        self.assertIn("what happened and when", found[0]["renders"], "the framework's own words")
         self.assertIn("reclassification_pivots", [e["element"] for e in self.elements("investigation")])
 
     def test_a_missing_reference_tree_is_an_error_not_an_empty_list(self):
@@ -312,9 +312,12 @@ class TheNoteCheck(unittest.TestCase):
                             for f in self.failures(note)))
 
     def test_the_findings_element_says_what_an_alert_finding_renders(self):
+        """The disposition of a recommended action is no longer among them: what the executor ran
+        renders as the Finding it produced, and what it did not run renders nowhere."""
         findings = next(e for e in note_elements.elements("triage", FRAMEWORK) if e["element"] == "findings")
-        for words in ("ID (Name)", "remediation state", "disposition of the recommended actions"):
+        for words in ("ID (Name)", "remediation state", "recommended action the executor ran"):
             self.assertIn(words, findings["renders"])
+        self.assertNotIn("disposition of the recommended actions", findings["renders"])
 
     def test_something_that_is_not_a_note_is_a_failure_and_not_a_traceback(self):
         for broken in ([], {"findings": "F1"}, ledger_note(findings=[{"id": "F1", "tag": "Malicious (High)"}])):
@@ -426,7 +429,7 @@ class AFrameworkChangeIsASkillsReleaseAndNothingElse(unittest.TestCase):
         self.assertEqual(note_elements.check(note, "triage", root)[0], [])
 
     def test_an_element_the_script_cannot_read_stops_it_rather_than_vanishing(self):
-        root = self.served(lambda text: text.replace("4.  **Rationale** —", "4.  **Rationale:**", 1))
+        root = self.served(lambda text: text.replace("3.  **Rationale** —", "3.  **Rationale:**", 1))
         with self.assertRaises(SystemExit) as stopped:
             note_elements.elements("triage", root)
         self.assertIn("Rationale", str(stopped.exception))
@@ -464,9 +467,10 @@ class AFrameworkChangeIsASkillsReleaseAndNothingElse(unittest.TestCase):
 
     def test_every_element_of_both_notes_is_read_at_this_pin(self):
         self.assertEqual([e["element"] for e in note_elements.elements("triage", FRAMEWORK)],
-                         ["classification", "summary", "findings", "rationale", "timeline", "visibility_gaps", "provenance"])
+                         ["summary", "classification", "rationale", "findings", "timeline",
+                          "visibility_gaps", "provenance"])
         self.assertEqual([e["element"] for e in note_elements.elements("investigation", FRAMEWORK)],
-                         ["classification", "summary", "findings", "rationale", "reclassification_pivots",
+                         ["summary", "classification", "rationale", "findings", "reclassification_pivots",
                           "timeline", "visibility_gaps", "provenance"])
 
 

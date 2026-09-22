@@ -16,8 +16,9 @@ executor puts that language in its place; read as it is, it means the language o
   and the block is a response. It never makes a Benign finding. What stays open is how the entity
   arrived, what ran before it was stopped, and whether the same thing is elsewhere — aim the checks
   there, and at the entities the source left active.
-- Answer every recommended action: followed, with what it showed and the tag the evidence it
-  returned deserves, or set aside with a reason, which is context and carries no tag.
+- The source's recommended actions are indicative: run the ones that bear on this Case. One you
+  run is a finding like any other, naming the recommendation it came from and tagged on the evidence
+  it returned; one you do not run is not written down at all.
 - Tag each result Malicious or Benign at Low, Medium or High as the playbook prescribes; a result
   that bears on neither side is context: it carries no side and no confidence.
 - Every finding cites the alert ids or the event references that ground it. A finding that cannot

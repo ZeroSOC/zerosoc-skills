@@ -11,7 +11,7 @@ required_data_sources:
   - DNS logs
 status: draft
 ---
-<!-- generated from zerosoc-framework@80af9d768c9d : 04-Playbooks/01-Triage/network.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@25ac3ea17488 : 04-Playbooks/01-Triage/network.md — do not edit; regenerate with tools/build_references.py -->
 
 # Network Triage Playbook
 

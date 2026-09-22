@@ -143,16 +143,17 @@ per Case: the playbook the script prints.
     on the **same element structure as the Triage Note** — it extends and updates that Note rather than
     mirroring it. The canonical list is
     [Detection & Analysis §2.5](references/framework/03-Processes/02-detection_and_analysis.md), in this
-    order: **Classification** (confirmed or last candidate category, severity, confidence, impact,
-    significance and cross-border on a confirmed Incident, and the decision: the `verdict_id` the
-    resolution produced, with the master Case id on a Duplicate); **Summary** (as the Triage Note, at
-    this gate); **Findings** (the Alerts; the triage Findings, each now verified or **retracted** with
-    the reason; and the result of each validation query — every one rendered with its tag, with what
-    produced it, and with the events it rests on by OCSF identifier; the Alerts also render what their
-    detection asserted, as in the Triage Note, with the remediation state of each entity **as it stands at
-    this gate** and the disposition of the recommended actions); **Rationale** (the score of each
-    side, the Findings that carry the verdict, the retractions and why — how the confidence was reached,
-    not a restatement of it); **Re-classification Pivots**; **Case Timeline**; **Visibility Gaps** (or
+    order: **Summary** (as the Triage Note, at this gate); **Classification** (confirmed or last
+    candidate category, severity, confidence, impact, significance and cross-border on a confirmed
+    Incident, and the decision: the `verdict_id` the resolution produced, with the master Case id on a
+    Duplicate); **Rationale** (the score of each side, the Findings that carry the verdict, the
+    retractions and why — how the confidence was reached, not a restatement of it); **Findings** (the
+    Alerts; the triage Findings, each now verified or **retracted** with the reason; and the result of
+    each validation query — every one rendered with its tag, with what produced it, and with the events
+    it rests on by OCSF identifier; the Alerts also render what their detection asserted, as in the
+    Triage Note, with the remediation state of each entity **as it stands at this gate**, and any
+    recommended action run at this gate renders as the Finding it produced);
+    **Re-classification Pivots**; **Case Timeline**; **Visibility Gaps** (or
     "None."); **Provenance**, with the preserved-evidence pointer once §3.3 preservation has happened.
     There is no Executed Queries element and no Evidence References element: a query that produced a
     Finding is that Finding's `analytic`, and the identifiers are cited with each Finding.

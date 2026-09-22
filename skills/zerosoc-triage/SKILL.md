@@ -156,17 +156,17 @@ Read per alert: the playbook section the script prints.
    **structure** and runs the **checks**; the prose is
    yours ([rules/note-prose.md](rules/note-prose.md)). The canonical element list is [Detection & Analysis
    §1.6](references/framework/03-Processes/02-detection_and_analysis.md), and the order is part of it —
-   **Classification** (severity, confidence, impact when known, the candidate categories, and the decision: Close or
-   Promote, with `verdict_id` on a Close and the master Case id on a Duplicate); **Summary** (what happened and when,
-   which entities were involved and who acted on whom, and the root cause where found — how it is known and how sure
-   you are, in prose, which is not `confidence_id`); **Findings** (a table, alerts first, each with its tag, **what
-   produced it** — the check is the Finding's `analytic` — and the events it rests on by OCSF identifier; each
-   **Alert** also renders what its detection asserted: its techniques as `ID (Name)`, the threat name and family, the
-   detection source and detector, and the remediation state of each entity it names, with the **disposition of the
-   recommended actions** — each followed, with the Finding it produced, or set aside, with the reason); **Rationale**
-   (the coverage rule applied in one or two sentences); **Case Timeline** (only the Findings flagged for it, which at
-   triage is usually none — write "None."); **Visibility Gaps** (or "None."); **Provenance** (playbook path and
-   version, executor classes, capability classes invoked, Case id). There is no Actions Taken element and no
+   **Summary** (what happened and when, which entities were involved and who acted on whom, and the root cause
+   where found — how it is known and how sure you are, in prose, which is not `confidence_id`); **Classification**
+   (severity, confidence, impact when known, the candidate categories, and the decision: Close or Promote, with
+   `verdict_id` on a Close and the master Case id on a Duplicate); **Rationale** (the coverage rule applied in one or
+   two sentences); **Findings** (a table, alerts first, each with its tag, **what produced it** — the check is the
+   Finding's `analytic` — and the events it rests on by OCSF identifier; each **Alert** also renders what its
+   detection asserted: its techniques as `ID (Name)`, the threat name and family, the detection source and detector,
+   and the remediation state of each entity it names; a **recommended action you ran** renders as the Finding it
+   produced, naming the recommendation it came from, and one you did not run renders nowhere); **Case Timeline**
+   (only the Findings flagged for it, which at triage is usually none — write "None."); **Visibility Gaps** (or
+   "None."); **Provenance** (playbook path and version, executor classes, capability classes invoked, Case id). There is no Actions Taken element and no
    References element: the check that produced a Finding is rendered beside that Finding, and so are the events it
    cites.
    Name it `triage_note_<case-id>_<YYYYMMDD-HHMM>`.

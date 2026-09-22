@@ -10,7 +10,7 @@ required_data_sources:
   - Depends on the triggering alert (endpoint, identity, network, cloud, email, data, application, or OT/ICS telemetry)
 status: draft
 ---
-<!-- generated from zerosoc-framework@80af9d768c9d : 04-Playbooks/02-Investigation-Response/00-generic.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@25ac3ea17488 : 04-Playbooks/02-Investigation-Response/00-generic.md — do not edit; regenerate with tools/build_references.py -->
 
 # 00-Generic Investigation & Response
 

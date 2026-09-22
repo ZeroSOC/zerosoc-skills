@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- **The pin follows the framework to 25ac3ea.** Two releases of the method, taken together.
+
+  A Note renders **the account before the measures**: Summary, Classification, Rationale, Findings,
+  then the rest (ZeroSOC/zerosoc-framework#75). The scripts read the order out of the method, so
+  the check needed no change — but both `SKILL.md` files spelled the old order out in prose, and an
+  executor reading the skill would have written a Note the check then accepted. They now name the
+  order the framework renders. The Case Schema also declares `ocsf_version`, so a Case written into
+  another system's record says which OCSF release it was written against.
+
+  A source's **recommended actions are indicative** (ZeroSOC/zerosoc-framework#76): one the executor
+  runs is recorded as the Finding it produced, and one it does not run is recorded nowhere. `#30`
+  carried that into the skills' own procedure, but `rules/checks.md` still opened with *"Answer
+  every recommended action: followed … or set aside with a reason"* — the retired rule, in the text
+  a host hands an executor verbatim. Measured against a live tenant: with that line in the rules and
+  the opposite instruction beside it, a 59-alert Case answered 105 of its 107 distinct
+  recommendations, 97 of them tagged malicious, none of them run. The line is gone.
+
 - **The Note check answers again.** #28 made `check()` return `(failures, advisories)` and #30
   rewrote the same function; merged one after the other, `_asserted` was left returning one list
   where `check()` unpacked two, so **every** Note raised `ValueError: not enough values to unpack`

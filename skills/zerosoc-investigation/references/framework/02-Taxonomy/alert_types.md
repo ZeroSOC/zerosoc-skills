@@ -5,7 +5,7 @@ status: development
 last_updated: 2026-09-21
 license: Apache-2.0
 ---
-<!-- generated from zerosoc-framework@80af9d768c9d : 02-Taxonomy/alert_types.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@25ac3ea17488 : 02-Taxonomy/alert_types.md — do not edit; regenerate with tools/build_references.py -->
 
 # Alert Type Taxonomy
 

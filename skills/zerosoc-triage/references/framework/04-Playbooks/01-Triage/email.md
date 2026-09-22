@@ -11,7 +11,7 @@ required_data_sources:
   - User-reported phishing mailbox
 status: draft
 ---
-<!-- generated from zerosoc-framework@80af9d768c9d : 04-Playbooks/01-Triage/email.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@25ac3ea17488 : 04-Playbooks/01-Triage/email.md — do not edit; regenerate with tools/build_references.py -->
 
 # Email Triage Playbook
 
