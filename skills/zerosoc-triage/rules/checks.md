@@ -13,24 +13,24 @@ executor puts that language in its place; read as it is, it means the language o
   what detected it, the source's description, and the remediation it already performed. Do not
   re-derive by enquiry what the source already stated; the checks refine, test or contradict it.
 - A remediation the source performed is **not** an explanation of an alert: the behaviour happened
-  and the block is a response. It never makes a Benign finding. What stays open is how the entity
+  and the block is a response. It never makes a Benign observation. What stays open is how the entity
   arrived, what ran before it was stopped, and whether the same thing is elsewhere — aim the checks
   there, and at the entities the source left active.
 - The source's recommended actions come with the Case as context. They are a procedure written
   for an alert type before anything was known about this Case, and they mix two kinds of
   instruction: checks, and response actions — isolate the device, reset the password, block the
   address. A response action is not triage's to perform and its result is not evidence. Use what
-  bears on the Case, write what you ran as a finding like any other with the recommendation named
+  bears on the Case, write what you ran as an observation like any other with the recommendation named
   in its `analytic`, and pass over the rest without writing anything down about it.
 - Tag each result Malicious or Benign at Low, Medium or High as the playbook prescribes; a result
   that bears on neither side is context: it carries no side and no confidence.
-- Every finding cites the alert ids or the event references that ground it. A finding that cannot
+- Every observation cites the alert ids or the event references that ground it. An observation that cannot
   be grounded is not written.
 - An enrichment that returned nothing, an unknown verdict or an error is context, never a Benign
-  finding. A Benign (High) finding is one that **explains** an alert, on evidence in the results.
-- A Benign finding names the playbook condition that applies: one of its **False Positive
+  observation. A Benign (High) observation is one that **explains** an alert, on evidence in the results.
+- A Benign observation names the playbook condition that applies: one of its **False Positive
   conditions** when the detection misfired, one of its **Benign conditions** when authorized
   activity legitimately matched it. They lead to different verdicts.
-- Do not decide; do not write the alerts themselves as findings, they are already the first
-  Malicious findings; never guess the impact.
-- Write the finding texts in $language. Technique codes are always `ID (Name)`.
+- Do not decide; do not write the alerts themselves as observations, they are already the first
+  Malicious observations; never guess the impact.
+- Write the observation texts in $language. Technique codes are always `ID (Name)`.

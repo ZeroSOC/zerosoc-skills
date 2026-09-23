@@ -181,10 +181,10 @@ class Coherence(unittest.TestCase):
         self.assertIn("finding_info_list[].severity_id", found)
         self.assertIn("no_such_extension_property", found)
 
-    def test_an_alerts_severity_lands_on_its_detection_finding_and_on_the_findings_confidence(self) -> None:
+    def test_an_alerts_severity_lands_on_its_detection_finding_and_on_the_observations_confidence(self) -> None:
         entry = next(e for e in self.profile["case_map"] if e["path"] == "alerts[].severity")
         self.assertEqual(entry["case"], ["finding_info_list[].related_events[].severity_id",
-                                         "finding_info_list[].tags[]"])
+                                         "finding_info_list[].zerosoc.confidence_id"])
         self.assertIn("no confidence of its own", entry["note"])
         schema = json.loads((ROOT / "capabilities" / "source_profile.schema.json").read_text())
         self.assertEqual(check_profiles.validate(self.profile, schema, schema, "p"), [])

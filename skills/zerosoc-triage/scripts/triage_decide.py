@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply the triage decision rule of Detection & Analysis §1.5 to a findings ledger. Standard library only.
+"""Apply the triage decision rule of Detection & Analysis §1.5 to an observations ledger. Standard library only.
 
   triage_decide.py ledger.json [--close-as fp|benign] [--json]
 
@@ -12,23 +12,23 @@ Ledger (JSON):
   "detection_metadata": {...},   the output of scripts/alert_metadata.py: what each Alert's detection
                                  asserts (§1.1), the remediation the source already performed, and the
                                  assertions it did not supply
-  "findings": [{"id": "F1", "desc": "...", "side": "Malicious"|"Benign"|null, "confidence": "Low|Medium|High",
+  "observations": [{"id": "F1", "desc": "...", "side": "Malicious"|"Benign"|null, "confidence": "Low|Medium|High",
                 "covers": ["DF-1"], "artifact": "hash:...", "retracted": false,
                 "event_refs": ["<event id or link>"], "first_seen": "2026-09-14T14:55:41Z", "timeline": false}],
   "evidence_inventory": {"extracted": 31, "source_count": 31, "complete": true},
   "visibility_gaps": [{"data_source": "...", "check_prevented": "..."}],
   "duplicate_of": null | "CASE-0"
 }
-Alerts are the first Malicious findings at the tool's confidence, or at the level their severity maps to.
+Alerts are the first Malicious observations at the tool's confidence, or at the level their severity maps to.
 The confidence leaving triage rises on independent alerts of different types **or techniques**, which are
 the techniques the detections named. The coverage rule itself is unchanged: what the source already
 neutralized is reported with the decision and never weighed into it — a block is a response, not an
 explanation. What a source recommends is indicative (§1.5): a recommendation the run made nothing of
 holds nothing up.
-"event_refs" are the events a finding rests on, "first_seen" is when the thing it reports happened (not
-when the finding was made) and "timeline" flags it for the Case Timeline: this rule reads none of them, and
+"event_refs" are the events an observation rests on, "first_seen" is when the thing it reports happened (not
+when the observation was made) and "timeline" flags it for the Case Timeline: this rule reads none of them, and
 note_elements.py and timeline.py read them from this same ledger.
-Findings with side null are context and do not score. A Benign finding with no "covers" covers every alert.
+Observations with side null are context and do not score. A Benign observation with no "covers" covers every alert.
 Prints the decision, the coverage per alert, the confidence leaving triage and the verdict to record.
 """
 import json, os, sys
@@ -64,7 +64,7 @@ def dedupe_alerts(alerts):
 
 def _decide(ledger):
     alerts = dedupe_alerts(ledger.get("alerts", []))
-    active = [f for f in ledger.get("findings", []) if not f.get("retracted") and f.get("side") in ("Malicious", "Benign")]
+    active = [f for f in ledger.get("observations", []) if not f.get("retracted") and f.get("side") in ("Malicious", "Benign")]
     mal = [f for f in active if f["side"] == "Malicious"]
     ben = [f for f in active if f["side"] == "Benign"]
     coverage = []
@@ -72,7 +72,7 @@ def _decide(ledger):
         covering = [b for b in ben if not b.get("covers") or a["id"] in b["covers"]]
         if a["confidence"] == "High":
             covered = any(b["confidence"] == "High" for b in covering)
-            rule = "High alert: needs a Benign (High) finding"
+            rule = "High alert: needs a Benign (High) observation"
         else:
             total = sum(W[b["confidence"]] for b in covering)
             covered = total > W[a["confidence"]]
@@ -81,7 +81,7 @@ def _decide(ledger):
     all_covered = bool(alerts) and all(c["covered"] for c in coverage)
     close_ok = not mal and all_covered
     result = {"case_uid": ledger.get("case_uid"), "alerts_considered": [a["id"] for a in alerts], "coverage": coverage,
-              "malicious_beyond_alerts": [f["id"] for f in mal], "benign_findings": [f["id"] for f in ben]}
+              "malicious_beyond_alerts": [f["id"] for f in mal], "benign_observations": [f["id"] for f in ben]}
     if ledger.get("duplicate_of"):
         result.update(decision="Close", verdict_id=10, verdict="Duplicate", master_case_uid=ledger["duplicate_of"],
                       reminder="Duplicate only if all four §1.5 criteria were validated: matching core entities, overlapping timeline, active assignment, evidence merged.")
@@ -89,11 +89,11 @@ def _decide(ledger):
         result.update(decision="Close", verdict_id=None, verdict="False Positive (1) if a False Positive condition explains the alerts; Benign (5) if a Benign condition does (use --close-as)")
     else:
         why = []
-        if mal: why.append("Malicious findings exist beyond the alerts: " + ", ".join(f["id"] for f in mal))
+        if mal: why.append("Malicious observations exist beyond the alerts: " + ", ".join(f["id"] for f in mal))
         if not all_covered: why.append("not every alert is covered: " + ", ".join(c["alert"] for c in coverage if not c["covered"]))
         if not alerts: why.append("no alert in the Case")
         result.update(decision="Promote", verdict_id=0, verdict="none (promoted Cases carry no verdict)", why=why)
-    # confidence (§1.5): on a Close, the strongest Benign finding; on a Promote, the confidence leaving triage
+    # confidence (§1.5): on a Close, the strongest Benign observation; on a Promote, the confidence leaving triage
     if alerts and close_ok and not ledger.get("duplicate_of"):
         level = max(W[b["confidence"]] for b in ben)
         notes = ["close: the highest confidence on the Benign side"]
@@ -115,8 +115,8 @@ def _decide(ledger):
         if lowered: level -= 1
         level = max(1, min(3, level))
         notes = []
-        if raised: notes.append("+1: independent alerts of different types/techniques or two or more independent Malicious findings")
-        if lowered: notes.append("-1: Benign findings exist but do not close the Case")
+        if raised: notes.append("+1: independent alerts of different types/techniques or two or more independent Malicious observations")
+        if lowered: notes.append("-1: Benign observations exist but do not close the Case")
         result.update(confidence_id=level, confidence=LEVELS[level - 1], confidence_notes=notes)
     return result
 

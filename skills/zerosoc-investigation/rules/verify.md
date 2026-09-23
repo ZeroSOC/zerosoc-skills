@@ -17,11 +17,11 @@ executor puts that language in its place; read as it is, it means the language o
   response. It carries no side, and what stays open — how the entity arrived, what ran before it
   was stopped, whether the same thing is elsewhere — is what the queries must answer. An entity the
   source left active is where they go first.
-- Start from the conflict: the findings that disagree are what the first queries must discriminate.
-- A finding that does not hold, or does not apply to this Case, is retracted with its reason.
-  Retract on evidence, not on doubt; a finding that merely cannot be confirmed still holds.
+- Start from the conflict: the observations that disagree are what the first queries must discriminate.
+- An observation that does not hold, or does not apply to this Case, is retracted with its reason.
+  Retract on evidence, not on doubt; an observation that merely cannot be confirmed still holds.
 - Every query is discriminating and states both readings, so a negative result is evidence too (a
-  clean hash is a Benign finding, not silence). A query whose negative result says nothing is not
+  clean hash is a Benign observation, not silence). A query whose negative result says nothing is not
   worth asking.
 - The playbook's queries are indicative: choose the applicable ones and add what this Case calls
   for. Name the capability class that can answer each one; do not write any tool's query language.

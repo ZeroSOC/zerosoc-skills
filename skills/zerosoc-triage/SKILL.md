@@ -1,10 +1,10 @@
 ---
 name: zerosoc-triage
-description: Triage a security alert under the ZeroSOC Framework (Phase 2.a). Selects the domain triage playbook, enriches the entities, tags every finding Malicious or Benign with a confidence, applies the coverage rule to decide Close (False Positive, Benign, Duplicate) or Promote, and produces a conformant Triage Note plus the Triage to Investigation contract. Use when an alert, a detection, a user report or any suspected-incident intake needs a disposition.
+description: Triage a security alert under the ZeroSOC Framework (Phase 2.a). Selects the domain triage playbook, enriches the entities, tags every observation Malicious or Benign with a confidence, applies the coverage rule to decide Close (False Positive, Benign, Duplicate) or Promote, and produces a conformant Triage Note plus the Triage to Investigation contract. Use when an alert, a detection, a user report or any suspected-incident intake needs a disposition.
 license: Apache-2.0
 metadata:
   version: "0.4.1"
-  framework: "zerosoc-framework@a5ef27c (2026-09-21)"
+  framework: "zerosoc-framework@b36b208 (2026-09-24)"
   status: draft
   author: ZeroSOC
 ---
@@ -58,7 +58,7 @@ Read per alert: the playbook section the script prints.
    for the parent/child lineage the [Artifact enrichment](references/framework/04-Playbooks/99-Shared/sub_enrichment_artifact.md)
    produces: one chain per alert, each process under its ancestors, as an alert story is read (`--case` joins
    the Case's alerts into one chain per device). Read the command lines, not only the names: they carry the
-   objective, and the layers of encoding over them are part of the finding: a command hidden behind one
+   objective, and the layers of encoding over them are part of the observation: a command hidden behind one
    layer is read for its intent, each further layer is a deliberate choice, and decoding stops at five.
    Two deployments, told apart by the binding, not by assumption:
    - **The endpoint class carries process telemetry.** Query the Case's devices and window for process
@@ -82,8 +82,8 @@ Read per alert: the playbook section the script prints.
    - Take the **threat name and family** to step 6: they direct the enrichment and seed the hypotheses.
    - **The recommended actions are context** (§1.5): read them as a set — the same instruction is
      one instruction however many alerts published it — and **use the ones that bear on this Case**.
-     What you run is a finding like any other, tagged on the evidence it returned, with the
-     recommendation named in the finding's `analytic`. Nothing is recorded about the rest, and
+     What you run is an observation like any other, tagged on the evidence it returned, with the
+     recommendation named in the observation's `analytic`. Nothing is recorded about the rest, and
      nothing asks what became of each: the source mixes **checks** with **response actions**
      — isolate the device, reset the password, block the address — and a response action is not
      triage's to perform, so answering for one is answering for work that did not happen.
@@ -116,7 +116,7 @@ Read per alert: the playbook section the script prints.
    you identified and the techniques of step 3, and an unmapped alert does not change that choice. `python3 scripts/source_profile.py --bindings zerosoc.capabilities.json --json`
    prints the ledger's `source_profile` object and the source's entry for the Case's `provenance.products`:
    a **local override** of the shipped profile is recorded there and named in the Note's Provenance. Each independent
-   alert is the first Malicious finding at the tool's confidence, or at the level its severity maps to
+   alert is the first Malicious observation at the tool's confidence, or at the level its severity maps to
    (Informational/Low → Low, Medium → Medium, High/Critical → High). Same type on the same entity counts
    once.
 6. **Enrich** (§1.2–§1.3), starting from what the detection already asserted rather than repeating it: a
@@ -130,7 +130,7 @@ Read per alert: the playbook section the script prints.
 7. **Tag every result** as the playbook prescribes: `Malicious` or `Benign` at Low, Medium or High
    (Definitions §7: High establishes the side alone, Medium is a strong signal needing a second, Low is
    consistent but common in normal operation). A result that bears on neither side is context, untagged.
-   A `Benign (High)` finding is one that **explains** an alert: an approved exception or documented
+   A `Benign (High)` observation is one that **explains** an alert: an approved exception or documented
    change in the Knowledge Base, an authorized test window covering the host and time, a known-benign
    recurrence with the same parameters. Check the playbook's **False Positive conditions** (the detection
    misfired) and **Benign conditions** (authorized activity that legitimately matches) and record which
@@ -141,9 +141,9 @@ Read per alert: the playbook section the script prints.
    privilege and blast radius, and state why. Record `impact_id` only when already known; never guess.
 9. **Decide** by the coverage rule: `python3 scripts/triage_decide.py ledger.json`. It repeats what the source already
    neutralized, so that no Case is closed because everything in it was blocked. The script closes
-   only when no Malicious finding exists beyond the alerts *and* the Benign findings cover every alert
-   (a High alert only by a `Benign (High)` finding; a Low or Medium alert by Benign weights summing above
-   its own); otherwise it promotes, including when there is no finding at all. It also computes the
+   only when no Malicious observation exists beyond the alerts *and* the Benign observations cover every alert
+   (a High alert only by a `Benign (High)` observation; a Low or Medium alert by Benign weights summing above
+   its own); otherwise it promotes, including when there is no observation at all. It also computes the
    confidence leaving triage. For a **Duplicate**, first validate all
    four criteria of §1.5 (matching core entities, overlapping timeline, active master Case, evidence
    merged), set `duplicate_of` in the ledger, and never treat the same alert on a different entity as a
@@ -161,21 +161,24 @@ Read per alert: the playbook section the script prints.
    where found — how it is known and how sure you are, in prose, which is not `confidence_id`); **Classification**
    (severity, confidence, impact when known, the candidate categories, and the decision: Close or Promote, with
    `verdict_id` on a Close and the master Case id on a Duplicate); **Rationale** (the coverage rule applied in one or
-   two sentences); **Findings** (a table, alerts first, each with its tag, **what produced it** — the check is the
-   Finding's `analytic` — and the events it rests on by OCSF identifier; each **Alert** also renders what its
+   two sentences); **Observations** (a table, alerts first, each with its tag, **what produced it** — the check is the
+   Observation's `analytic` — and the events it rests on by OCSF identifier; each **Alert** also renders what its
    detection asserted: its techniques as `ID (Name)`, the threat name and family, the detection source and detector,
-   and the remediation state of each entity it names; a **recommended action you ran** renders as the Finding it
+   and the remediation state of each entity it names; a **recommended action you ran** renders as the Observation it
    produced, naming the recommendation it came from, and one you did not run renders nowhere); **Case Timeline**
-   (only the Findings flagged for it, which at triage is usually none — write "None."); **Visibility Gaps** (or
+   (only the Observations flagged for it, which at triage is usually none — write "None."); **Response Actions**
+   (the remediation the Case carries in one place: each Remediation Activity it references, with the entity it acted on
+   and whether it succeeded, and each open ticket it raised, with its kind — a remediation the source performed before
+   you opened the Case renders here too; write "None." when it carries neither); **Visibility Gaps** (or
    "None."); **Provenance** (playbook path and version, executor classes, capability classes invoked, Case id). There is no Actions Taken element and no
-   References element: the check that produced a Finding is rendered beside that Finding, and so are the events it
+   References element: the check that produced an Observation is rendered beside that Observation, and so are the events it
    cites.
    Name it `triage_note_<case-id>_<YYYYMMDD-HHMM>`.
    Write technique codes as `ID (Name)`: `scripts/alert_metadata.py` renders the ones the framework's
    tables name, and for the rest write the ATT&CK or ATLAS name. §1.6 states this as a SHOULD and it is
    guidance to you here — nothing reads the Note back to check its spelling.
    Summarize evidence in the Note and never paste raw logs — what the Note summarizes, the Case
-   keeps: the events each Finding rests on stay on the Case and the Note cites them
+   keeps: the events each Observation rests on stay on the Case and the Note cites them
    ([Case Schema §3](references/framework/02-Taxonomy/case_schema.md)).
 11. **Emit.** On Close: `verdict_id` 1 (False Positive; also a tuning ticket to Phase 1), 5 (Benign; also a
     Knowledge Base entry if the exception was unrecorded) or 10 (Duplicate, with `master_case_uid`). On
@@ -200,9 +203,9 @@ Read per alert: the playbook section the script prints.
 
 ## Completion criteria
 
-Exactly one outcome recorded; the Triage Note conformant (every tagged Finding has an event reference,
+Exactly one outcome recorded; the Triage Note conformant (every tagged Observation has an event reference,
 what each detection asserted rendered with its Alert, each recommended action you ran rendered as the
-Finding it produced, Visibility Gaps stated); on Promote the contract populated; on Close the verdict and its
+Observation it produced, Visibility Gaps stated); on Promote the contract populated; on Close the verdict and its
 emission done.
-A Note whose Findings lack event references, or a close that leaves an alert uncovered, is
+A Note whose Observations lack event references, or a close that leaves an alert uncovered, is
 non-conformant and voids the run.

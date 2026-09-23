@@ -8,7 +8,7 @@ it, and in any ZeroSOC platform implementation that vendors this repository.
 The framework is the method; the skills sequence it. Deterministic rules (the coverage rule that closes or
 promotes at triage, the score-and-coverage resolution of a verdict, the containment autonomy matrix) run
 as small standard-library Python scripts, so the decision is computed the same way whoever the executor
-is. Judgment stays where the framework leaves it: producing, tagging and retracting findings, translating
+is. Judgment stays where the framework leaves it: producing, tagging and retracting observations, translating
 playbook questions into tool queries, writing the Notes.
 
 ## Skills

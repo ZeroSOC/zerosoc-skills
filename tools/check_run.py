@@ -17,9 +17,9 @@ A run is a directory holding what the executor produced, one file per artifact:
 
 The checks are the ones a human cannot do by reading a transcript: every figure the run reported is
 recomputed from the artifacts it produced, so a ledger that states an inventory it never extracted, a
-score built from findings that should have collapsed, or a timebox that was declared instead of measured,
+score built from observations that should have collapsed, or a timebox that was declared instead of measured,
 all fail here. What the checks cannot see — whether the executor followed the procedure, whether a
-finding is true — stays a human judgement, and the run's notes are where that is read.
+observation is true — stays a human judgement, and the run's notes are where that is read.
 
 Each check prints `ok` or `FAIL` with what was expected and what the run holds. Exit 1 on any failure,
 2 when the run is missing an artifact the check needs.
@@ -216,7 +216,7 @@ def check_alert_map(report, run, profile_path):
         report.ok("alert types: every source title maps to a framework type")
     collapsed = len(alerts) - len(built)
     report.ok("alert types: same type on one entity collapsed",
-              f"{len(alerts)} source alerts → {len(built)} findings ({collapsed} collapsed)")
+              f"{len(alerts)} source alerts → {len(built)} observations ({collapsed} collapsed)")
     return {str(a.get("source_title") or "").lower() for a in built}
 
 
@@ -225,29 +225,29 @@ def check_alert_ledger(report, ledger, label, source_titles=None):
     named as the framework names them — a type the catalog does not hold was invented in the run.
 
     Triage holds them in `alerts` (`type`, `entity`), where the decision rule reads them; investigation
-    holds them among the scored `findings` (`alert_type`, `entity`). Both shapes are checked here."""
+    holds them among the scored `observations` (`alert_type`, `entity`). Both shapes are checked here."""
     ledger = ledger or {}
-    findings = [dict(a, alert_type=a.get("type")) for a in ledger.get("alerts", []) if a.get("type")]
-    findings += [f for f in ledger.get("findings", []) if f.get("alert_type")]
-    if not findings:
+    observations = [dict(a, alert_type=a.get("type")) for a in ledger.get("alerts", []) if a.get("type")]
+    observations += [f for f in ledger.get("observations", []) if f.get("alert_type")]
+    if not observations:
         report.skip(f"{label}: the Case's alerts carry type and entity",
-                    "no alerts in the ledger: triage records them in \"alerts\", investigation among \"findings\"")
+                    "no alerts in the ledger: triage records them in \"alerts\", investigation among \"observations\"")
         return []
-    typed = [f for f in findings if f.get("entity")]
-    report.check(len(typed) == len(findings), f"{label}: the Case's alerts carry type and entity",
+    typed = [f for f in observations if f.get("entity")]
+    report.check(len(typed) == len(observations), f"{label}: the Case's alerts carry type and entity",
                  "every alert with a type and the entity it was raised on",
-                 f"all {len(findings)} placed on an entity" if len(typed) == len(findings)
-                 else f"{len(findings) - len(typed)} of {len(findings)} without an entity")
+                 f"all {len(observations)} placed on an entity" if len(typed) == len(observations)
+                 else f"{len(observations) - len(typed)} of {len(observations)} without an entity")
     keys = {(str(f["alert_type"]).lower(), str(f.get("entity", "")).lower()) for f in typed}
     report.check(len(keys) == len(typed), f"{label}: no alert counted twice",
-                 "one finding per (type, entity)", f"{len(typed)} findings for {len(keys)} distinct pairs")
+                 "one observation per (type, entity)", f"{len(typed)} observations for {len(keys)} distinct pairs")
     catalog = alert_types.framework_alert_types(read_reference("02-Taxonomy/alert_types.md"))
-    invented = sorted({f["alert_type"] for f in findings if f["alert_type"] not in catalog
+    invented = sorted({f["alert_type"] for f in observations if f["alert_type"] not in catalog
                        and str(f["alert_type"]).lower() not in (source_titles or set())})
     report.check(not invented, f"{label}: alert types come from the framework catalog",
                  "every alert_type in the framework's alert_types.md, or the source title of an unmapped alert",
                  f"{len(invented)} from neither: " + "; ".join(invented[:4]) if invented else "none invented")
-    return findings
+    return observations
 
 
 def check_detection_metadata(report, run, ledger, label, note_name, profile_path=None):
@@ -337,9 +337,9 @@ def check_timebox(report, ledger):
                  "source measured from started_at", f"source={box.get('source')}")
     report.ok("timebox: elapsed against the reference",
               f"{box.get('elapsed_minutes')} min elapsed of {box.get('minutes')} (expired={box.get('expired')})")
-    dated = [f for f in ledger.get("findings", []) if f.get("at")]
-    report.check(len(dated) == len(ledger.get("findings", [])), "timebox: findings carry their own timestamps",
-                 "every finding with an 'at'", f"{len(dated)} of {len(ledger.get('findings', []))} dated")
+    dated = [f for f in ledger.get("observations", []) if f.get("at")]
+    report.check(len(dated) == len(ledger.get("observations", [])), "timebox: observations carry their own timestamps",
+                 "every observation with an 'at'", f"{len(dated)} of {len(ledger.get('observations', []))} dated")
     return result
 
 

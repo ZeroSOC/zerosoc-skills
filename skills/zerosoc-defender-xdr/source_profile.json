@@ -951,9 +951,9 @@
       "path": "alerts[].severity",
       "case": [
         "finding_info_list[].related_events[].severity_id",
-        "finding_info_list[].tags[]"
+        "finding_info_list[].zerosoc.confidence_id"
       ],
-      "note": "It lands twice. As the severity of the Detection Finding that represents the alert, the event the Alert Finding cites. And as that Finding's confidence (the zerosoc:confidence_id tag: Informational and Low give Low, Medium gives Medium, High and Critical give High) — a workaround, because this source states no confidence of its own for an alert. How bad and how sure are two measures, and the day the source states the second this entry stops borrowing the first."
+      "note": "It lands twice. As the severity of the Detection Finding that represents the alert, the event the Alert Observation cites. And as that Observation's confidence (the zerosoc:confidence_id tag: Informational and Low give Low, Medium gives Medium, High and Critical give High) — a workaround, because this source states no confidence of its own for an alert. How bad and how sure are two measures, and the day the source states the second this entry stops borrowing the first."
     },
     {
       "path": "alerts[].mitreTechniques",
@@ -978,7 +978,7 @@
     {
       "path": "alerts[].recommendedActions",
       "case": "finding_info_list[].desc",
-      "note": "the source's own procedure. It reaches the Case as the disposition of each recommendation — the Finding a followed one produced, or the Finding that states why it was set aside — never as a block of text on the alert"
+      "note": "the source's own procedure. It reaches the Case as the disposition of each recommendation — the Observation a followed one produced, or the Observation that states why it was set aside — never as a block of text on the alert"
     },
     {
       "path": "alerts[].firstActivityDateTime",
@@ -1090,7 +1090,7 @@
     },
     {
       "path": "alerts[].evidence[].verdict",
-      "ignored": "the source's per-entity verdict. Read by the evidence inventory to show what the source thought; it is not a Finding of the Case, which weighs the evidence itself"
+      "ignored": "the source's per-entity verdict. Read by the evidence inventory to show what the source thought; it is not an Observation of the Case, which weighs the evidence itself"
     },
     {
       "path": "alerts[].evidence[].remediationStatus",
@@ -1102,7 +1102,7 @@
     },
     {
       "path": "alerts[].evidence[].detectionStatus",
-      "ignored": "what the sensor did at the moment of detection: detected, blocked, prevented. It travels with the evidence row the inventory builds, and reaches the Case only inside a Finding that cites it; the state the method reads for §1.5 is remediationStatus"
+      "ignored": "what the sensor did at the moment of detection: detected, blocked, prevented. It travels with the evidence row the inventory builds, and reaches the Case only inside an Observation that cites it; the state the method reads for §1.5 is remediationStatus"
     },
     {
       "path": "alerts[].evidence[].createdDateTime",
@@ -1114,7 +1114,7 @@
     },
     {
       "path": "alerts[].evidence[].detailedRoles",
-      "ignored": "the part the source gives the entity in the alert, in its own words. Which entity a Finding is about is decided by the method from the evidence, not taken from a label"
+      "ignored": "the part the source gives the entity in the alert, in its own words. Which entity an Observation is about is decided by the method from the evidence, not taken from a label"
     },
     {
       "path": "alerts[].evidence[].tags",
@@ -1130,7 +1130,7 @@
     },
     {
       "path": "alerts[].evidence[].osPlatform",
-      "ignored": "the device's platform. Asset context the enrichment asks the source for at triage, where it is a Finding with its analytic, rather than an unattributed field on the Case"
+      "ignored": "the device's platform. Asset context the enrichment asks the source for at triage, where it is an Observation with its analytic, rather than an unattributed field on the Case"
     },
     {
       "path": "alerts[].evidence[].hostName",
@@ -1150,27 +1150,27 @@
     },
     {
       "path": "alerts[].evidence[].osBuild",
-      "ignored": "the device's OS build. Asset context: the enrichment asks the source for the device at triage, and what bears on the Case is stated there as a Finding, with its source"
+      "ignored": "the device's OS build. Asset context: the enrichment asks the source for the device at triage, and what bears on the Case is stated there as an Observation, with its source"
     },
     {
       "path": "alerts[].evidence[].version",
-      "ignored": "the device's OS version. Asset context: the enrichment asks the source for the device at triage, and what bears on the Case is stated there as a Finding, with its source"
+      "ignored": "the device's OS version. Asset context: the enrichment asks the source for the device at triage, and what bears on the Case is stated there as an Observation, with its source"
     },
     {
       "path": "alerts[].evidence[].healthStatus",
-      "ignored": "the sensor's health on the device. Asset context: the enrichment asks the source for the device at triage, and what bears on the Case is stated there as a Finding, with its source"
+      "ignored": "the sensor's health on the device. Asset context: the enrichment asks the source for the device at triage, and what bears on the Case is stated there as an Observation, with its source"
     },
     {
       "path": "alerts[].evidence[].onboardingStatus",
-      "ignored": "whether the device is onboarded to the sensor. Asset context: the enrichment asks the source for the device at triage, and what bears on the Case is stated there as a Finding, with its source"
+      "ignored": "whether the device is onboarded to the sensor. Asset context: the enrichment asks the source for the device at triage, and what bears on the Case is stated there as an Observation, with its source"
     },
     {
       "path": "alerts[].evidence[].defenderAvStatus",
-      "ignored": "the state of the anti-malware engine on the device. Asset context: the enrichment asks the source for the device at triage, and what bears on the Case is stated there as a Finding, with its source"
+      "ignored": "the state of the anti-malware engine on the device. Asset context: the enrichment asks the source for the device at triage, and what bears on the Case is stated there as an Observation, with its source"
     },
     {
       "path": "alerts[].evidence[].riskScore",
-      "ignored": "the source's own risk level for the device. How much the asset matters comes from the SOC Knowledge Base; the source's score is read at enrichment and stated as a Finding where it bears"
+      "ignored": "the source's own risk level for the device. How much the asset matters comes from the SOC Knowledge Base; the source's score is read at enrichment and stated as an Observation where it bears"
     },
     {
       "path": "alerts[].evidence[].rbacGroupId",
@@ -1182,11 +1182,11 @@
     },
     {
       "path": "alerts[].evidence[].firstSeenDateTime",
-      "ignored": "when the sensor first saw the device. Asset context: the enrichment asks the source for the device at triage, and what bears on the Case is stated there as a Finding, with its source"
+      "ignored": "when the sensor first saw the device. Asset context: the enrichment asks the source for the device at triage, and what bears on the Case is stated there as an Observation, with its source"
     },
     {
       "path": "alerts[].evidence[].lastIpAddress",
-      "ignored": "the device's last internal address. Asset context: the enrichment asks the source for the device at triage, and what bears on the Case is stated there as a Finding, with its source; an address an alert cites arrives as evidence of its own"
+      "ignored": "the device's last internal address. Asset context: the enrichment asks the source for the device at triage, and what bears on the Case is stated there as an Observation, with its source; an address an alert cites arrives as evidence of its own"
     },
     {
       "path": "alerts[].evidence[].lastExternalIpAddress",
@@ -1198,7 +1198,7 @@
     },
     {
       "path": "alerts[].evidence[].loggedOnUsers",
-      "ignored": "who was logged on to the device when the alert fired. A lead for the identity pivot of the investigation, asked of the source then and stated as a Finding; not an observable by itself"
+      "ignored": "who was logged on to the device when the alert fired. A lead for the identity pivot of the investigation, asked of the source then and stated as an Observation; not an observable by itself"
     },
     {
       "path": "alerts[].evidence[].loggedOnUsers[].accountName",
@@ -1214,7 +1214,7 @@
     },
     {
       "path": "alerts[].evidence[].vmMetadata",
-      "ignored": "the cloud virtual machine behind the device, where it is one. Asset context: the enrichment asks the source for the device at triage, and what bears on the Case is stated there as a Finding, with its source"
+      "ignored": "the cloud virtual machine behind the device, where it is one. Asset context: the enrichment asks the source for the device at triage, and what bears on the Case is stated there as an Observation, with its source"
     },
     {
       "path": "alerts[].evidence[].vmMetadata.cloudProvider",
@@ -1238,7 +1238,7 @@
     },
     {
       "path": "alerts[].evidence[].countryLetterCode",
-      "ignored": "where the source geolocated the address. Geolocation is enrichment and reaches the Case as a Finding with what produced it"
+      "ignored": "where the source geolocated the address. Geolocation is enrichment and reaches the Case as an Observation with what produced it"
     },
     {
       "path": "alerts[].evidence[].location",
@@ -1270,7 +1270,7 @@
     },
     {
       "path": "alerts[].evidence[].userAccount.userSid",
-      "ignored": "the account's security identifier. It travels with the evidence row the inventory builds, and reaches the Case only inside a Finding that cites it: it tells a well-known system account from a person's, which the lineage of a process needs"
+      "ignored": "the account's security identifier. It travels with the evidence row the inventory builds, and reaches the Case only inside an Observation that cites it: it tells a well-known system account from a person's, which the lineage of a process needs"
     },
     {
       "path": "alerts[].evidence[].userAccount.displayName",
@@ -1302,11 +1302,11 @@
     },
     {
       "path": "alerts[].evidence[].fileDetails.filePath",
-      "ignored": "where the file was. It travels with the evidence row the inventory builds and with the evidence a Finding rests on; the observable is the hash, which is what a lookup takes"
+      "ignored": "where the file was. It travels with the evidence row the inventory builds and with the evidence an Observation rests on; the observable is the hash, which is what a lookup takes"
     },
     {
       "path": "alerts[].evidence[].fileDetails.signer",
-      "ignored": "the signature's subject. A check of who signed the file reads it from the evidence row and states it as a Finding, with the check that produced it"
+      "ignored": "the signature's subject. A check of who signed the file reads it from the evidence row and states it as an Observation, with the check that produced it"
     },
     {
       "path": "alerts[].evidence[].fileDetails.issuer",
@@ -1314,7 +1314,7 @@
     },
     {
       "path": "alerts[].evidence[].fileDetails.sha1",
-      "ignored": "a second digest of the same file. It travels with the evidence row the inventory builds, and reaches the Case only inside a Finding that cites it, where it helps tell one file from another; the observable is the SHA-256, which every lookup of the method takes"
+      "ignored": "a second digest of the same file. It travels with the evidence row the inventory builds, and reaches the Case only inside an Observation that cites it, where it helps tell one file from another; the observable is the SHA-256, which every lookup of the method takes"
     },
     {
       "path": "alerts[].evidence[].fileDetails.md5",
@@ -1330,11 +1330,11 @@
     },
     {
       "path": "alerts[].evidence[].fileDetails.filePublisher",
-      "ignored": "the publisher the source read from the file. As signer: a check of who signed a file states it as a Finding, and it is not carried unattributed"
+      "ignored": "the publisher the source read from the file. As signer: a check of who signed a file states it as an Observation, and it is not carried unattributed"
     },
     {
       "path": "alerts[].evidence[].processCommandLine",
-      "ignored": "the command line. Evidence a Finding rests on, kept where that Finding cites it, and never an observable: an observable is an entity that can be looked up"
+      "ignored": "the command line. Evidence an Observation rests on, kept where that Observation cites it, and never an observable: an observable is an entity that can be looked up"
     },
     {
       "path": "alerts[].evidence[].processId",
@@ -1378,7 +1378,7 @@
     },
     {
       "path": "alerts[].evidence[].imageFile.filePublisher",
-      "ignored": "the publisher the source read from the process image, as fileDetails.filePublisher: stated as a Finding by a check of who signed it, never carried unattributed"
+      "ignored": "the publisher the source read from the process image, as fileDetails.filePublisher: stated as an Observation by a check of who signed it, never carried unattributed"
     },
     {
       "path": "alerts[].evidence[].imageFile.signer",
@@ -1442,7 +1442,7 @@
     },
     {
       "path": "alerts[].evidence[].registryHive",
-      "ignored": "the hive of a registry key or value the alert cites. It travels with the evidence row the inventory builds, and reaches the Case only inside a Finding that cites it: with registryKey it is the identity of one registry entity on one device"
+      "ignored": "the hive of a registry key or value the alert cites. It travels with the evidence row the inventory builds, and reaches the Case only inside an Observation that cites it: with registryKey it is the identity of one registry entity on one device"
     },
     {
       "path": "alerts[].evidence[].registryKey",
@@ -1454,7 +1454,7 @@
     },
     {
       "path": "alerts[].evidence[].registryValue",
-      "ignored": "the value's data. Evidence a Finding rests on, kept where that Finding cites it, and never an observable"
+      "ignored": "the value's data. Evidence an Observation rests on, kept where that Observation cites it, and never an observable"
     },
     {
       "path": "alerts[].evidence[].registryValueType",

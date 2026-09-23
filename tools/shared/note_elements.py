@@ -7,7 +7,7 @@ The framework says which elements a Note renders and in what order, and what mak
 non-conformant (Detection & Analysis §1.6 and §2.5). That is **structure and conformance**, and it
 belongs with the method rather than with whatever assembled the Note last.
 
-What this script does **not** do is write the Note. The Summary, the Rationale, each Finding's
+What this script does **not** do is write the Note. The Summary, the Rationale, each Observation's
 wording and the deployment's language are the executor's: a Note produced by a template would be a
 form, and the framework asks for an account. The script renders the structure and runs the checks;
 the executor renders the content.
@@ -21,7 +21,7 @@ nothing is copied into a second shape, plus one field per element the framework 
 
 {"kind": "triage",
  "classification": {...}, "summary": "...", "rationale": "...", "provenance": {...},
- "findings": [{"id": "F1", "desc": "...", "side": "Malicious"|"Benign"|null,
+ "observations": [{"id": "F1", "desc": "...", "side": "Malicious"|"Benign"|null,
                "confidence": "Low|Medium|High", "event_refs": ["<event id or link>"]}],
  "alerts": [...], "detection_metadata": {...}, "visibility_gaps": [{"data_source", "check_prevented"}],
  "timeline": [...], "reclassification_pivots": [...]}
@@ -29,8 +29,8 @@ nothing is copied into a second shape, plus one field per element the framework 
 An element's field is the framework's own name for it, lower-cased and joined with underscores —
 "Visibility Gaps" is `visibility_gaps` — so an element the framework adds or renames is required under
 its new name with no change here. Two are shorter by habit: "Case Timeline" is `timeline` and
-"Re-classification Pivots" is `reclassification_pivots`. A finding with side null is context. A finding
-written as {"n", "finding", "tag": {"side", "confidence_id"}} is read too.
+"Re-classification Pivots" is `reclassification_pivots`. An observation with side null is context. An observation
+written as {"n", "observation", "tag": {"side", "confidence_id"}} is read too.
 """
 import argparse, json, os, re, sys
 
@@ -145,26 +145,26 @@ def _listed(value):
 
 
 
-def _read(finding):
-    """One finding, from either shape: (label, text, side, confidence, event references)."""
-    tag = finding.get("tag") if isinstance(finding.get("tag"), dict) else {}
-    side = finding.get("side", tag.get("side"))
+def _read(observation):
+    """One observation, from either shape: (label, text, side, confidence, event references)."""
+    tag = observation.get("tag") if isinstance(observation.get("tag"), dict) else {}
+    side = observation.get("side", tag.get("side"))
     side = None if side is None or str(side).strip().lower() in ("", "context") else str(side).strip().lower()
-    stated = finding.get("confidence", tag.get("confidence_id"))
+    stated = observation.get("confidence", tag.get("confidence_id"))
     if isinstance(stated, float) and stated.is_integer():
         stated = int(stated)
     confidence = None if stated in (None, "") or isinstance(stated, bool) else CONFIDENCE.get(str(stated).strip().lower(), 0)
-    cited = [r for r in _listed(finding.get("event_refs")) if not isinstance(r, bool)
+    cited = [r for r in _listed(observation.get("event_refs")) if not isinstance(r, bool)
              and (r.get("uid") if isinstance(r, dict) else str(r if r is not None else "").strip())]
-    label = finding.get("id", finding.get("n", "?"))
-    return label, str(finding.get("desc") or finding.get("finding") or ""), side, confidence, cited
+    label = observation.get("id", observation.get("n", "?"))
+    return label, str(observation.get("desc") or observation.get("observation") or ""), side, confidence, cited
 
 
 def check(note, kind=None, root=FRAMEWORK):
     """What this Note does not meet, in the framework's terms.
 
     A failure is a conformance condition: either the Note is not a Note of its kind, or the Case
-    cannot be read from it as decided — a Finding that cites no event, a side with no confidence,
+    cannot be read from it as decided — an Observation that cites no event, a side with no confidence,
     an element the framework requires and the Note does not render. A caller refuses a Note on one.
 
     Nothing else is reported. The script checked one thing the framework states as a SHOULD — that
@@ -183,36 +183,36 @@ def check(note, kind=None, root=FRAMEWORK):
     if note.get("kind") and note["kind"] != kind:
         failures.append(f"the Note says it is a {note['kind']} Note and is checked as a {kind} Note")
 
-    findings = note.get("findings") or []
-    if not isinstance(findings, list) or not all(isinstance(f, dict) for f in findings):
-        return failures + ["findings is a list of findings, each an object with its side, confidence and events"]
+    observations = note.get("observations") or []
+    if not isinstance(observations, list) or not all(isinstance(f, dict) for f in observations):
+        return failures + ["observations is a list of observations, each an object with its side, confidence and events"]
     alerts = [a for a in _listed(note.get("alerts")) if isinstance(a, dict)]
 
     listed = elements(kind, root)
     for element in listed:
         held = note.get(element["element"])
-        if element["element"] == "findings":
-            held = findings or alerts  # the Alerts are the Case's first Findings, wherever the ledger keeps them
+        if element["element"] == "observations":
+            held = observations or alerts  # the Alerts are the Case's first Observations, wherever the ledger keeps them
         if not element["may_be_empty"] and (_blank(held) or str(held).strip().rstrip(".").lower() == "none"):
             failures.append(f"the Note renders no {element['name']}: the framework's {kind} Note requires it")
 
-    for finding in findings:
-        if isinstance(finding.get("tag"), str):
-            failures.append(f"finding {finding.get('id', finding.get('n', '?'))}: the tag is the text "
-                            f"{finding['tag']!r}; state \"side\" and \"confidence\" as the ledger does")
+    for observation in observations:
+        if isinstance(observation.get("tag"), str):
+            failures.append(f"observation {observation.get('id', observation.get('n', '?'))}: the tag is the text "
+                            f"{observation['tag']!r}; state \"side\" and \"confidence\" as the ledger does")
             continue
-        label, text, side, confidence, cited = _read(finding)
-        where = f"finding {label}"
+        label, text, side, confidence, cited = _read(observation)
+        where = f"observation {label}"
         if not text.strip():
-            failures.append(f"{where} says nothing: a Finding is stated in accurate terms")
+            failures.append(f"{where} says nothing: an Observation is stated in accurate terms")
         if side not in (None, "malicious", "benign"):
             failures.append(f"{where}: side is {side!r}; the framework has Malicious, Benign, or neither for context")
         elif side and not confidence:
-            failures.append(f"{where}: {side} with no confidence (Low, Medium or High); a side without one is not a finding")
+            failures.append(f"{where}: {side} with no confidence (Low, Medium or High); a side without one is not an observation")
         elif side is None and confidence is not None:
             failures.append(f"{where}: context carries a confidence; context bears on no hypothesis")
         if not cited:
-            failures.append(f"{where}: cites no event; a Finding without a traceable reference is not conformant")
+            failures.append(f"{where}: cites no event; an Observation without a traceable reference is not conformant")
 
     gaps = _listed(note.get("visibility_gaps"))
     for gap in gaps:
@@ -224,14 +224,14 @@ def check(note, kind=None, root=FRAMEWORK):
         if not prevented or prevented.startswith(PLACEHOLDER):
             failures.append(f"visibility gap {gap.get('data_source')!r} names no check it prevented")
     recorded = {str(g.get("data_source", "")).strip().lower() for g in gaps if isinstance(g, dict)}
-    return failures + _asserted(note, alerts, findings, recorded)
+    return failures + _asserted(note, alerts, observations, recorded)
 
 
-def _asserted(note, alerts, findings, recorded_gaps):
-    """§1.6: each Alert Finding renders what its detection asserted. Triage keeps the Case's alerts
-    in "alerts"; investigation keeps them among its findings, each with its "alert_type"."""
+def _asserted(note, alerts, observations, recorded_gaps):
+    """§1.6: each Alert Observation renders what its detection asserted. Triage keeps the Case's alerts
+    in "alerts"; investigation keeps them among its observations, each with its "alert_type"."""
     failures = []
-    among = [f for f in findings if f.get("alert_type")]
+    among = [f for f in observations if f.get("alert_type")]
     record = note.get("detection_metadata")
     if not isinstance(record, dict) or not isinstance(record.get("alerts", []), list) \
             or not all(isinstance(a, dict) for a in record.get("alerts", [])):
@@ -240,7 +240,7 @@ def _asserted(note, alerts, findings, recorded_gaps):
                             "\"techniques\", \"recommended_actions\", \"absent\", ...}], ...}")
         elif alerts or among:
             failures.append(f"the Note holds {len(alerts) + len(among)} Alert(s) and no detection_metadata: each Alert "
-                            "Finding renders what its detection asserted (techniques, threat, source, remediation state)")
+                            "Observation renders what its detection asserted (techniques, threat, source, remediation state)")
         return failures
     read = {str(a.get("id")) for a in record["alerts"]} if record.get("alerts") else set()
     # A deployment that declares no source profile reads nothing of §1.1 — there are no field names
@@ -254,7 +254,7 @@ def _asserted(note, alerts, findings, recorded_gaps):
         if str(alert.get("id")) not in read and not blind:
             failures.append(f"alert {alert.get('id')} renders nothing of what its detection asserted")
     if among and not read and not blind:
-        failures.append(f"{len(among)} Alert Finding(s) and a detection_metadata that read no alert: each renders "
+        failures.append(f"{len(among)} Alert Observation(s) and a detection_metadata that read no alert: each renders "
                         "what its detection asserted")
     for alert in record.get("alerts") or []:
         for absent in _listed(alert.get("absent")):
@@ -262,11 +262,11 @@ def _asserted(note, alerts, findings, recorded_gaps):
                 failures.append(f"alert {alert.get('id')}: the source did not supply the {absent}, and no "
                                 "Visibility Gap says so with the check it prevented")
     # What a source recommends is nothing this checks. They are part of what the detection
-    # asserts, the executor reads them with the rest of the Case, and what it runs is a Finding
-    # like any other — named in that Finding's `analytic` and checked as a Finding. Nothing here
+    # asserts, the executor reads them with the rest of the Case, and what it runs is an Observation
+    # like any other — named in that Observation's `analytic` and checked as an Observation. Nothing here
     # reads a published procedure back to see what became of each line: the procedure is written
     # for an alert type before anything is known about the Case, and holding a Note to it is how
-    # a Case of three alerts produced a Note of sixty-seven findings, six of which decided it.
+    # a Case of three alerts produced a Note of sixty-seven observations, six of which decided it.
     return failures
 
 

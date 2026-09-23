@@ -54,12 +54,12 @@ def classify(action, confidence, severity, reversible=None, stops_critical=None,
         timing = "apply immediately, before the internal notification completes; stakeholders confirm afterwards or request rollback"
     else:
         timing = "may be scheduled with the affected asset owner when applying it at once would disrupt work; record the schedule on the action entry"
-    r = {"action": action, "tier": tier, "matrix_entry": reasons or ["reversible, leaves the entity's service running"], "timing": timing if tier == "pre-authorized" else "after approval; while pending, apply the pre-authorized actions and continue the investigation of residual findings",
+    r = {"action": action, "tier": tier, "matrix_entry": reasons or ["reversible, leaves the entity's service running"], "timing": timing if tier == "pre-authorized" else "after approval; while pending, apply the pre-authorized actions and continue the investigation of residual observations",
          "record": "an `action` entry on the Case: the action, entity, timestamp and rollback"}
     if tier == "requires approval":
         r["presentation_payload"] = {
-            "1_context": "Incident Category, Case severity and confidence, and in plain language why the Malicious hypothesis was proven (score and carrying findings)",
-            "2_evidence": "the findings, each with its tag, event references and queries",
+            "1_context": "Incident Category, Case severity and confidence, and in plain language why the Malicious hypothesis was proven (score and carrying observations)",
+            "2_evidence": "the observations, each with its tag, event references and queries",
             "3_action_and_matrix_entry": f"{action} — requires approval because: " + "; ".join(reasons),
             "4_blast_radius": "expected effect on operations",
             "5_rollback": "the exact call, script or procedure that reverses it, or the statement that it cannot be reversed",

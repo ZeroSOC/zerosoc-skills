@@ -4,7 +4,7 @@ description: Respond to a confirmed Incident under the ZeroSOC Framework (Phase 
 license: Apache-2.0
 metadata:
   version: "0.4.1"
-  framework: "zerosoc-framework@a5ef27c (2026-09-21)"
+  framework: "zerosoc-framework@b36b208 (2026-09-24)"
   status: draft
   author: ZeroSOC
 ---
@@ -15,7 +15,7 @@ The Case arrives confirmed (`verdict_id = 2`) with its Investigation → Respons
 carries it through containment, eradication and recovery; there is no separate incident commander. Every
 action is its own entry in the Case's `finding_info_list`, typed `action`, carrying the Remediation
 Activity event in `related_events` with its timestamp, entity and rollback. An action is recorded against
-the Case and not against the Finding that prompted it: the reasoning may be retracted, and the action
+the Case and not against the Observation that prompted it: the reasoning may be retracted, and the action
 still happened. Paths are relative to this
 skill's directory.
 
@@ -31,7 +31,7 @@ and the autonomy matrix, §2.1) and [Guardrails §2–§3](references/framework/
 ## Inputs
 
 - The contract: confirmed `incident_category`, scope (`observables`), `finding_info_list` (the Alerts,
-  the Findings and any action already taken), `start_time` (the Incident's T0), `severity_id`,
+  the Observations and any action already taken), `start_time` (the Incident's T0), `severity_id`,
   `confidence_id`, `impact_id`, `significant`, `cross_border`, `handover_reason`, `notes` carrying the
   Investigation Note, the recommended actions. A tool-initiated action that fired before any executor
   opened the Case is already an entry — this is where the **remediation the source performed per entity**
@@ -74,11 +74,11 @@ and the autonomy matrix, §2.1) and [Guardrails §2–§3](references/framework/
    scheduled with the asset owner.
 5. **Request approval** with the five-part payload the script prints
    ([Guardrails §2](references/framework/07-Governance/agentic_guardrails.md)): Context (category,
-   severity, confidence, why Malicious was proven with score and findings), Evidence (findings with tags,
+   severity, confidence, why Malicious was proven with score and observations), Evidence (observations with tags,
    event references, queries), the action and its matrix entry, Blast radius, Rollback. The same payload
    whoever the executor is; the SOC Manager is the default approver. Record the decision (approved,
    modified, rejected) on the action's entry; a rejection is a review event. While pending, apply the
-   pre-authorized actions and continue investigating residual findings. Waiting time is HITL dwell, never
+   pre-authorized actions and continue investigating residual observations. Waiting time is HITL dwell, never
    containment time.
 6. **Apply and record** each containment action: entity, timestamp, how it is reversed. Verify from
    telemetry that contained activity has stopped before eradicating (no lateral movement from isolated
