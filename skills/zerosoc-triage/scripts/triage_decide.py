@@ -39,9 +39,9 @@ try:
 except ImportError:  # the shared script is copied next to this one by tools/build_references.py
     inventory_note = None
 try:
-    from alert_metadata import actions_of, decision_notes, dispositions, neutralized, techniques_of
+    from alert_metadata import decision_notes, neutralized, techniques_of
 except ImportError:
-    actions_of = decision_notes = dispositions = neutralized = techniques_of = None
+    decision_notes = neutralized = techniques_of = None
 
 W = {"Low": 1, "Medium": 2, "High": 3}
 LEVELS = ["Low", "Medium", "High"]
@@ -135,7 +135,6 @@ def decide(ledger):
     if decision_notes:
         r["detection_notes"] = decision_notes(record, ledger)
     if record:
-        r["recommended_actions"] = dispositions(actions_of(record)) if dispositions else {}
         r["neutralized_entities"] = neutralized(record)
         if record.get("candidate_incident_categories"):
             r["candidate_incident_categories"] = record["candidate_incident_categories"]

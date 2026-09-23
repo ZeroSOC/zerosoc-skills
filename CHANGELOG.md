@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+- **A source's recommended actions are context, and nothing answers them.** They were carried as a
+  list with a `disposition` on each, and the executor said what became of every published line —
+  followed with the Finding it produced, or set aside with a reason. The reason that was wrong is
+  not volume: **the source publishes two kinds of instruction in one list.** Some are checks
+  ("Examine the PowerShell command line", "Inspect the parent process"); roughly a fifth of a live
+  59-alert Case's 107 distinct instructions are **response actions** — "Contain and mitigate the
+  breach", "Decommission compromised accounts or reset passwords", "Block IP addresses and URLs" —
+  which are not triage's to perform and whose result is not evidence. Accounting for every line
+  made triage answer for containment, and the only vocabulary it had for *"that is a response
+  action"* was `set aside`.
+
+  So: `dispositions()` is gone from `alert_metadata.py`, the `disposition` field is gone from each
+  action, the Note check no longer reads a published procedure back to see what became of it, and
+  neither decision script reports a tally. `check_run.py` reports how many the source published
+  and asks nothing about them. What the executor runs is a Finding like any other, naming the
+  recommendation in the Finding's `analytic` and checked as a Finding.
+
+- **A missing technique does not cost the playbook.** The visibility gap for an absent technique
+  said the candidate Incident Categories *and the playbook section* start from it. The playbook and
+  its section are chosen from the **alert type**; techniques are a second route that widens the
+  categories through the framework's tables. Measured on a live 59-alert Case: 14 alerts carried no
+  technique, every typed alert still got its playbook section, and the Case promoted with six
+  candidate categories. The sentence now names what is actually lost — the categories those tables
+  would have proposed, and the confidence the technique rule would have raised.
+
 - **How a Note spells a technique is guidance, not a conformance check.** The check reported a bare
   technique code as an advisory, because §1.6 states the `ID (Name)` rendering as a SHOULD. It goes
   with the checks #30 removed: the framework is indicative about what an executor examines, and a

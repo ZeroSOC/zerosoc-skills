@@ -52,7 +52,7 @@ FIELDS = {"techniques": "techniques", "threat_name": "threat name", "threat_fami
           "recommended_actions": "recommended actions"}
 # What triage loses when the source supplies none of it (§1.1), as the check each gap prevented.
 PREVENTS = {
-    "techniques": "the technique identifiers the candidate Incident Categories and the playbook section start from",
+    "techniques": "the categories the framework's technique tables would have proposed, and the confidence its technique rule would have raised; the playbook and its section are chosen from the alert type and are unaffected",
     "threat name": "the threat or family name the Malicious hypothesis and the family-specific enrichment start from",
     "detection source": "how the Alert is weighed: a signature match and a model score are not the same evidence",
     "description": "what the detection fires on, which the False Positive conditions are judged against",
@@ -87,13 +87,18 @@ def _list(value):
 
 
 def _actions(value):
-    """The source's recommended actions, each undecided until triage follows it or sets it aside."""
+    """The source's recommended actions, as it published them, each with an id to cite it by.
+
+    They are part of what the detection asserts and nothing more. The executor reads them with the
+    rest of the Case and uses the ones that bear on it; what it runs is a Finding like any other,
+    naming the recommendation in the Finding's `analytic`.
+    """
     out = []
     for n, item in enumerate(_list(value), start=1):
         if isinstance(item, dict):
-            out.append(dict({"id": f"RA{n}", "disposition": None}, **item))
+            out.append(dict({"id": f"RA{n}"}, **item))
         else:
-            out.append({"id": f"RA{n}", "action": item, "disposition": None})
+            out.append({"id": f"RA{n}", "action": item})
     return out
 
 
@@ -105,26 +110,6 @@ def actions_of(record):
 def neutralized(record):
     """The entities the source reports it blocked, quarantined or removed."""
     return [r.get("entity") for r in (record or {}).get("remediation", []) if r.get("neutralized")]
-
-
-def dispositions(actions):
-    """Which recommended actions the executor ran, which it declined with a stated reason, and
-    which it left alone.
-
-    §1.5: what a source recommends is indicative. One that was run produces a Finding like any
-    other check; one the executor left alone produces nothing, and is neither a failure nor an
-    entry on the Case. "open" is what nobody acted on — the ordinary case, not a debt.
-    """
-    followed, set_aside, open_ = [], [], []
-    for action in actions or []:
-        state = str(action.get("disposition") or "").strip().lower().replace("_", " ")
-        if state == "followed":
-            followed.append(action.get("id"))
-        elif state in ("set aside", "setaside", "rejected") and str(action.get("reason") or "").strip():
-            set_aside.append(action.get("id"))
-        else:
-            open_.append(action.get("id"))
-    return {"followed": followed, "set_aside": set_aside, "open": open_}
 
 
 def assertions(alert, profile, index=None):
@@ -241,7 +226,7 @@ def build(alerts, profile, evidence=None, index=None):
                 techniques.append(t["id"])
     built["techniques"] = techniques
     built["candidate_incident_categories"] = sorted({c for a in built["alerts"] for c in a["candidate_incident_categories"]})
-    built["recommended_actions"] = dispositions(actions_of(built))
+    built["recommended_actions"] = actions_of(built)
     built["neutralized_entities"] = neutralized(built)
     built["visibility_gaps"] = gaps(built, evidence_read=evidence is not None)
     return built

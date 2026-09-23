@@ -16,9 +16,12 @@ executor puts that language in its place; read as it is, it means the language o
   and the block is a response. It never makes a Benign finding. What stays open is how the entity
   arrived, what ran before it was stopped, and whether the same thing is elsewhere — aim the checks
   there, and at the entities the source left active.
-- The source's recommended actions are indicative: run the ones that bear on this Case. One you
-  run is a finding like any other, naming the recommendation it came from and tagged on the evidence
-  it returned; one you do not run is not written down at all.
+- The source's recommended actions come with the Case as context. They are a procedure written
+  for an alert type before anything was known about this Case, and they mix two kinds of
+  instruction: checks, and response actions — isolate the device, reset the password, block the
+  address. A response action is not triage's to perform and its result is not evidence. Use what
+  bears on the Case, write what you ran as a finding like any other with the recommendation named
+  in its `analytic`, and pass over the rest without writing anything down about it.
 - Tag each result Malicious or Benign at Low, Medium or High as the playbook prescribes; a result
   that bears on neither side is context: it carries no side and no confidence.
 - Every finding cites the alert ids or the event references that ground it. A finding that cannot

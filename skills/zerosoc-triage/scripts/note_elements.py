@@ -34,12 +34,6 @@ written as {"n", "finding", "tag": {"side", "confidence_id"}} is read too.
 """
 import argparse, json, os, re, sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-try:
-    from alert_metadata import dispositions
-except ImportError:  # the shared script is copied next to this one by tools/build_references.py
-    dispositions = None
-
 HERE = os.path.dirname(os.path.abspath(__file__))
 FRAMEWORK = os.path.normpath(os.path.join(HERE, "..", "references", "framework"))
 METHOD = os.path.join("03-Processes", "02-detection_and_analysis.md")
@@ -202,14 +196,12 @@ def check(note, kind=None, root=FRAMEWORK):
         if not element["may_be_empty"] and (_blank(held) or str(held).strip().rstrip(".").lower() == "none"):
             failures.append(f"the Note renders no {element['name']}: the framework's {kind} Note requires it")
 
-    ids = set()
     for finding in findings:
         if isinstance(finding.get("tag"), str):
             failures.append(f"finding {finding.get('id', finding.get('n', '?'))}: the tag is the text "
                             f"{finding['tag']!r}; state \"side\" and \"confidence\" as the ledger does")
             continue
         label, text, side, confidence, cited = _read(finding)
-        ids.add(str(label))
         where = f"finding {label}"
         if not text.strip():
             failures.append(f"{where} says nothing: a Finding is stated in accurate terms")
@@ -232,13 +224,12 @@ def check(note, kind=None, root=FRAMEWORK):
         if not prevented or prevented.startswith(PLACEHOLDER):
             failures.append(f"visibility gap {gap.get('data_source')!r} names no check it prevented")
     recorded = {str(g.get("data_source", "")).strip().lower() for g in gaps if isinstance(g, dict)}
-    return failures + _asserted(note, alerts, findings, ids, recorded)
+    return failures + _asserted(note, alerts, findings, recorded)
 
 
-def _asserted(note, alerts, findings, finding_ids, recorded_gaps):
-    """§1.6: each Alert Finding renders what its detection asserted, and a recommended action the
-    executor ran renders as the Finding it produced. Triage keeps the Case's alerts in "alerts";
-    investigation keeps them among its findings, each with its "alert_type"."""
+def _asserted(note, alerts, findings, recorded_gaps):
+    """§1.6: each Alert Finding renders what its detection asserted. Triage keeps the Case's alerts
+    in "alerts"; investigation keeps them among its findings, each with its "alert_type"."""
     failures = []
     among = [f for f in findings if f.get("alert_type")]
     record = note.get("detection_metadata")
@@ -265,37 +256,17 @@ def _asserted(note, alerts, findings, finding_ids, recorded_gaps):
     if among and not read and not blind:
         failures.append(f"{len(among)} Alert Finding(s) and a detection_metadata that read no alert: each renders "
                         "what its detection asserted")
-    actions = []
     for alert in record.get("alerts") or []:
         for absent in _listed(alert.get("absent")):
             if f"alert metadata: {absent}".lower() not in recorded_gaps:
                 failures.append(f"alert {alert.get('id')}: the source did not supply the {absent}, and no "
                                 "Visibility Gap says so with the check it prevented")
-        for action in _listed(alert.get("recommended_actions")):
-            if isinstance(action, dict):
-                actions.append((alert.get("id"), action))
-    # What a source recommends is indicative (§1.5). An action the executor RAN renders as the
-    # Finding it produced, and is held to naming it. One it did not run is not a failure and not
-    # an entry: a Note recording every published action as considered-and-irrelevant states the
-    # source's checklist in place of the Case's own account of itself. This once required the
-    # opposite — every action answered — on sources that publish their procedure per alert, which
-    # is how a Case of three alerts produced a Note of sixty-seven findings, six of which decided
-    # it.
-    # Per alert, never across them: a source numbers its procedure per alert, so "RA7" is one
-    # instruction on one alert and another on the next. Keyed by the bare number, an answer given
-    # for one alert's RA7 was read as an answer for every alert's — and a live 59-alert Case whose
-    # Note was complete was refused for two recommendations that had each been answered where they
-    # were published.
-    by_alert = {}
-    for alert_id, action in actions:
-        by_alert.setdefault(alert_id, []).append(action)
-    for alert_id, held in by_alert.items():
-        ran = dispositions(held)["followed"] if dispositions else []
-        for action in held:
-            if action.get("id") in ran and str(action.get("finding") or "") not in finding_ids:
-                failures.append(f"alert {alert_id}: recommended action {action.get('id')} was run and names no "
-                                "Finding it produced: one run renders as that Finding, naming the recommendation "
-                                "it came from")
+    # What a source recommends is nothing this checks. They are part of what the detection
+    # asserts, the executor reads them with the rest of the Case, and what it runs is a Finding
+    # like any other — named in that Finding's `analytic` and checked as a Finding. Nothing here
+    # reads a published procedure back to see what became of each line: the procedure is written
+    # for an alert type before anything is known about the Case, and holding a Note to it is how
+    # a Case of three alerts produced a Note of sixty-seven findings, six of which decided it.
     return failures
 
 

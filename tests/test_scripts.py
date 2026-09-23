@@ -372,30 +372,21 @@ class DecisionReadsWhatTheDetectionAsserts(unittest.TestCase):
         self.assertIn("what the detection asserts", " ".join(r["detection_notes"]))
         self.assertIn("alert_metadata.py", " ".join(r["detection_notes"]))
 
-    def test_a_recommendation_the_run_made_nothing_of_holds_nothing_up(self):
-        """§1.5: what a source recommends is indicative. It used to hold the decision until every
-        published action was followed or set aside with a reason, on sources that publish their
-        procedure per alert — which made the decision wait on a checklist rather than on evidence."""
+    def test_a_recommendation_is_nothing_the_decision_accounts_for(self):
+        """§1.5: what a source recommends is indicative. The decision once waited until every
+        published action was followed or set aside with a reason, then reported what became of
+        each. Both are a checklist on a source that publishes its procedure per alert — and the
+        source publishes two kinds of instruction, checks and response actions, so accounting for
+        every line made triage answer for containment it is not triage's to perform."""
         led = self.ledger()
-        led["detection_metadata"]["alerts"][0]["recommended_actions"].append({"id": "RA2", "action": "Check other devices"})
+        led["detection_metadata"]["alerts"][0]["recommended_actions"].append(
+            {"id": "RA2", "action": "Isolate the device"})
 
         r = triage.decide(led)
 
         self.assertNotIn("decision_ready", r)
-        self.assertEqual(r["recommended_actions"]["open"], ["RA2"], "what nobody acted on is still reported")
+        self.assertNotIn("recommended_actions", r)
         self.assertEqual(r["decision"], "Close", "the coverage rule is unchanged")
-
-    def test_what_the_run_did_with_the_recommendations_is_still_reported(self):
-        """Reporting them is not requiring them: a reader of the decision is told what was run and
-        what was declined, and draws their own conclusion about what was left."""
-        led = self.ledger()
-        led["detection_metadata"]["alerts"][0]["recommended_actions"].append(
-            {"id": "RA2", "action": "Reset the user's password", "disposition": "set aside",
-             "reason": "no identity in scope"})
-
-        r = triage.decide(led)
-
-        self.assertEqual(r["recommended_actions"], {"followed": ["RA1"], "set_aside": ["RA2"], "open": []})
 
     def test_a_neutralized_entity_is_recorded_and_never_taken_as_an_explanation(self):
         r = triage.decide(self.ledger())
@@ -524,16 +515,12 @@ class DetectionMetadata(unittest.TestCase):
         unknown = self.one(dict(self.ALERT, detectionSource="somethingElse"))
         self.assertEqual(unknown["detection"]["analytic_type_id"], 99, "an unmapped source is Other, never guessed")
 
-    def test_recommended_actions_start_undecided_and_are_followed_or_set_aside(self):
+    def test_a_recommended_action_is_what_the_source_published_and_an_id_to_cite_it_by(self):
+        """No disposition field: the executor is not asked what became of each one. What it ran is
+        a Finding naming the recommendation in its `analytic`, checked as a Finding."""
         a = self.one()
-        self.assertEqual([r["disposition"] for r in a["recommended_actions"]], [None, None])
-        d = metadata.dispositions([{"id": "RA1", "action": "x", "disposition": "followed", "finding": "F4"},
-                                   {"id": "RA2", "action": "y", "disposition": "set aside", "reason": "no such tool here"},
-                                   {"id": "RA3", "action": "z"}])
-        self.assertEqual(d["followed"], ["RA1"]); self.assertEqual(d["set_aside"], ["RA2"])
-        self.assertEqual(d["open"], ["RA3"])
-        self.assertEqual(metadata.dispositions([{"id": "RA4", "action": "z", "disposition": "set aside"}])["open"], ["RA4"],
-                         "set aside without a reason is not a disposition")
+        self.assertEqual([sorted(r) for r in a["recommended_actions"]], [["action", "id"], ["action", "id"]])
+        self.assertFalse(hasattr(metadata, "dispositions"))
 
     def test_an_assertion_the_source_does_not_supply_is_named_not_assumed(self):
         bare = self.one({"id": "A2", "title": "Suspicious activity"})
@@ -993,7 +980,7 @@ class RunCheck(unittest.TestCase):
 
         self.assertEqual(code, 0)
         self.assertIn("note  triage: recommended actions", out)
-        self.assertIn("1 not acted on", out)
+        self.assertIn("published across the Case's alerts", out)
 
     def test_a_ledger_claiming_an_assertion_its_alerts_do_not_carry_fails(self):
         """The assertions are recomputed from the run's own alerts: the ledger does not get to
