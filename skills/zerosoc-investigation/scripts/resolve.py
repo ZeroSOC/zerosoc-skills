@@ -41,9 +41,9 @@ try:
 except ImportError:  # the shared script is copied next to this one by tools/build_references.py
     inventory_note = None
 try:
-    from alert_metadata import actions_of, decision_notes, dispositions, neutralized
+    from alert_metadata import decision_notes, neutralized
 except ImportError:
-    actions_of = decision_notes = dispositions = neutralized = None
+    decision_notes = neutralized = None
 
 W = {"Low": 1, "Medium": 2, "High": 3}
 LEVELS = ["Low", "Medium", "High"]
@@ -131,7 +131,6 @@ def resolve(ledger, now=None):
     record = ledger.get("detection_metadata")
     if decision_notes: r["detection_notes"] = decision_notes(record, ledger)
     if record:
-        if dispositions: r["recommended_actions"] = dispositions(actions_of(record))
         r["neutralized_entities"] = neutralized(record)
     if ledger.get("duplicate_of"):
         r.update(outcome="Duplicate", verdict_id=10, confidence_id=None, master_case_uid=ledger["duplicate_of"], next="close; merge evidence into the master Case")

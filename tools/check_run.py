@@ -305,13 +305,11 @@ def check_detection_metadata(report, run, ledger, label, note_name, profile_path
                  f"{len(unrecorded)} absent and not recorded: " + ", ".join(unrecorded) if unrecorded
                  else ("nothing absent" if not absent else f"all {len(absent)} recorded"))
     # §1.5: what a source recommends is indicative. This once failed a run that left one
-    # unanswered; on a source that publishes its procedure per alert that is a checklist, not a
-    # check. What the run did with them is reported, and nothing is required of it.
-    state = alert_metadata.dispositions(alert_metadata.actions_of(record))
+    # unanswered, then reported what became of each; on a source that publishes its procedure per
+    # alert both are a checklist. How many it published is worth knowing — it sizes what the
+    # executor read — and nothing is asked about what it did with them.
     actions = alert_metadata.actions_of(record)
-    report.note(f"{label}: recommended actions",
-                f"{len(actions)} published, {len(state['followed'])} run, "
-                f"{len(state['set_aside'])} declined with a reason, {len(state['open'])} not acted on")
+    report.note(f"{label}: recommended actions", f"{len(actions)} published across the Case's alerts")
     neutralized = [r["entity"] for r in record.get("remediation", []) if r.get("neutralized")]
     note = read(run, note_name)
     if not neutralized:

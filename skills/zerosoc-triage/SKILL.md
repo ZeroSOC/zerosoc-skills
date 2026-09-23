@@ -80,12 +80,13 @@ Read per alert: the playbook section the script prints.
      sub-technique falling back to its parent). One the framework's tables do not hold widens nothing,
      and is recorded on the Case and named in the Note rather than dropped or renamed.
    - Take the **threat name and family** to step 6: they direct the enrichment and seed the hypotheses.
-   - **The recommended actions are indicative** (§1.5): read them as a set — the same instruction is
-     one instruction however many alerts published it — and **run the ones that bear on this Case**.
-     One you run is recorded on the action as `"disposition": "followed"` with the finding it produced,
-     tagged like any other check on the evidence it returned; one you decline for a stated reason is
-     recorded as `"disposition": "set aside"` with `"reason"`. One you simply do not act on is recorded
-     nowhere: a line saying a recommendation was considered and found irrelevant is not evidence.
+   - **The recommended actions are context** (§1.5): read them as a set — the same instruction is
+     one instruction however many alerts published it — and **use the ones that bear on this Case**.
+     What you run is a finding like any other, tagged on the evidence it returned, with the
+     recommendation named in the finding's `analytic`. Nothing is recorded about the rest, and
+     nothing asks what became of each: the source mixes **checks** with **response actions**
+     — isolate the device, reset the password, block the address — and a response action is not
+     triage's to perform, so answering for one is answering for work that did not happen.
    - Aim the checks of step 6 where the **remediation state** leaves them: at the entities the source left
      **active** first, and at what a block does not answer — how the entity arrived, what ran before it
      was stopped, whether the same thing is elsewhere. The state is recorded, never weighed (§1.5).

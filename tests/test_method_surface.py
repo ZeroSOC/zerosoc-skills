@@ -258,12 +258,16 @@ class TheNoteCheck(unittest.TestCase):
         gap = {"data_source": "EDR", "check_prevented": "(state the check this source would have supported)"}
         self.assertTrue(any("names no check" in f for f in self.failures(ledger_note(visibility_gaps=[gap]))))
 
-    def test_a_followed_recommendation_names_the_finding_it_produced(self):
+    def test_a_recommendation_is_nothing_the_note_is_held_to(self):
+        """The source publishes two kinds of instruction in one list — checks, and response
+        actions it is not triage's place to perform. Reading the list back to see what became of
+        each line made triage account for containment, and the only vocabulary it had for "that is
+        a response action" was a disposition. The list is context now, and the Note answers for
+        its Findings."""
         note = ledger_note()
-        actions = note["detection_metadata"]["alerts"][0]["recommended_actions"]
-        actions.append({"id": "RA1", "action": "Run a full scan", "disposition": "followed"})
-        self.assertTrue(any("RA1" in f and "Finding it produced" in f for f in self.failures(note)))
-        actions[0]["finding"] = "F1"
+        note["detection_metadata"]["alerts"][0]["recommended_actions"].append(
+            {"id": "RA1", "action": "Contain the breach. Isolate affected machines."})
+
         self.assertEqual(self.failures(note), [])
 
     def test_alerts_render_what_their_detection_asserted(self):
@@ -696,9 +700,9 @@ if __name__ == "__main__":
     unittest.main()
 
 
-class ARecommendationIsAnsweredWhereItWasPublished(unittest.TestCase):
-    """A source numbers its procedure per alert, so "RA7" is one instruction on one alert and
-    another on the next. The check reads them per alert for that reason."""
+class ARecommendationIsCarriedAndNotAccountedFor(unittest.TestCase):
+    """The recommendations a source publishes travel with the Case as context. Nothing reads them
+    back: an executor that ran one writes a Finding, and the Finding is what is checked."""
 
     def note(self, actions_by_alert):
         return ledger_note(
@@ -710,23 +714,16 @@ class ARecommendationIsAnsweredWhereItWasPublished(unittest.TestCase):
             ]},
         )
 
-    def test_an_answer_for_one_alerts_action_is_not_an_answer_for_anothers(self):
-        """Measured on a live 59-alert Case: the Note was refused for RA7 and RA11 while both had
-        been answered on the alerts that published them."""
+    def test_the_same_id_on_two_alerts_is_two_instructions_and_neither_is_checked(self):
+        """A source numbers its procedure per alert, so "RA7" is one instruction on one alert and
+        another on the next. Keyed by the bare number, a live 59-alert Case whose Note was complete
+        was refused for RA7 and RA11 — both answered on the alerts that published them."""
         note = self.note({
-            "A1": [{"id": "RA7", "action": "Submit the files", "disposition": "followed", "finding": "F1"}],
-            "A2": [{"id": "RA7", "action": "Check the timeline", "disposition": "set aside",
-                    "reason": "no timeline in scope"}],
+            "A1": [{"id": "RA7", "action": "Submit the files"}],
+            "A2": [{"id": "RA7", "action": "Check the timeline"}],
         })
 
         self.assertEqual(note_elements.check(note, root=FRAMEWORK), [])
-
-    def test_an_action_that_was_run_and_names_no_finding_says_which_alert(self):
-        note = self.note({"A1": [{"id": "RA7", "action": "Submit the files", "disposition": "followed"}]})
-
-        failures = note_elements.check(note, root=FRAMEWORK)
-
-        self.assertTrue(any("alert A1" in f and "RA7" in f for f in failures), failures)
 
 
 class TheCheckAnswersTheSameShapeEveryWayOut(unittest.TestCase):
