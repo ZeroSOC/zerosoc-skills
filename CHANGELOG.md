@@ -2,9 +2,28 @@
 
 ## Unreleased
 
+- **The pin follows the framework to b36b208, and a Finding becomes an Observation.** The framework
+  took its own word for the entry in a Case's record, leaving *Finding* to OCSF, where a Detection
+  Finding is an Alert and an Incident Finding is a Case. The skills follow: the ledger's `findings`
+  is `observations`, and so is the Note element the check reads out of the method. Every OCSF term
+  stays as it was — `finding_info`, `finding_info_list` and the class names are untouched.
+
+- **A Note renders Response Actions, and the check requires it.** The method added an element after
+  the Case Timeline holding the remediation the Case carries: each Remediation Activity it references
+  and each open ticket it raised, with its kind. `note_elements.py` needed no change — it reads the
+  element list out of §1.6 and §2.5 — so what changed is the ledger, which now carries
+  `response_actions`, and both `SKILL.md` files, which tell the executor what to put there. An
+  element the script requires and the skill never mentions is an element nobody writes.
+
+- **An Observation's side and confidence are their own attributes.** They were `zerosoc:side` and
+  `zerosoc:confidence_id` in OCSF's `tags`, which OCSF intends for categorising and searching and
+  whose values it does not constrain. They are now typed attributes under `finding_info.zerosoc`, so
+  the source profile's `alerts[].severity` lands on `finding_info_list[].zerosoc.confidence_id`
+  rather than on a tag array the Case Schema no longer declares.
+
 - **A source's recommended actions are context, and nothing answers them.** They were carried as a
   list with a `disposition` on each, and the executor said what became of every published line —
-  followed with the Finding it produced, or set aside with a reason. The reason that was wrong is
+  followed with the Observation it produced, or set aside with a reason. The reason that was wrong is
   not volume: **the source publishes two kinds of instruction in one list.** Some are checks
   ("Examine the PowerShell command line", "Inspect the parent process"); roughly a fifth of a live
   59-alert Case's 107 distinct instructions are **response actions** — "Contain and mitigate the
@@ -16,8 +35,8 @@
   So: `dispositions()` is gone from `alert_metadata.py`, the `disposition` field is gone from each
   action, the Note check no longer reads a published procedure back to see what became of it, and
   neither decision script reports a tally. `check_run.py` reports how many the source published
-  and asks nothing about them. What the executor runs is a Finding like any other, naming the
-  recommendation in the Finding's `analytic` and checked as a Finding.
+  and asks nothing about them. What the executor runs is an Observation like any other, naming the
+  recommendation in the Observation's `analytic` and checked as an Observation.
 
 - **A missing technique does not cost the playbook.** The visibility gap for an absent technique
   said the candidate Incident Categories *and the playbook section* start from it. The playbook and
@@ -31,7 +50,7 @@
   technique code as an advisory, because §1.6 states the `ID (Name)` rendering as a SHOULD. It goes
   with the checks #30 removed: the framework is indicative about what an executor examines, and a
   rule about how a Note spells an identifier it has already grounded in events is the same kind of
-  prescription in a smaller place. Measured on a live Case: 28 findings, every one grounded, every
+  prescription in a smaller place. Measured on a live Case: 28 observations, every one grounded, every
   Alert rendering what its detection asserted — and the only thing the check had to say was that
   `T1053` appeared once without its name. The recommendation stays in the rule files and both
   `SKILL.md`s, and `alert_metadata.py` still renders the names the framework's tables hold; nothing
@@ -45,7 +64,7 @@
 
 - **The pin follows the framework to 25ac3ea.** Two releases of the method, taken together.
 
-  A Note renders **the account before the measures**: Summary, Classification, Rationale, Findings,
+  A Note renders **the account before the measures**: Summary, Classification, Rationale, Observations,
   then the rest (ZeroSOC/zerosoc-framework#75). The scripts read the order out of the method, so
   the check needed no change — but both `SKILL.md` files spelled the old order out in prose, and an
   executor reading the skill would have written a Note the check then accepted. They now name the
@@ -53,7 +72,7 @@
   another system's record says which OCSF release it was written against.
 
   A source's **recommended actions are indicative** (ZeroSOC/zerosoc-framework#76): one the executor
-  runs is recorded as the Finding it produced, and one it does not run is recorded nowhere. `#30`
+  runs is recorded as the Observation it produced, and one it does not run is recorded nowhere. `#30`
   carried that into the skills' own procedure, but `rules/checks.md` still opened with *"Answer
   every recommended action: followed … or set aside with a reason"* — the retired rule, in the text
   a host hands an executor verbatim. Measured against a live tenant: with that line in the rules and
@@ -68,7 +87,7 @@
   through `check()` and asserts both lists come back, and the command-line tests cover the rest.
 
 - **A recommendation is answered where it was published.** The one check that remains — an action
-  the executor ran names the Finding it produced — read the actions of every alert as one list,
+  the executor ran names the Observation it produced — read the actions of every alert as one list,
   keyed by the number the source gave them. A source numbers its procedure **per alert**, so "RA7"
   is one instruction on one alert and another on the next: an answer given for one alert's RA7 was
   read as an answer for every alert's, and a live 59-alert Case whose Note was complete was refused
@@ -79,7 +98,7 @@
 
 - **The Note check reports advisories beside the failures, and only a failure refuses a Note.**
   `note_elements.check()` returned one flat list and every entry in it was a gate condition,
-  whatever it was about. Most of them are: a Finding that cites no event, a side with no
+  whatever it was about. Most of them are: an Observation that cites no event, a side with no
   confidence, a recommended action nobody dispositioned, an Alert that renders nothing of what its
   detection asserted — each says the Case cannot be read as decided on evidence. Technique
   rendering is not one of them. The framework states it as a SHOULD (§1.6, §2.5), and a Note that
@@ -111,8 +130,8 @@
   back and answer them. All four are gone, following the framework's §1.5. A source publishes its
   procedure on every alert it raises: measured on a live tenant, a 59-alert Case published 684
   recommended actions — 107 distinct instructions — and a **three-alert** Case produced a Triage
-  Note of 67 findings, six of which decided it. What the executor **ran** is still held to naming
-  the Finding it produced; what it did not run is neither a failure nor an entry, because a line
+  Note of 67 observations, six of which decided it. What the executor **ran** is still held to naming
+  the Observation it produced; what it did not run is neither a failure nor an entry, because a line
   recording that a recommendation was considered and found irrelevant is not evidence. The scripts
   still **report** what was run, declined and left alone — reporting is not requiring, and a reader
   of a decision can draw their own conclusion about what was left.
@@ -177,10 +196,10 @@ ships here rather than in whatever runs the skills.
   tool skill installed beside the method skills — so a deployment installs the tool skill of each
   technology it runs on. What a deployment reads differently goes in a local override named under
   `source_profile_overrides`, not in fields of the binding.
-- **Findings on the ledger gained `event_refs`, `first_seen` and `timeline`.** The decision rules read
+- **Observations on the ledger gained `event_refs`, `first_seen` and `timeline`.** The decision rules read
   none of the three, so a `v0.3.0` ledger still decides the same way; the rest of the surface does read
   them. `timeline.py` derives T0 from the earliest Malicious `first_seen` and shows only what `timeline`
-  flags, and `note_elements.py` fails a Finding that cites no event. A ledger written without them
+  flags, and `note_elements.py` fails an Observation that cites no event. A ledger written without them
   yields a Case with no timeline and a Note that does not pass its own check.
 
 - **A source profile: one versioned home for what a technology's records mean.** What this project
@@ -223,7 +242,7 @@ ships here rather than in whatever runs the skills.
 - **The method surface moves here: rendering, the timeline and the rule text.** A rule the framework
   changes should be a skills release and a pin bump; three of them needed a patch somewhere else as
   well, because something else owned them. All three scripts read **the ledger** the decision rules
-  already run on, so nothing is copied into a second shape: a finding now also says the events it
+  already run on, so nothing is copied into a second shape: an observation now also says the events it
   rests on (`event_refs`), when the thing it reports happened (`first_seen`) and whether the
   narrative shows it (`timeline`).
   `select_playbook.py` returns the playbook's **candidate Incident Categories** in the playbook's
@@ -232,12 +251,12 @@ ships here rather than in whatever runs the skills.
   `timeline.py` builds the **Case Timeline** and **derives T0**, the earliest Malicious
   `first_seen`: context may come before it, a Malicious entry may not. It flags the one entry that
   carries T0, reads ISO 8601 and epoch milliseconds alike, and fails a T0 no entry carries, a stated
-  T0 the findings contradict, and a finding placed by when it was made instead of when it happened.
+  T0 the observations contradict, and an observation placed by when it was made instead of when it happened.
   `note_elements.py` prints the elements of a conformant Note **as the framework names them**, with
   all it says each contains, and checks an assembled one: a side without a confidence, context with
-  one, a finding that cites no event, a technique code written bare anywhere in the Note — and
+  one, an observation that cites no event, a technique code written bare anywhere in the Note — and
   `T1114.003 (Name)` is not one — an Alert that renders nothing of what its detection asserted, a
-  recommendation followed that names no Finding, a gap that names no check. An element the framework
+  recommendation followed that names no Observation, a gap that names no check. An element the framework
   renames or adds is required under its new name **with no change to the script**, and one it cannot
   read stops it. It renders the structure and runs the checks — the prose stays the executor's,
   because a Note written by a template would be a form and the framework asks for an account.
@@ -252,7 +271,7 @@ produce Notes whose elements the framework no longer defines, and to hand on two
 Schema now rejects.
 
 - **What a Note summarizes, the Case keeps.** The framework's evidence rule changed with the pin: a
-  Finding's evidence is kept with the Case and cited by identifier, not cited alone, because a
+  Observation's evidence is kept with the Case and cited by identifier, not cited alone, because a
   citation is evidence only while the source still holds the event. The Note still summarizes and
   still pastes no raw log; the instruction now says which of the two is which.
 
@@ -274,23 +293,23 @@ Schema now rejects.
 
 - **Both Notes render the Case, in one element structure.** Classification first, and it carries the
   decision: Close or Promote at triage, the verdict at investigation, beside severity, confidence, impact
-  and the category. Then Summary, Findings, Rationale, Case Timeline, Visibility Gaps, Provenance. The
+  and the category. Then Summary, Observations, Rationale, Case Timeline, Visibility Gaps, Provenance. The
   Investigation Note gains a Summary. `zerosoc-triage` and `zerosoc-investigation` write to this
   structure and no longer point at the deliverable templates, which are being rebuilt.
 
-- **Three elements dissolved.** *Actions Taken* — the check that produced a Finding is that Finding's
-  `analytic`, rendered beside it. *Executed Queries* — a query that produced a Finding is the same
-  `analytic`. *References* and *Evidence References* — the events are cited with each Finding, and the
+- **Three elements dissolved.** *Actions Taken* — the check that produced an Observation is that Observation's
+  `analytic`, rendered beside it. *Executed Queries* — a query that produced an Observation is the same
+  `analytic`. *References* and *Evidence References* — the events are cited with each Observation, and the
   preserved-evidence pointer moved to Provenance.
 
 - **`t0` and `timeline` are gone from the contracts.** T0 is the Case's `start_time`, which every Case
-  carries: it opens at the earliest Alert and moves earlier whenever a Malicious Finding cites an earlier
-  event. The Case Timeline is the Findings flagged `zerosoc:timeline`, rendered in `first_seen_time`
+  carries: it opens at the earliest Alert and moves earlier whenever a Malicious Observation cites an earlier
+  event. The Case Timeline is the Observations flagged `zerosoc:timeline`, rendered in `first_seen_time`
   order, not a field. `resolve.py` says so where it named the timeline as T0's source.
 
 - **Response actions are entries on the Case.** `zerosoc-response` records each action as its own
   `finding_info_list` entry typed `action`, carrying the Remediation Activity event — against the Case,
-  not against the Finding that prompted it, because the reasoning may be retracted and the action still
+  not against the Observation that prompted it, because the reasoning may be retracted and the action still
   happened. The skill now reads the entries on arrival, so a tool-initiated action that fired before any
   executor opened the Case is not done twice. `autonomy.py` follows.
 
@@ -304,12 +323,12 @@ telemetry).
 
 - **A visibility gap no longer caps the Case's confidence.** The rule was removed from the framework, so
   `triage_decide.py` and `resolve.py` no longer lower the level when the ledger records a gap: confidence
-  follows the findings that were gathered, and the gap is recorded in the Note and counted by the
+  follows the observations that were gathered, and the gap is recorded in the Note and counted by the
   Visibility-Gap Rate. The playbook selector and both procedures say the same. `check_run.py` still holds a
   run to recording the gaps its binding implies.
 
 - **Acceptance harness for a live run.** `tools/check_run.py` recomputes what a run reported from the
-  artifacts it produced: the evidence inventory against the evidence, the alert findings against the
+  artifacts it produced: the evidence inventory against the evidence, the alert observations against the
   deployment map and the framework catalog, the timebox against the ledger's timestamps, the verdict
   against the rule, the sweep against the Note, and the binding against every data source the playbooks
   name. It also holds the run to the visibility-gap rule: every required source the binding marks
@@ -349,7 +368,7 @@ Fixes found running the three skills end to end against a live Incident.
   binding schema gains the optional `data_source_notes` and `alert_type_map`.
 - **Deterministic alert types.** `scripts/alert_types.py` maps source alerts to framework alert types
   from a deployment map (`capabilities/alert_types.defender-xdr.json`) and collapses the same type on the
-  same entity; `resolve.py` counts alert findings of one type on one entity once.
+  same entity; `resolve.py` counts alert observations of one type on one entity once.
 - **Measured timebox.** `resolve.py` computes the investigation timebox from `started_at` to `--now`,
   `resolved_at` or the current time, against the severity-scaled reference value, which
   `timebox_minutes` may tighten and never extend; a self-reported `timebox_expired` is a labelled

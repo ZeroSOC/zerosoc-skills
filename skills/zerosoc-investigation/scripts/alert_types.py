@@ -31,7 +31,7 @@ alert is flagged exactly as before: the taxonomy is not bent to cover what it do
 the maintainer's list of what to add stops carrying what was already decided. Output: the "alerts"
 array of ledger.json
 (format in triage_decide.py). Each entry also carries "alert_type" and "side": "Malicious", so the same
-entries seed the findings of resolve.py, where one type on one entity again counts once.
+entries seed the observations of resolve.py, where one type on one entity again counts once.
 """
 import argparse, json, os, re, sys
 

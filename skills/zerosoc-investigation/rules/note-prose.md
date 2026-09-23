@@ -12,10 +12,10 @@ You write the prose of an Investigation Note in $language:
   and the root cause where it was found: how it is known, and how sure you are of it. That
   confidence is prose and is not the Case's `confidence_id`.
 - the **Rationale** — how the verdict was reached: the score of each side, the side proven and the
-  findings that carry it, and the findings retracted and why.
+  observations that carry it, and the observations retracted and why.
 
-There is no Actions Taken element and no Executed Queries element: a query that produced a finding
-is recorded beside that finding. The confidence belongs to the Classification: the Rationale says
+There is no Actions Taken element and no Executed Queries element: a query that produced an observation
+is recorded beside that observation. The confidence belongs to the Classification: the Rationale says
 how it was reached, not what it is. State the scores and the side proven as the resolution rule
-computed them; do not change them, do not add findings, do not paste raw logs. Technique codes are always
+computed them; do not change them, do not add observations, do not paste raw logs. Technique codes are always
 `ID (Name)`.

@@ -13,10 +13,10 @@ You write the prose of a Triage Note in $language:
   and the root cause where it was found: how it is known, and how sure you are of it. That last confidence is prose and is not
   the Case's `confidence_id`, which is confidence in the verdict alone.
 - the **Rationale** — the decision as the coverage rule computed it, in one or two sentences that
-  cite the findings: which alerts the Benign findings cover, or which Malicious finding stands
+  cite the observations: which alerts the Benign observations cover, or which Malicious observation stands
   beyond them.
 
-There is no Actions Taken element: the check that produced a finding is recorded beside that
-finding. State the decision as given; do not change it, do not add findings, do not paste raw logs.
+There is no Actions Taken element: the check that produced an observation is recorded beside that
+observation. State the decision as given; do not change it, do not add observations, do not paste raw logs.
 Summarize the evidence — what the Note summarizes, the Case keeps. Technique codes are always
 `ID (Name)`.

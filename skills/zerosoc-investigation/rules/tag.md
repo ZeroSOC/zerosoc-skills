@@ -11,8 +11,8 @@ executor puts that language in its place; read as it is, it means the language o
   Benign (Low) if <result>` — each with its confidence. Decide by judgment only when a result fits
   neither stated outcome; then it is usually context.
 - A query that was not run, or whose answer says the source could not answer, produces **no**
-  finding: it is a visibility gap, never a Benign finding.
-- Evidence that **explains** what the alerts fired on is a Benign finding, not context. The Benign
+  observation: it is a visibility gap, never a Benign observation.
+- Evidence that **explains** what the alerts fired on is a Benign observation, not context. The Benign
   hypothesis is proven by evidence, like the Malicious one: a record of authorization is one way to
   prove it, and the absence of such a record proves nothing either way. When an answer shows what
   the activity actually was — the tooling it ran, what launched it, the artifacts it left — tag it
@@ -23,20 +23,20 @@ executor puts that language in its place; read as it is, it means the language o
   launched it being what that activity is launched by — and above all **nothing outside it**. State the
   corroboration, and answer the question that settles it: did anything happen that the declared
   explanation does not account for? If something did, the explanation does not hold; if nothing
-  did, say so, because that is the finding the verdict rests on.
+  did, say so, because that is the observation the verdict rests on.
 - An answer with no rows **is** an answer: tag it as the playbook states for that outcome.
-- Name the telemetry artifact a finding rests on, so two findings on the same artifact count once.
-- Every Malicious finding at Medium or High left uncovered is stated, with the reason it stands.
+- Name the telemetry artifact an observation rests on, so two observations on the same artifact count once.
+- Every Malicious observation at Medium or High left uncovered is stated, with the reason it stands.
   (*Residual* is the framework's word for the uncovered **Low** ones, below.) Consider
   each one against the explanation first: a detection's own wording is its reading of the
   behaviour, not a fact — where the evidence shows the behaviour was part of the explained
-  activity, the finding is covered and the detection's reading was wrong. Where the evidence does
-  not reach it, say so: it stands, a finding that stands blocks a Benign verdict, and what the Case
+  activity, the observation is covered and the detection's reading was wrong. Where the evidence does
+  not reach it, say so: it stands, an observation that stands blocks a Benign verdict, and what the Case
   then is the resolution rule computes.
-- Coverage (§2.4): mark a Malicious finding covered when the Benign explanation accounts for that
-  specific finding on evidence. Do not mark one covered because a verdict would be tidier, and do
+- Coverage (§2.4): mark a Malicious observation covered when the Benign explanation accounts for that
+  specific observation on evidence. Do not mark one covered because a verdict would be tidier, and do
   not leave one uncovered that the evidence plainly accounts for: the first invents a Benign
-  verdict, the second invents an Incident. Uncovered Low Malicious findings do not block a Benign
+  verdict, the second invents an Incident. Uncovered Low Malicious observations do not block a Benign
   verdict; they are residual observations.
 - Re-classify only on evidence: change the Incident Category when the objective differs from or
   exceeds the candidate one, and say why.

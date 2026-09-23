@@ -90,8 +90,8 @@ def _actions(value):
     """The source's recommended actions, as it published them, each with an id to cite it by.
 
     They are part of what the detection asserts and nothing more. The executor reads them with the
-    rest of the Case and uses the ones that bear on it; what it runs is a Finding like any other,
-    naming the recommendation in the Finding's `analytic`.
+    rest of the Case and uses the ones that bear on it; what it runs is an Observation like any other,
+    naming the recommendation in the Observation's `analytic`.
     """
     out = []
     for n, item in enumerate(_list(value), start=1):
@@ -195,7 +195,7 @@ def gaps(built, evidence_read=False):
     One gap per assertion, naming the alerts that lack it: an assertion missing on one alert of twenty
     is a gap for that alert's triage, and the Case's other alerts do not make it up. The remediation
     state is a gap only once the evidence has been read — an executor that did not pass the evidence has
-    not established that the source reports none, and a gap is a finding about the deployment, not about
+    not established that the source reports none, and a gap is an observation about the deployment, not about
     how the script was called.
     """
     missing = {}

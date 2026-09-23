@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply the hypothesis resolution rule of Detection & Analysis §2.4 to a findings ledger. Standard library only.
+"""Apply the hypothesis resolution rule of Detection & Analysis §2.4 to an observations ledger. Standard library only.
 
   resolve.py ledger.json [--benign-kind fp|benign] [--now 2026-09-14T15:12:00Z] [--json]
 
@@ -8,7 +8,7 @@ Ledger (JSON):
   "case_uid": "CASE-1", "severity": "High" (or "severity_id": 4), "started_at": "2026-09-14T15:00:00Z",
   "playbook": "04-Playbooks/02-Investigation-Response/02-malware.md", "playbook_version": "2026-09-16",
   "incident_category": "IC-02",
-  "findings": [{"id": "F1", "desc": "...", "side": "Malicious"|"Benign"|null, "confidence": "Low|Medium|High",
+  "observations": [{"id": "F1", "desc": "...", "side": "Malicious"|"Benign"|null, "confidence": "Low|Medium|High",
                 "at": "2026-09-14T15:03:10Z", "artifact": "hash:...", "alert_type": "...", "entity": "...",
                 "retracted": false, "retraction_reason": "", "covered": false,
                 "event_refs": ["<event id or link>"], "first_seen": "2026-09-14T14:55:41Z", "timeline": false}],
@@ -19,14 +19,14 @@ Ledger (JSON):
   "visibility_gaps": [], "duplicate_of": null, "budget_exhausted": false,
   "timebox_minutes": null, "resolved_at": null, "timebox_expired": false
 }
-"at" is when the finding was made; "first_seen" is when the thing it reports happened, "event_refs" the
+"at" is when the observation was made; "first_seen" is when the thing it reports happened, "event_refs" the
 events it rests on and "timeline" whether the Case Timeline shows it — this rule reads none of the three, and
 note_elements.py and timeline.py read them from this same ledger.
-"covered" on a Malicious finding means the Benign explanation accounts for it (§2.4 coverage). Findings
-that share an "artifact" on the same side count once, and so do alert findings of the same "alert_type"
+"covered" on a Malicious observation means the Benign explanation accounts for it (§2.4 coverage). Observations
+that share an "artifact" on the same side count once, and so do alert observations of the same "alert_type"
 on the same "entity" (§1.1). The timebox is measured, not declared: elapsed time runs from "started_at"
 to --now, else "resolved_at", else the current time, against 10 minutes at High or Critical severity and
-20 otherwise ("timebox_minutes" may tighten the reference value, never extend it). Finding and step
+20 otherwise ("timebox_minutes" may tighten the reference value, never extend it). Observation and step
 timestamps ("at") are checked against "started_at". Without "started_at" the script falls back to the
 self-reported "timebox_expired" and says so. Prints the score
 of each side, which side is proven, the verdict and confidence to record, the residual observations, the
@@ -53,7 +53,7 @@ SEVERITY = {1: "Informational", 2: "Low", 3: "Medium", 4: "High", 5: "Critical"}
 
 
 def _once_key(f):
-    """What makes two findings the same observation: one alert type on one entity, or one artifact."""
+    """What makes two observations the same observation: one alert type on one entity, or one artifact."""
     if f.get("alert_type") and f.get("entity"):
         return (f["side"], "alert", str(f["alert_type"]).strip().lower(), str(f["entity"]).strip().lower())
     if f.get("artifact"):
@@ -61,9 +61,9 @@ def _once_key(f):
     return None
 
 
-def dedupe(findings):
+def dedupe(observations):
     seen, out = {}, []
-    for f in findings:
+    for f in observations:
         key = _once_key(f)
         if key and key in seen:
             if W[f["confidence"]] > W[seen[key]["confidence"]]:
@@ -96,7 +96,7 @@ def timebox(ledger, now=None):
         return {"minutes": minutes, "elapsed_minutes": None, "expired": bool(reported), "source": "self-reported"}, notes
     start = _utc(ledger["started_at"])
     end = _utc(now or ledger.get("resolved_at") or datetime.now(timezone.utc).isoformat())
-    early = [x.get("id", "?") for x in ledger.get("findings", []) + ledger.get("steps", []) if x.get("at") and _utc(x["at"]) < start]
+    early = [x.get("id", "?") for x in ledger.get("observations", []) + ledger.get("steps", []) if x.get("at") and _utc(x["at"]) < start]
     if early:
         notes.append("timestamps precede started_at: " + ", ".join(map(str, early)))
     elapsed = round((end - start).total_seconds() / 60, 1)
@@ -110,7 +110,7 @@ def timebox(ledger, now=None):
 
 
 def resolve(ledger, now=None):
-    active = dedupe([f for f in ledger.get("findings", []) if not f.get("retracted") and f.get("side") in ("Malicious", "Benign")])
+    active = dedupe([f for f in ledger.get("observations", []) if not f.get("retracted") and f.get("side") in ("Malicious", "Benign")])
     mal = [f for f in active if f["side"] == "Malicious"]
     ben = [f for f in active if f["side"] == "Benign"]
     mal_score = sum(W[f["confidence"]] for f in mal)
@@ -120,8 +120,8 @@ def resolve(ledger, now=None):
     malicious_proven = mal_score >= 3
     benign_proven = ben_score >= 3 and not uncovered_mh
     r = {"case_uid": ledger.get("case_uid"), "malicious_score": mal_score, "benign_score": ben_score,
-         "malicious_findings": [f["id"] for f in mal], "benign_findings": [f["id"] for f in ben],
-         "retracted": [f["id"] for f in ledger.get("findings", []) if f.get("retracted")],
+         "malicious_observations": [f["id"] for f in mal], "benign_observations": [f["id"] for f in ben],
+         "retracted": [f["id"] for f in ledger.get("observations", []) if f.get("retracted")],
          "uncovered_medium_high_malicious": [f["id"] for f in uncovered_mh], "residual_low_malicious": [f["id"] for f in residual_low]}
     box, box_notes = timebox(ledger, now)
     r["timebox"] = box
@@ -170,11 +170,11 @@ def main():
         r["emit"] = "tuning ticket to Phase 1" if a.benign_kind == "fp" else "SOC Knowledge Base entry if the exception was not recorded"
     if a.json:
         print(json.dumps(r, indent=2)); return
-    print(f"Malicious {r['malicious_score']} ({', '.join(r['malicious_findings']) or '-'})  |  Benign {r['benign_score']} ({', '.join(r['benign_findings']) or '-'})")
+    print(f"Malicious {r['malicious_score']} ({', '.join(r['malicious_observations']) or '-'})  |  Benign {r['benign_score']} ({', '.join(r['benign_observations']) or '-'})")
     if r["retracted"]: print("Retracted: " + ", ".join(r["retracted"]))
     print(f"Outcome: {r['outcome']}  verdict: {r.get('verdict', '-')} ({r.get('verdict_id')})  confidence: {r.get('confidence', '-')}")
-    if r["uncovered_medium_high_malicious"]: print("Uncovered Medium/High Malicious findings (block a Benign verdict): " + ", ".join(r["uncovered_medium_high_malicious"]))
-    if r["residual_low_malicious"]: print("Residual Low Malicious findings (listed in the Note, monitoring watch): " + ", ".join(r["residual_low_malicious"]))
+    if r["uncovered_medium_high_malicious"]: print("Uncovered Medium/High Malicious observations (block a Benign verdict): " + ", ".join(r["uncovered_medium_high_malicious"]))
+    if r["residual_low_malicious"]: print("Residual Low Malicious observations (listed in the Note, monitoring watch): " + ", ".join(r["residual_low_malicious"]))
     if r.get("confidence_note"): print(r["confidence_note"])
     box = r["timebox"]
     print(f"Timebox: {box['minutes']} min, elapsed {box['elapsed_minutes'] if box['elapsed_minutes'] is not None else '?'} min, {'EXPIRED' if box['expired'] else 'running'} ({box['source']})")

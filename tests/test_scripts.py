@@ -30,35 +30,35 @@ class TriageRule(unittest.TestCase):
     def test_oauth_consent_closes_as_benign_high(self):
         # Detection & Analysis §1.5, first example
         ledger = {"alerts": [{"id": "A", "type": "OAuth app consent", "entity": "u1", "confidence": "Medium"}],
-                  "findings": [{"id": "F2", "side": "Benign", "confidence": "High"}, {"id": "F3", "side": "Benign", "confidence": "Medium"},
+                  "observations": [{"id": "F2", "side": "Benign", "confidence": "High"}, {"id": "F3", "side": "Benign", "confidence": "Medium"},
                                {"id": "F4", "side": "Benign", "confidence": "Low"}, {"id": "F1", "side": None}]}
         r = triage.decide(ledger)
         self.assertEqual(r["decision"], "Close"); self.assertEqual(r["confidence"], "High")
 
     def test_credential_dumping_promotes_at_high(self):
-        # §1.5, second example: two techniques, a Malicious finding beyond the alerts
+        # §1.5, second example: two techniques, a Malicious observation beyond the alerts
         ledger = {"alerts": [{"id": "A1", "type": "Credential dumping", "entity": "h", "confidence": "High", "technique": "T1003"},
                              {"id": "A2", "type": "Internal scan", "entity": "h", "severity": "Medium", "technique": "T1046"}],
-                  "findings": [{"id": "B1", "side": "Benign", "confidence": "Low"}, {"id": "M1", "side": "Malicious", "confidence": "Medium"},
+                  "observations": [{"id": "B1", "side": "Benign", "confidence": "Low"}, {"id": "M1", "side": "Malicious", "confidence": "Medium"},
                                {"id": "M2", "side": "Malicious", "confidence": "Low"}]}
         r = triage.decide(ledger)
         self.assertEqual(r["decision"], "Promote"); self.assertEqual(r["confidence"], "High")
 
     def test_high_alert_needs_benign_high(self):
         ledger = {"alerts": [{"id": "A", "type": "x", "entity": "e", "confidence": "High"}],
-                  "findings": [{"id": "B1", "side": "Benign", "confidence": "Medium"}, {"id": "B2", "side": "Benign", "confidence": "Medium"}]}
+                  "observations": [{"id": "B1", "side": "Benign", "confidence": "Medium"}, {"id": "B2", "side": "Benign", "confidence": "Medium"}]}
         self.assertEqual(triage.decide(ledger)["decision"], "Promote")
 
-    def test_no_finding_promotes_and_a_gap_leaves_the_confidence_alone(self):
-        ledger = {"alerts": [{"id": "A", "type": "x", "entity": "e", "confidence": "High"}], "findings": [], "visibility_gaps": [{"data_source": "EDR"}]}
+    def test_no_observation_promotes_and_a_gap_leaves_the_confidence_alone(self):
+        ledger = {"alerts": [{"id": "A", "type": "x", "entity": "e", "confidence": "High"}], "observations": [], "visibility_gaps": [{"data_source": "EDR"}]}
         r = triage.decide(ledger)
         self.assertEqual(r["decision"], "Promote")
-        self.assertEqual(r["confidence_id"], 3, "confidence follows the findings; the gap is recorded, not weighed in")
+        self.assertEqual(r["confidence_id"], 3, "confidence follows the observations; the gap is recorded, not weighed in")
         self.assertEqual(triage.decide(dict(ledger, visibility_gaps=[]))["confidence_id"], 3)
 
     def test_same_type_same_entity_counts_once(self):
         ledger = {"alerts": [{"id": "A1", "type": "x", "entity": "e", "confidence": "Low"}, {"id": "A2", "type": "x", "entity": "e", "confidence": "Low"}],
-                  "findings": [{"id": "B", "side": "Benign", "confidence": "Medium"}]}
+                  "observations": [{"id": "B", "side": "Benign", "confidence": "Medium"}]}
         r = triage.decide(ledger)
         self.assertEqual(len(r["alerts_considered"]), 1); self.assertEqual(r["decision"], "Close")
 
@@ -70,7 +70,7 @@ class ResolutionRule(unittest.TestCase):
              {"id": "domain", "side": "Malicious", "confidence": "Medium", "retracted": True},
              {"id": "page", "side": "Malicious", "confidence": "High", "retracted": True},
              {"id": "campaign", "side": "Benign", "confidence": "High"}]
-        r = inv.resolve({"findings": f})
+        r = inv.resolve({"observations": f})
         self.assertEqual(r["outcome"], "Benign proven"); self.assertEqual(r["confidence"], "High")
 
     def test_coverage_decides(self):
@@ -78,33 +78,33 @@ class ResolutionRule(unittest.TestCase):
         f = [{"id": "alert", "side": "Malicious", "confidence": "High", "covered": True},
              {"id": "use", "side": "Malicious", "confidence": "High", "covered": False},
              {"id": "agent", "side": "Benign", "confidence": "High"}]
-        r = inv.resolve({"findings": f})
+        r = inv.resolve({"observations": f})
         self.assertEqual(r["verdict_id"], 2); self.assertEqual(r["confidence"], "High")
 
     def test_strongest_not_average(self):
         f = [{"id": "a", "side": "Malicious", "confidence": "Medium"}, {"id": "feed", "side": "Malicious", "confidence": "High"},
              {"id": "l1", "side": "Malicious", "confidence": "Low"}, {"id": "l2", "side": "Malicious", "confidence": "Low"}, {"id": "l3", "side": "Malicious", "confidence": "Low"}]
-        r = inv.resolve({"findings": f})
+        r = inv.resolve({"observations": f})
         self.assertEqual(r["malicious_score"], 8); self.assertEqual(r["confidence"], "High")
 
     def test_low_confidence_true_positive(self):
         f = [{"id": str(i), "side": "Malicious", "confidence": "Low"} for i in range(4)]
-        r = inv.resolve({"findings": f})
+        r = inv.resolve({"observations": f})
         self.assertEqual(r["verdict_id"], 2); self.assertEqual(r["confidence"], "Low")
 
     def test_residual_low_lowers_benign_confidence(self):
         f = [{"id": "m", "side": "Malicious", "confidence": "Low"}, {"id": "b", "side": "Benign", "confidence": "High"}]
-        r = inv.resolve({"findings": f})
+        r = inv.resolve({"observations": f})
         self.assertEqual(r["outcome"], "Benign proven"); self.assertEqual(r["confidence"], "Medium"); self.assertEqual(r["residual_low_malicious"], ["m"])
 
     def test_insufficient_data_at_timebox(self):
         f = [{"id": "m", "side": "Malicious", "confidence": "Medium"}, {"id": "b", "side": "Benign", "confidence": "Low"}]
-        self.assertIsNone(inv.resolve({"findings": f})["verdict_id"])
-        self.assertEqual(inv.resolve({"findings": f, "timebox_expired": True})["verdict_id"], 7)
+        self.assertIsNone(inv.resolve({"observations": f})["verdict_id"])
+        self.assertEqual(inv.resolve({"observations": f, "timebox_expired": True})["verdict_id"], 7)
 
     def test_same_artifact_counts_once(self):
         f = [{"id": "t", "side": "Malicious", "confidence": "Medium", "artifact": "hash:1"}, {"id": "i", "side": "Malicious", "confidence": "Medium", "artifact": "hash:1"}]
-        self.assertEqual(inv.resolve({"findings": f})["malicious_score"], 2)
+        self.assertEqual(inv.resolve({"observations": f})["malicious_score"], 2)
 
 
 class TimeboxFromLedger(unittest.TestCase):
@@ -114,32 +114,32 @@ class TimeboxFromLedger(unittest.TestCase):
     START, AT_12 = "2026-09-14T15:00:00Z", "2026-09-14T15:12:00Z"
 
     def test_high_severity_expires_after_ten_minutes(self):
-        r = inv.resolve({"findings": self.F, "started_at": self.START, "severity": "High"}, now=self.AT_12)
+        r = inv.resolve({"observations": self.F, "started_at": self.START, "severity": "High"}, now=self.AT_12)
         self.assertEqual(r["timebox"], {"minutes": 10, "elapsed_minutes": 12.0, "expired": True, "source": "computed"})
         self.assertEqual(r["verdict_id"], 7)
 
     def test_medium_severity_has_twenty_minutes(self):
-        r = inv.resolve({"findings": self.F, "started_at": self.START, "severity_id": 3}, now=self.AT_12)
+        r = inv.resolve({"observations": self.F, "started_at": self.START, "severity_id": 3}, now=self.AT_12)
         self.assertFalse(r["timebox"]["expired"]); self.assertEqual(r["timebox"]["minutes"], 20)
         self.assertIsNone(r["verdict_id"])
 
-    def test_the_end_is_now_then_resolved_at_then_the_clock_never_the_last_finding(self):
-        ledger = {"findings": self.F, "started_at": self.START, "severity": "Low", "resolved_at": "2026-09-14T15:25:00Z"}
+    def test_the_end_is_now_then_resolved_at_then_the_clock_never_the_last_observation(self):
+        ledger = {"observations": self.F, "started_at": self.START, "severity": "Low", "resolved_at": "2026-09-14T15:25:00Z"}
         self.assertTrue(inv.resolve(ledger)["timebox"]["expired"])
         self.assertFalse(inv.resolve(ledger, now="2026-09-14T15:05:00Z")["timebox"]["expired"])
-        del ledger["resolved_at"]  # a stalled run: the last finding is at +9 minutes, the clock is years later
+        del ledger["resolved_at"]  # a stalled run: the last observation is at +9 minutes, the clock is years later
         self.assertTrue(inv.resolve(ledger)["timebox"]["expired"])
 
     def test_computed_value_overrides_a_self_reported_flag(self):
-        r = inv.resolve({"findings": self.F, "started_at": self.START, "severity": "Critical", "timebox_expired": False}, now=self.AT_12)
+        r = inv.resolve({"observations": self.F, "started_at": self.START, "severity": "Critical", "timebox_expired": False}, now=self.AT_12)
         self.assertTrue(r["timebox"]["expired"]); self.assertIn("self-reported", r["timebox_note"])
 
     def test_without_a_start_the_flag_is_used_and_marked_self_reported(self):
-        r = inv.resolve({"findings": self.F, "timebox_expired": True})
+        r = inv.resolve({"observations": self.F, "timebox_expired": True})
         self.assertEqual(r["timebox"]["source"], "self-reported"); self.assertEqual(r["verdict_id"], 7)
 
     def test_an_organization_may_tighten_the_reference_value_not_extend_it(self):
-        base = {"findings": self.F, "started_at": self.START, "severity": "High"}
+        base = {"observations": self.F, "started_at": self.START, "severity": "High"}
         tight = inv.resolve(dict(base, timebox_minutes=5), now="2026-09-14T15:06:00Z")
         self.assertEqual(tight["timebox"]["minutes"], 5); self.assertTrue(tight["timebox"]["expired"])
         loose = inv.resolve(dict(base, timebox_minutes=30), now=self.AT_12)
@@ -147,13 +147,13 @@ class TimeboxFromLedger(unittest.TestCase):
         self.assertIn("ignored", loose["timebox_note"])
 
     def test_timestamps_out_of_order_are_reported(self):
-        r = inv.resolve({"findings": self.F, "started_at": "2026-09-14T15:05:00Z", "severity": "High"}, now="2026-09-14T15:00:00Z")
+        r = inv.resolve({"observations": self.F, "started_at": "2026-09-14T15:05:00Z", "severity": "High"}, now="2026-09-14T15:00:00Z")
         self.assertEqual(r["timebox"]["elapsed_minutes"], 0.0)
         self.assertIn("precedes started_at", r["timebox_note"]); self.assertIn("m", r["timebox_note"])
 
     def test_a_malformed_timestamp_is_a_value_error(self):
         with self.assertRaises(ValueError):
-            inv.resolve({"findings": [], "started_at": "yesterday"})
+            inv.resolve({"observations": [], "started_at": "yesterday"})
 
 
 class LedgerDedup(unittest.TestCase):
@@ -162,9 +162,9 @@ class LedgerDedup(unittest.TestCase):
         f = [{"id": "a1", "side": "Malicious", "confidence": "Medium", "alert_type": "Credential dumping", "entity": "ws-04", "artifact": "alert:1"},
              {"id": "a2", "side": "Malicious", "confidence": "High", "alert_type": "credential dumping", "entity": "WS-04", "artifact": "alert:2"},
              {"id": "a3", "side": "Malicious", "confidence": "Medium", "alert_type": "Credential dumping", "entity": "ws-09"}]
-        r = inv.resolve({"findings": f})
+        r = inv.resolve({"observations": f})
         self.assertEqual(r["malicious_score"], 5)  # High (3) for ws-04 once, Medium (2) for ws-09
-        self.assertEqual(r["malicious_findings"], ["a1", "a3"])
+        self.assertEqual(r["malicious_observations"], ["a1", "a3"])
 
 
 class AlertTypeMapping(unittest.TestCase):
@@ -293,8 +293,8 @@ class AlertTypeMapping(unittest.TestCase):
         alerts = [{"id": "A1", "title": "Sensitive credential memory read", "entity": "ws-04", "severity": "Medium"},
                   {"id": "A2", "title": "Possible credential dumping (LSASS)", "entity": "ws-04", "severity": "Medium"}]
         raw = [alert_types.classify(a, self.map) for a in alerts]  # not yet collapsed
-        self.assertEqual(inv.resolve({"findings": raw})["malicious_score"], 2)
-        self.assertEqual(inv.resolve({"findings": alert_types.build_alerts(alerts, self.map)})["malicious_score"], 2)
+        self.assertEqual(inv.resolve({"observations": raw})["malicious_score"], 2)
+        self.assertEqual(inv.resolve({"observations": alert_types.build_alerts(alerts, self.map)})["malicious_score"], 2)
 
     def test_the_binding_names_its_map(self):
         import subprocess, sys, tempfile, json as j
@@ -352,7 +352,7 @@ class DecisionReadsWhatTheDetectionAsserts(unittest.TestCase):
     def ledger(self, **overrides):
         led = {"case_uid": "CASE-1",
                "alerts": [{"id": "A1", "type": "Malware / loader execution", "entity": "ws-04", "confidence": "High"}],
-               "findings": [{"id": "B1", "side": "Benign", "confidence": "High"}],
+               "observations": [{"id": "B1", "side": "Benign", "confidence": "High"}],
                "evidence_inventory": {"extracted": 2, "source_count": 2, "complete": True},
                "detection_metadata": {
                    "alerts": [{"id": "A1", "techniques": [{"id": "T1204", "rendered": "T1204 (User Execution)"}],
@@ -368,7 +368,7 @@ class DecisionReadsWhatTheDetectionAsserts(unittest.TestCase):
         return led
 
     def test_a_ledger_without_the_assertions_is_told_to_extract_them(self):
-        r = triage.decide({"alerts": [{"id": "A", "type": "x", "entity": "e", "confidence": "Low"}], "findings": []})
+        r = triage.decide({"alerts": [{"id": "A", "type": "x", "entity": "e", "confidence": "Low"}], "observations": []})
         self.assertIn("what the detection asserts", " ".join(r["detection_notes"]))
         self.assertIn("alert_metadata.py", " ".join(r["detection_notes"]))
 
@@ -409,7 +409,7 @@ class DecisionReadsWhatTheDetectionAsserts(unittest.TestCase):
         led = self.ledger()
         led["alerts"].append({"id": "A2", "type": "Malware / loader execution", "entity": "ws-09", "confidence": "Medium"})
         led["detection_metadata"]["alerts"].append(dict(led["detection_metadata"]["alerts"][0], id="A2"))
-        led["findings"] = []
+        led["observations"] = []
         self.assertEqual(triage.decide(led)["confidence_id"], 3, "one technique on both alerts: no raise beyond High")
         led["alerts"][0]["confidence"] = "Low"
         led["alerts"][1]["confidence"] = "Low"
@@ -426,7 +426,7 @@ class DecisionReadsWhatTheDetectionAsserts(unittest.TestCase):
 
     def test_investigation_reads_the_same_record_at_its_own_gate(self):
         led = self.ledger()
-        led["findings"] = [{"id": "F1", "side": "Malicious", "confidence": "High"}]
+        led["observations"] = [{"id": "F1", "side": "Malicious", "confidence": "High"}]
         r = inv.resolve(led)
         self.assertIn("loader.exe", " ".join(r["detection_notes"]))
         self.assertEqual(r["verdict_id"], 2, "the resolution rule is unchanged")
@@ -517,7 +517,7 @@ class DetectionMetadata(unittest.TestCase):
 
     def test_a_recommended_action_is_what_the_source_published_and_an_id_to_cite_it_by(self):
         """No disposition field: the executor is not asked what became of each one. What it ran is
-        a Finding naming the recommendation in its `analytic`, checked as a Finding."""
+        an Observation naming the recommendation in its `analytic`, checked as an Observation."""
         a = self.one()
         self.assertEqual([sorted(r) for r in a["recommended_actions"]], [["action", "id"], ["action", "id"]])
         self.assertFalse(hasattr(metadata, "dispositions"))
@@ -549,7 +549,7 @@ class DetectionMetadata(unittest.TestCase):
         read = metadata.build([self.ALERT], self.spec, rows, index=self.index)
         self.assertEqual([g["data_source"] for g in read["visibility_gaps"]], ["alert metadata: remediation state"])
         unread = metadata.build([self.ALERT], self.spec, index=self.index)
-        self.assertEqual(unread["visibility_gaps"], [], "not passing the evidence is not a finding about the deployment")
+        self.assertEqual(unread["visibility_gaps"], [], "not passing the evidence is not an observation about the deployment")
 
     def test_the_case_candidate_categories_come_from_the_techniques(self):
         built = metadata.build([self.ALERT], self.spec, index=self.index)
@@ -625,11 +625,11 @@ class EvidenceInventory(unittest.TestCase):
         self.assertEqual(built["entities"][2]["alert_ids"], ["A", "B"])
 
     def test_decisions_surface_a_missing_or_incomplete_inventory(self):
-        ledger = {"alerts": [{"id": "A", "type": "x", "entity": "e", "confidence": "High"}], "findings": []}
+        ledger = {"alerts": [{"id": "A", "type": "x", "entity": "e", "confidence": "High"}], "observations": []}
         self.assertIn("not recorded", triage.decide(ledger)["evidence_inventory_note"])
         ledger["evidence_inventory"] = {"extracted": 28, "source_count": 31, "complete": False}
         self.assertIn("28 of 31", triage.decide(ledger)["evidence_inventory_note"])
-        self.assertIn("28 of 31", inv.resolve({"findings": [], "evidence_inventory": ledger["evidence_inventory"]})["evidence_inventory_note"])
+        self.assertIn("28 of 31", inv.resolve({"observations": [], "evidence_inventory": ledger["evidence_inventory"]})["evidence_inventory_note"])
         ledger["evidence_inventory"] = {"extracted": 31, "source_count": 31, "complete": True}
         self.assertNotIn("evidence_inventory_note", triage.decide(ledger))
 
@@ -932,9 +932,9 @@ class RunCheck(unittest.TestCase):
                                   "detection": {"source": "antivirus", "analytic_type_id": 5, "analytic_type": "Fingerprinting"},
                                   "description": "d", "absent": [],
                                   "recommended_actions": [{"id": "RA1", "action": "Run a full scan",
-                                                           "disposition": "followed", "finding": "F1"}]}],
+                                                           "disposition": "followed", "observation": "F1"}]}],
                       "remediation": [], "visibility_gaps": []},
-                  "findings": [{"id": "F1", "side": "Malicious", "confidence": "High", "at": "2026-09-14T15:01:00Z",
+                  "observations": [{"id": "F1", "side": "Malicious", "confidence": "High", "at": "2026-09-14T15:01:00Z",
                                 "alert_type": "Credential dumping", "entity": "ws-01"}]}
         ledger.update(overrides)
         alerts = [{"id": "A1", "title": "Possible credential dumping (LSASS)", "entity": "ws-01",
@@ -1060,18 +1060,18 @@ class RunCheck(unittest.TestCase):
                     "alert_type": "Credential dumping", "entity": "ws-01"},
                    {"id": "F2", "side": "Malicious", "confidence": "High", "at": "2026-09-14T15:02:00Z",
                     "alert_type": "credential dumping", "entity": "WS-01"}]
-        code, out = self.check(self.run_dir(findings=doubled))
+        code, out = self.check(self.run_dir(observations=doubled))
         self.assertEqual(code, 1)
         self.assertIn("FAIL  investigation: no alert counted twice", out)
 
     def test_the_two_ledger_shapes_are_both_read(self):
-        """Triage records the Case's alerts in "alerts"; investigation scores them among "findings"."""
+        """Triage records the Case's alerts in "alerts"; investigation scores them among "observations"."""
         alerts = [{"id": "A1", "type": "Credential dumping", "entity": "ws-01", "confidence": "High"},
                   {"id": "A2", "type": "credential dumping", "entity": "WS-01", "confidence": "Low"}]
-        code, out = self.check(self.run_dir(alerts=alerts, findings=[]))
+        code, out = self.check(self.run_dir(alerts=alerts, observations=[]))
         self.assertIn("FAIL  triage: no alert counted twice", out)
         self.assertEqual(code, 1)
-        one = self.run_dir(alerts=alerts[:1], findings=[])
+        one = self.run_dir(alerts=alerts[:1], observations=[])
         code, out = self.check(one)
         self.assertIn("ok    triage: the Case's alerts carry type and entity", out)
         self.assertNotIn("skip  triage: the Case's alerts", out)
