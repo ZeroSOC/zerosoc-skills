@@ -52,7 +52,7 @@ FIELDS = {"techniques": "techniques", "threat_name": "threat name", "threat_fami
           "recommended_actions": "recommended actions"}
 # What triage loses when the source supplies none of it (§1.1), as the check each gap prevented.
 PREVENTS = {
-    "techniques": "the technique identifiers the candidate Incident Categories and the playbook section start from",
+    "techniques": "the categories the framework's technique tables would have proposed, and the confidence its technique rule would have raised; the playbook and its section are chosen from the alert type and are unaffected",
     "threat name": "the threat or family name the Malicious hypothesis and the family-specific enrichment start from",
     "detection source": "how the Alert is weighed: a signature match and a model score are not the same evidence",
     "description": "what the detection fires on, which the False Positive conditions are judged against",
