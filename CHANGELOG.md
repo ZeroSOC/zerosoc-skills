@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **The investigation timebox runs from when the Case is taken, not from when the ledger is started.**
+  `resolve.py` has measured the timebox from the ledger's own `started_at` since v0.2.0, but the
+  procedure told the executor to record that time at step 3, after the playbook was selected and the
+  evidence extracted, so the minutes those two steps took never counted. Guardrails §5 gives an
+  executor *assigned a Case in Investigation* ten or twenty minutes, so the clock starts at the
+  assignment: the skill now names `started_at` at its first step and the ledger step carries that time
+  rather than setting one, and a test holds the order. Both skills also say what N is when the
+  inventory's count is checked — the source's distinct evidence items, not its rows per alert — as the
+  script's own help already did. Follow-up to ZeroSOC/zerosoc-skills#1, whose five gaps v0.2.0 closed.
+
 - **The pin follows the framework to b36b208, and a Finding becomes an Observation.** The framework
   took its own word for the entry in a Case's record, leaving *Finding* to OCSF, where a Detection
   Finding is an Alert and an Incident Finding is a Case. The skills follow: the ledger's `findings`

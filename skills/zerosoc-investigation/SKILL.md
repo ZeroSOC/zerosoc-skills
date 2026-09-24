@@ -39,11 +39,15 @@ per Case: the playbook the script prints.
   enrichment classes and `cases.store`.
 - The investigation **timebox** (10 minutes at High or Critical severity, 20 otherwise, reference values)
   and the Case **token budget**; both are organization settings. `scripts/resolve.py` measures the
-  timebox from the ledger's timestamps.
+  timebox from the ledger's timestamps: it runs from `started_at`, the moment the Case was assigned to
+  you in Investigation (Guardrails §5), which is noted before step 1, not when the ledger file is
+  created, so the playbook selection and the extraction count against it.
 
 ## Procedure
 
-1. **Select the playbook and check visibility.** Use the candidate `incident_category` from the contract:
+1. **Select the playbook and check visibility.** First note the UTC time you take the Case: it is the
+   ledger's `started_at`, and the timebox runs from it. Then use the candidate `incident_category` from
+   the contract:
    `python3 scripts/select_playbook.py --category IC-01 --section Investigation --bindings zerosoc.capabilities.json`.
    It prints the version, the required data sources, the visibility gaps to record, and the Investigation
    section (hypotheses, validation queries with their outcome tags, re-classification pivots). Record the
@@ -54,9 +58,10 @@ per Case: the playbook the script prints.
 2. **Extract the evidence inventory** for the Case as it is now: alerts are appended after triage, so the
    triage inventory is a starting point, not the answer. List every entity the source attaches to the
    Case's alerts as `evidence.json` and run
-   `python3 scripts/evidence_inventory.py evidence.json --source-count N` (N: the evidence items the source
-   shows). Record the printed `evidence_inventory` object in the ledger; extract what is missing before
-   scoring. For a hunt-opened Case the inventory is what the hunt collected, and N is unverified.
+   `python3 scripts/evidence_inventory.py evidence.json --source-count N` (N: the distinct evidence items
+   the source shows for the Case, not its rows per alert). Record the printed `evidence_inventory` object
+   in the ledger; extract what is missing before scoring. For a hunt-opened Case the inventory is what
+   the hunt collected, and N is unverified.
    When it holds processes, rebuild the lineage with `python3 scripts/process_chain.py evidence.json --alerts alerts.json`
    (one chain per alert, each process under its ancestors; `--case` joins them into one chain per device, the
    view to score on). Where the bound endpoint class carries process telemetry, query the Case's devices and
@@ -75,9 +80,9 @@ per Case: the playbook the script prints.
    the ledger's `source_profile` object across too, and refresh it with
    `python3 scripts/source_profile.py --bindings zerosoc.capabilities.json --json`: a local override of the
    shipped profile in force now is recorded on the ledger and in the Case's `provenance.products`, and
-   named in the Note's Provenance. Record `started_at`
-   (UTC) now, the Case `severity`, the `evidence_inventory` object of step 2, and `at` on every observation
-   as it is added: the timebox is computed from these, not declared. Alert observations carry their
+   named in the Note's Provenance. Record `started_at` (UTC) as noted at step 1, never the time this
+   file is created, the Case `severity`, the `evidence_inventory` object of step 2, and `at` on every
+   observation as it is added: the timebox is computed from these, not declared. Alert observations carry their
    `alert_type` and `entity`, so the same type on the same entity counts once in the score; alerts
    appended since triage are added with `python3 scripts/alert_types.py alerts.json --bindings zerosoc.capabilities.json --json`,
    whose entries are ready-made Malicious observations. Refine the two
