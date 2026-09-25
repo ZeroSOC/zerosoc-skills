@@ -1141,6 +1141,18 @@ class Procedures(unittest.TestCase):
         sweep = text[text.index("retrospective"):]
         self.assertIn("`cases.store`", sweep[:700])
 
+    def test_the_timebox_runs_from_when_the_case_is_taken_not_from_when_the_ledger_is_started(self):
+        # Guardrails §5 gives an executor assigned a Case in Investigation ten or twenty minutes: the clock
+        # starts at the assignment, so the procedure names `started_at` at its first step, before the
+        # playbook selection and the extraction, and the ledger step carries that time rather than setting one
+        text = self.read("zerosoc-investigation")
+        procedure = text[text.index("## Procedure"):]
+        first = procedure.index("`started_at`")
+        self.assertLess(first, procedure.index("2. **Extract the evidence inventory**"))
+        self.assertLess(first, procedure.index("Start the ledger"))
+        ledger_step = procedure[procedure.index("Start the ledger"):procedure.index("4. **Verify or retract**")]
+        self.assertIn("as noted at step 1", ledger_step)
+
 
 class AutonomyMatrix(unittest.TestCase):
     def test_workstation_isolation_preauthorized_immediate(self):

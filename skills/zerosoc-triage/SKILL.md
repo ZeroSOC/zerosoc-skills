@@ -50,7 +50,8 @@ Read per alert: the playbook section the script prints.
    the Case's alerts (devices, identities, processes with PID and creation time, files with hashes,
    addresses, URLs, registry keys, mailboxes), paging through every alert, as `evidence.json`. Run
    `python3 scripts/evidence_inventory.py evidence.json --source-count N`, where N is the number of
-   evidence items the source itself shows for the Case. The script removes duplicates, joins each row to
+   distinct evidence items the source itself shows for the Case (its list of unique entities, not its
+   rows per alert). The script removes duplicates, joins each row to
    its device and prints the `evidence_inventory` object to record in the ledger. A mismatch is recorded and
    visible in every later script output: extract the rest, or state in the Note why it cannot be. When
    the source shows no count, record it as unverified. The Note's Summary states the figures ("31 of 31 entities extracted").
