@@ -28,9 +28,14 @@ executor puts that language in its place; read as it is, it means the language o
   be grounded is not written.
 - An enrichment that returned nothing, an unknown verdict or an error is context, never a Benign
   observation. A Benign (High) observation is one that **explains** an alert, on evidence in the results.
-- A Benign observation names the playbook condition that applies: one of its **False Positive
-  conditions** when the detection misfired, one of its **Benign conditions** when authorized
-  activity legitimately matched it. They lead to different verdicts.
+- A Benign observation that explains an alert names the playbook condition it matched — one entry
+  of the alert type's **False Positive conditions** (the detection misfired: the activity is not what
+  its description says it is evidence of) or of its **Benign conditions** (that activity, authorized)
+  — by its place in the list. Never label the kind yourself: the list a condition is in is what
+  decides the verdict, and it is read off the playbook. An observation that fits no entry of either
+  list still carries its side and confidence; it names nothing.
 - Do not decide; do not write the alerts themselves as observations, they are already the first
-  Malicious observations; never guess the impact.
-- Write the observation texts in $language. Technique codes are always `ID (Name)`.
+  Malicious observations, and an observation that rests on the alert records alone restates them
+  and is not evidence beyond them; never guess the impact.
+- Write the observation texts in $language. Write technique codes `ID (Name)` where the name is
+  known; a bare identifier is rendered for you and is never a failure.

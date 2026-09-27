@@ -13,8 +13,9 @@ Ledger (JSON):
                                  asserts (§1.1), the remediation the source already performed, and the
                                  assertions it did not supply
   "observations": [{"id": "F1", "desc": "...", "side": "Malicious"|"Benign"|null, "confidence": "Low|Medium|High",
-                "covers": ["DF-1"], "artifact": "hash:...", "retracted": false,
-                "event_refs": ["<event id or link>"], "first_seen": "2026-09-14T14:55:41Z", "timeline": false}],
+                "covers": ["DF-1"], "condition": "false_positive"|"benign"|null, "artifact": "hash:...",
+                "retracted": false, "event_refs": ["<event id or link>"], "first_seen": "2026-09-14T14:55:41Z",
+                "timeline": false}],
   "evidence_inventory": {"extracted": 31, "source_count": 31, "complete": true},
   "visibility_gaps": [{"data_source": "...", "check_prevented": "..."}],
   "duplicate_of": null | "CASE-0"
@@ -25,9 +26,16 @@ the techniques the detections named. The coverage rule itself is unchanged: what
 neutralized is reported with the decision and never weighed into it — a block is a response, not an
 explanation. What a source recommends is indicative (§1.5): a recommendation the run made nothing of
 holds nothing up.
-"event_refs" are the events an observation rests on, "first_seen" is when the thing it reports happened (not
-when the observation was made) and "timeline" flags it for the Case Timeline: this rule reads none of them, and
-note_elements.py and timeline.py read them from this same ledger.
+"event_refs" are the events an observation rests on: a Malicious observation stands **beyond the alerts** only
+when one of them is not an alert of the ledger (§1.5) — one that cites alerts alone restates them and is set
+aside, however it is tagged, and reported under "restated_alerts". "first_seen" is when the thing it reports
+happened (not when the observation was made) and "timeline" flags it for the Case Timeline: this rule reads
+neither, and note_elements.py and timeline.py read them from this same ledger.
+"condition" on a Benign observation is the kind of the playbook condition it named, read off the list the
+condition belongs to (Playbook Architecture §4.1) — never a kind the executor labelled itself. The verdict a
+Close carries is the rule's (§1.5): Benign (5) when the covering observation of the highest confidence names a
+Benign condition, False Positive (1) otherwise — both kinds at that confidence, or no condition named at all.
+--close-as is read only for a ledger whose observations carry no "condition" key, written before it existed.
 Observations with side null are context and do not score. A Benign observation with no "covers" covers every alert.
 Prints the decision, the coverage per alert, the confidence leaving triage and the verdict to record.
 """
@@ -62,10 +70,46 @@ def dedupe_alerts(alerts):
     return list(best.values())
 
 
+def alert_ids(ledger):
+    """Every id an alert of the ledger is known by: its own and the ones merged into it."""
+    out = set()
+    for a in ledger.get("alerts", []):
+        out.update(str(i) for i in [a.get("id"), *(a.get("merged_ids") or [])] if i)
+    return out
+
+
+def restates_alerts(f, ids):
+    """A Malicious observation that rests on alert records alone: it restates what the alerts already
+    say, and the alerts are weighed by the coverage rule, not counted twice as evidence beyond themselves."""
+    refs = [str(r) for r in (f.get("event_refs") or []) if r]
+    return bool(refs) and all(r in ids for r in refs)
+
+
+def close_verdict(covering):
+    """§1.5: the verdict a Close carries, from the conditions the covering Benign observations named.
+
+    The covering observation of the highest confidence decides: Benign (5) when it names a Benign
+    condition and no False Positive one is named at that confidence; False Positive (1) otherwise —
+    including when no covering observation names a condition of either list. None when the ledger
+    predates the field: no observation carries a "condition" key at all."""
+    if not any("condition" in f for f in covering):
+        return None, None
+    top = max((W[f["confidence"]] for f in covering), default=0)
+    kinds = {f.get("condition") for f in covering if W[f["confidence"]] == top}
+    if "benign" in kinds and "false_positive" not in kinds:
+        return 5, "Benign Positive"
+    return 1, "False Positive"
+
+
+EMIT = {1: "tuning ticket to Phase 1", 5: "SOC Knowledge Base entry if the exception was not recorded"}
+
+
 def _decide(ledger):
     alerts = dedupe_alerts(ledger.get("alerts", []))
     active = [f for f in ledger.get("observations", []) if not f.get("retracted") and f.get("side") in ("Malicious", "Benign")]
-    mal = [f for f in active if f["side"] == "Malicious"]
+    ids = alert_ids(ledger)
+    restated = [f for f in active if f["side"] == "Malicious" and restates_alerts(f, ids)]
+    mal = [f for f in active if f["side"] == "Malicious" and f not in restated]
     ben = [f for f in active if f["side"] == "Benign"]
     coverage = []
     for a in alerts:
@@ -81,12 +125,20 @@ def _decide(ledger):
     all_covered = bool(alerts) and all(c["covered"] for c in coverage)
     close_ok = not mal and all_covered
     result = {"case_uid": ledger.get("case_uid"), "alerts_considered": [a["id"] for a in alerts], "coverage": coverage,
-              "malicious_beyond_alerts": [f["id"] for f in mal], "benign_observations": [f["id"] for f in ben]}
+              "malicious_beyond_alerts": [f["id"] for f in mal], "restated_alerts": [f["id"] for f in restated],
+              "benign_observations": [f["id"] for f in ben]}
     if ledger.get("duplicate_of"):
         result.update(decision="Close", verdict_id=10, verdict="Duplicate", master_case_uid=ledger["duplicate_of"],
                       reminder="Duplicate only if all four §1.5 criteria were validated: matching core entities, overlapping timeline, active assignment, evidence merged.")
     elif close_ok:
-        result.update(decision="Close", verdict_id=None, verdict="False Positive (1) if a False Positive condition explains the alerts; Benign (5) if a Benign condition does (use --close-as)")
+        covering_ids = {i for c in coverage for i in c["covering"]}
+        verdict_id, verdict = close_verdict([b for b in ben if b["id"] in covering_ids])
+        if verdict_id is None:
+            result.update(decision="Close", verdict_id=None, verdict="False Positive (1) if a False Positive condition explains the alerts; Benign (5) if a Benign condition does (use --close-as)")
+        else:
+            result.update(decision="Close", verdict_id=verdict_id, verdict=verdict, emit=EMIT[verdict_id],
+                          verdict_rule="the covering observation of the highest confidence names a Benign condition" if verdict_id == 5
+                          else "no Benign condition named by a covering observation of the highest confidence")
     else:
         why = []
         if mal: why.append("Malicious observations exist beyond the alerts: " + ", ".join(f["id"] for f in mal))
@@ -148,10 +200,10 @@ def main():
     ledger = json.load(open(args[0]))
     r = decide(ledger)
     if "--close-as" in sys.argv and r["decision"] == "Close" and r.get("verdict_id") is None:
+        # a ledger written before observations carried their condition: the caller says which kind
         kind = sys.argv[sys.argv.index("--close-as") + 1].lower()
         r["verdict_id"], r["verdict"] = (1, "False Positive") if kind == "fp" else (5, "Benign Positive")
-        if kind == "fp": r["emit"] = "tuning ticket to Phase 1"
-        else: r["emit"] = "SOC Knowledge Base entry if the exception was not recorded"
+        r["emit"] = EMIT[r["verdict_id"]]
     if "--json" in sys.argv:
         print(json.dumps(r, indent=2)); return
     print(f"Decision: {r['decision']}  verdict: {r.get('verdict')}")

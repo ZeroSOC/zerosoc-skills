@@ -142,8 +142,12 @@ per Case: the playbook the script prints.
     review, never dismissed); pass the scope to response. At Low
     confidence the Incident is still declared; every containment action then requires approval.
 12. **On Benign proven**: `verdict_id` 1 (False Positive, plus a tuning ticket to Phase 1) or 5 (Benign,
-    plus a Knowledge Base entry if the exception was unrecorded). A Low-confidence close carries a
-    monitoring watch and is flagged for QA sampling.
+    plus a Knowledge Base entry if the exception was unrecorded). Which of the two is the rule's, and
+    `resolve.py` prints it: a Benign observation carries in the ledger the kind of the triage playbook
+    condition it named, read off the list the condition is in — `"condition": "false_positive"` or
+    `"benign"` — and the Case closes as Benign when the Benign observation of the highest confidence
+    names a Benign condition, as False Positive otherwise, no condition named included. A Low-confidence
+    close carries a monitoring watch and is flagged for QA sampling.
 13. **Write the Investigation Note.** It renders the Case at this gate and holds no state of its own,
     on the **same element structure as the Triage Note** — it extends and updates that Note rather than
     mirroring it. The canonical list is

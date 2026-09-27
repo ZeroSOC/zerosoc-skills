@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+- **The verdict a Close carries is the rule's, and a restated alert is not evidence beyond it.**
+  Replaying one recorded false positive against a live model closed it as `1` and as `5` on the same
+  evidence, because the executor labelled the *kind* of condition itself, and once promoted it,
+  because a Malicious observation that only restated the alert was counted as evidence beyond the
+  alerts (platform-azure#36). Both readings the framework now settles (§1.5), and the scripts apply
+  them: a Benign observation carries in the ledger the kind of the condition it *named*, read off the
+  playbook's list — `"condition": "false_positive"` or `"benign"` — and `triage_decide.py` closes as
+  Benign when the covering observation of the highest confidence names a Benign condition, as False
+  Positive otherwise, no condition named included; `resolve.py` does the same on Benign proven. A
+  Malicious observation whose event references are all alert records is set aside as a restatement
+  (`restated_alerts`) and never promotes by itself. `--close-as` and `--benign-kind` are read only for
+  a ledger written before the field existed. The rules the executor reads say the same: name the
+  condition by its place in the list, never the kind; write `ID (Name)` where the name is known, and
+  a bare identifier is never a failure.
+- **The archives are checked.** `tools/package.py --check` fails when a `skills/*.zip` no longer
+  matches its directory, and CI runs it: the four archives had drifted ten content commits behind
+  the tree, so a host installing one ran a skill that still tagged Findings and had no Response
+  Actions element.
+
 - **The investigation timebox runs from when the Case is taken, not from when the ledger is started.**
   `resolve.py` has measured the timebox from the ledger's own `started_at` since v0.2.0, but the
   procedure told the executor to record that time at step 3, after the playbook was selected and the

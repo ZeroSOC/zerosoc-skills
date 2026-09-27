@@ -44,6 +44,46 @@ class TriageRule(unittest.TestCase):
         r = triage.decide(ledger)
         self.assertEqual(r["decision"], "Promote"); self.assertEqual(r["confidence"], "High")
 
+    def test_a_malicious_observation_resting_on_the_alerts_alone_restates_them(self):
+        # §1.5: "beyond the alerts" — an observation that cites alert records alone is the alert restated
+        ledger = {"alerts": [{"id": "A", "type": "Antivirus detection", "entity": "h", "confidence": "Medium"}],
+                  "observations": [{"id": "M1", "side": "Malicious", "confidence": "Medium", "event_refs": ["A"]},
+                                   {"id": "B1", "side": "Benign", "confidence": "High", "event_refs": ["EVT-1"], "covers": ["A"], "condition": "false_positive"}]}
+        r = triage.decide(ledger)
+        self.assertEqual(r["decision"], "Close"); self.assertEqual(r["restated_alerts"], ["M1"]); self.assertEqual(r["malicious_beyond_alerts"], [])
+        # the same observation resting on a check's event stands beyond the alerts and promotes
+        ledger["observations"][0]["event_refs"] = ["A", "EVT-2"]
+        self.assertEqual(triage.decide(ledger)["decision"], "Promote")
+        # a merged id is the alert's own
+        ledger["alerts"][0]["merged_ids"] = ["A2"]; ledger["observations"][0]["event_refs"] = ["A", "A2"]
+        self.assertEqual(triage.decide(ledger)["decision"], "Close")
+
+    def test_the_verdict_a_close_carries_is_read_off_the_named_condition(self):
+        # §1.5: Benign (5) when the highest-confidence covering observation names a Benign condition,
+        # False Positive (1) otherwise — both kinds at that confidence, or no condition named at all
+        def ledger(*obs):
+            return {"alerts": [{"id": "A", "type": "x", "entity": "h", "confidence": "Medium"}],
+                    "observations": [dict(o, side="Benign", covers=["A"], event_refs=["EVT"]) for o in obs]}
+        self.assertEqual(triage.decide(ledger({"id": "B1", "confidence": "High", "condition": "benign"}))["verdict_id"], 5)
+        self.assertEqual(triage.decide(ledger({"id": "B1", "confidence": "High", "condition": "false_positive"}))["verdict_id"], 1)
+        r = triage.decide(ledger({"id": "B1", "confidence": "High", "condition": "false_positive"},
+                                 {"id": "B2", "confidence": "Low", "condition": "benign"}))
+        self.assertEqual(r["verdict_id"], 1, "the higher confidence decides")
+        r = triage.decide(ledger({"id": "B1", "confidence": "High", "condition": "benign"},
+                                 {"id": "B2", "confidence": "Low", "condition": "false_positive"}))
+        self.assertEqual(r["verdict_id"], 5); self.assertEqual(r["emit"], "SOC Knowledge Base entry if the exception was not recorded")
+        r = triage.decide(ledger({"id": "B1", "confidence": "High", "condition": "benign"},
+                                 {"id": "B2", "confidence": "High", "condition": "false_positive"}))
+        self.assertEqual(r["verdict_id"], 1, "both kinds at the same confidence: False Positive")
+        r = triage.decide(ledger({"id": "B1", "confidence": "High", "condition": None}, {"id": "B2", "confidence": "Low", "condition": None}))
+        self.assertEqual(r["verdict_id"], 1, "explained but no condition named: False Positive")
+        self.assertEqual(r["emit"], "tuning ticket to Phase 1")
+        r = triage.decide(ledger({"id": "B1", "confidence": "High", "condition": None}, {"id": "B2", "confidence": "High", "condition": "benign"}))
+        self.assertEqual(r["verdict_id"], 5, "an unnamed observation beside a named Benign one names nothing against it")
+        # a ledger from before the field is left to the caller, as it always was
+        r = triage.decide(ledger({"id": "B1", "confidence": "High"}))
+        self.assertIsNone(r["verdict_id"]); self.assertIn("--close-as", r["verdict"])
+
     def test_high_alert_needs_benign_high(self):
         ledger = {"alerts": [{"id": "A", "type": "x", "entity": "e", "confidence": "High"}],
                   "observations": [{"id": "B1", "side": "Benign", "confidence": "Medium"}, {"id": "B2", "side": "Benign", "confidence": "Medium"}]}
@@ -64,6 +104,17 @@ class TriageRule(unittest.TestCase):
 
 
 class ResolutionRule(unittest.TestCase):
+    def test_benign_proven_carries_the_verdict_of_the_named_condition(self):
+        # §2.4 applies §1.5's rule to the same two verdicts
+        def ledger(*obs):
+            return {"observations": [dict(o, side="Benign", event_refs=["EVT"]) for o in obs]}
+        self.assertEqual(inv.resolve(ledger({"id": "B1", "confidence": "High", "condition": "benign"}))["verdict_id"], 5)
+        r = inv.resolve(ledger({"id": "B1", "confidence": "High", "condition": "false_positive"}, {"id": "B2", "confidence": "Low", "condition": "benign"}))
+        self.assertEqual(r["verdict_id"], 1); self.assertEqual(r["emit"], "tuning ticket to Phase 1")
+        self.assertEqual(inv.resolve(ledger({"id": "B1", "confidence": "High", "condition": None}))["verdict_id"], 1)
+        r = inv.resolve(ledger({"id": "B1", "confidence": "High"}))
+        self.assertEqual(r["outcome"], "Benign proven"); self.assertIsNone(r["verdict_id"])
+
     def test_retraction_flips_to_benign(self):
         # §2.4 example 1
         f = [{"id": "alert", "side": "Malicious", "confidence": "Medium", "covered": True},

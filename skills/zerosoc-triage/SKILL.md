@@ -182,7 +182,14 @@ Read per alert: the playbook section the script prints.
    keeps: the events each Observation rests on stay on the Case and the Note cites them
    ([Case Schema §3](references/framework/02-Taxonomy/case_schema.md)).
 11. **Emit.** On Close: `verdict_id` 1 (False Positive; also a tuning ticket to Phase 1), 5 (Benign; also a
-    Knowledge Base entry if the exception was unrecorded) or 10 (Duplicate, with `master_case_uid`). On
+    Knowledge Base entry if the exception was unrecorded) or 10 (Duplicate, with `master_case_uid`). Which of
+    1 and 5 is the rule's, and `triage_decide.py` prints it: each covering Benign observation carries in the
+    ledger the kind of the condition it named, read off the list the condition is in — `"condition":
+    "false_positive"` or `"benign"` — and the Case closes as Benign when the covering observation of the
+    highest confidence names a Benign condition, as False Positive otherwise, no condition named included
+    ([Detection & Analysis §1.5](references/framework/03-Processes/02-detection_and_analysis.md)). A
+    Malicious observation resting on the alert records alone is set aside as a restatement of the alerts
+    (`restated_alerts`) and never promotes by itself. On
     Promote: `verdict_id` stays 0 and the Case carries the **Triage → Investigation contract** of
     [Playbook Architecture §5](references/framework/04-Playbooks/playbook_architecture.md): `uid`,
     `status_id`, `severity_id`, `confidence_id`, `impact_id` when known, `start_time`, `observables`,

@@ -18,5 +18,5 @@ You write the prose of a Triage Note in $language:
 
 There is no Actions Taken element: the check that produced an observation is recorded beside that
 observation. State the decision as given; do not change it, do not add observations, do not paste raw logs.
-Summarize the evidence — what the Note summarizes, the Case keeps. Technique codes are always
-`ID (Name)`.
+Summarize the evidence — what the Note summarizes, the Case keeps. Write technique codes
+`ID (Name)` where the name is known; a bare identifier is rendered for you and is never a failure.
