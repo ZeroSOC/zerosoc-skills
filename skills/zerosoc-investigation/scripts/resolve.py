@@ -9,6 +9,7 @@ Ledger (JSON):
   "playbook": "04-Playbooks/02-Investigation-Response/02-malware.md", "playbook_version": "2026-09-16",
   "incident_category": "IC-02",
   "observations": [{"id": "F1", "desc": "...", "side": "Malicious"|"Benign"|null, "confidence": "Low|Medium|High",
+                "condition": "false_positive"|"benign"|null,
                 "at": "2026-09-14T15:03:10Z", "artifact": "hash:...", "alert_type": "...", "entity": "...",
                 "retracted": false, "retraction_reason": "", "covered": false,
                 "event_refs": ["<event id or link>"], "first_seen": "2026-09-14T14:55:41Z", "timeline": false}],
@@ -22,6 +23,12 @@ Ledger (JSON):
 "at" is when the observation was made; "first_seen" is when the thing it reports happened, "event_refs" the
 events it rests on and "timeline" whether the Case Timeline shows it — this rule reads none of the three, and
 note_elements.py and timeline.py read them from this same ledger.
+"condition" on a Benign observation is the kind of the triage playbook condition it named, read off the list
+the condition belongs to (Playbook Architecture §4.1), never a kind the executor labelled itself; on Benign
+proven the verdict is Benign (5) when the Benign observation of the highest confidence names a Benign
+condition and no False Positive one is named at that confidence, False Positive (1) otherwise — the rule of
+Detection & Analysis §1.5, which §2.4 applies to the same two verdicts. --benign-kind is read only for a
+ledger whose observations carry no "condition" key, written before it existed.
 "covered" on a Malicious observation means the Benign explanation accounts for it (§2.4 coverage). Observations
 that share an "artifact" on the same side count once, and so do alert observations of the same "alert_type"
 on the same "entity" (§1.1). The timebox is measured, not declared: elapsed time runs from "started_at"
@@ -109,6 +116,22 @@ def timebox(ledger, now=None):
     return record, notes
 
 
+EMIT = {1: "tuning ticket to Phase 1", 5: "exception ticket: the Knowledge Base entry proposed for a person to confirm, unless the Knowledge Base already holds it"}
+
+
+def benign_verdict(ben):
+    """The verdict a Benign proof carries, from the conditions the Benign observations named: Benign (5)
+    when the one of the highest confidence names a Benign condition and no False Positive one is named at
+    that confidence, False Positive (1) otherwise. None for a ledger that predates the field."""
+    if not any("condition" in f for f in ben):
+        return None, None
+    top = max((W[f["confidence"]] for f in ben), default=0)
+    kinds = {f.get("condition") for f in ben if W[f["confidence"]] == top}
+    if "benign" in kinds and "false_positive" not in kinds:
+        return 5, "Benign Positive"
+    return 1, "False Positive"
+
+
 def resolve(ledger, now=None):
     active = dedupe([f for f in ledger.get("observations", []) if not f.get("retracted") and f.get("side") in ("Malicious", "Benign")])
     mal = [f for f in active if f["side"] == "Malicious"]
@@ -138,9 +161,11 @@ def resolve(ledger, now=None):
         conf = max(W[f["confidence"]] for f in ben)
         if residual_low: conf -= 1
         conf = max(1, conf)
-        r.update(outcome="Benign proven", verdict_id=None, confidence_id=conf, confidence=LEVELS[conf - 1],
-                 verdict="False Positive (1) if the detection was wrong, Benign Positive (5) if the activity was authorized (use --benign-kind)",
+        verdict_id, verdict = benign_verdict(ben)
+        r.update(outcome="Benign proven", verdict_id=verdict_id, confidence_id=conf, confidence=LEVELS[conf - 1],
+                 verdict=verdict or "False Positive (1) if the detection was wrong, Benign Positive (5) if the activity was authorized (use --benign-kind)",
                  next="close" + ("; Low-confidence close carries a monitoring watch and is flagged for QA sampling" if conf == 1 else ""))
+        if verdict_id: r["emit"] = EMIT[verdict_id]
     elif malicious_proven:
         conf = max(W[f["confidence"]] for f in mal)
         r.update(outcome="Malicious proven", verdict_id=2, verdict="True Positive", confidence_id=conf, confidence=LEVELS[conf - 1],
@@ -165,9 +190,10 @@ def main():
         r = resolve(json.load(open(a.ledger, encoding="utf-8")), now=a.now)
     except ValueError as exc:
         sys.exit(f"invalid ledger: {exc}")
-    if a.benign_kind and r.get("outcome") == "Benign proven":
+    if a.benign_kind and r.get("outcome") == "Benign proven" and r.get("verdict_id") is None:
+        # a ledger written before observations carried their condition: the caller says which kind
         r["verdict_id"], r["verdict"] = (1, "False Positive") if a.benign_kind == "fp" else (5, "Benign Positive")
-        r["emit"] = "tuning ticket to Phase 1" if a.benign_kind == "fp" else "SOC Knowledge Base entry if the exception was not recorded"
+        r["emit"] = EMIT[r["verdict_id"]]
     if a.json:
         print(json.dumps(r, indent=2)); return
     print(f"Malicious {r['malicious_score']} ({', '.join(r['malicious_observations']) or '-'})  |  Benign {r['benign_score']} ({', '.join(r['benign_observations']) or '-'})")
