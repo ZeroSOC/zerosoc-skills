@@ -26,9 +26,11 @@ the techniques the detections named. The coverage rule itself is unchanged: what
 neutralized is reported with the decision and never weighed into it — a block is a response, not an
 explanation. What a source recommends is indicative (§1.5): a recommendation the run made nothing of
 holds nothing up.
-"event_refs" are the events an observation rests on: a Malicious observation stands **beyond the alerts** only
-when one of them is not an alert of the ledger (§1.5) — one that cites alerts alone restates them and is set
-aside, however it is tagged, and reported under "restated_alerts". "first_seen" is when the thing it reports
+"event_refs" are the events an observation rests on: a Malicious observation that cites nothing but one alert
+of the ledger (its own id and the ids merged into it) says of that alert what its detection asserted — it
+**restates** it (§1.5), is set aside however it is tagged, and is reported under "restated_alerts". One that
+cites a check's result, an item of the alert's own evidence it read further, or two or more alerts it
+relates, stands beyond the alerts. "first_seen" is when the thing it reports
 happened (not when the observation was made) and "timeline" flags it for the Case Timeline: this rule reads
 neither, and note_elements.py and timeline.py read them from this same ledger.
 "condition" on a Benign observation is the kind of the playbook condition it named, read off the list the
@@ -71,18 +73,22 @@ def dedupe_alerts(alerts):
 
 
 def alert_ids(ledger):
-    """Every id an alert of the ledger is known by: its own and the ones merged into it."""
-    out = set()
-    for a in ledger.get("alerts", []):
-        out.update(str(i) for i in [a.get("id"), *(a.get("merged_ids") or [])] if i)
+    """Which alert of the ledger each id belongs to: its own id and the ones merged into it."""
+    out = {}
+    for n, a in enumerate(ledger.get("alerts", [])):
+        for i in [a.get("id"), *(a.get("merged_ids") or [])]:
+            if i:
+                out[str(i)] = n
     return out
 
 
 def restates_alerts(f, ids):
-    """A Malicious observation that rests on alert records alone: it restates what the alerts already
-    say, and the alerts are weighed by the coverage rule, not counted twice as evidence beyond themselves."""
+    """A Malicious observation that cites one alert and nothing else says of it what its detection already
+    asserted: the alert is weighed by the coverage rule and is not counted twice as evidence beyond itself.
+    One that cites two alerts relates them, and one that cites an evidence item or a check's result read
+    something the detection did not state — both stand beyond the alerts (§1.5)."""
     refs = [str(r) for r in (f.get("event_refs") or []) if r]
-    return bool(refs) and all(r in ids for r in refs)
+    return bool(refs) and all(r in ids for r in refs) and len({ids[r] for r in refs}) == 1
 
 
 def close_verdict(covering):

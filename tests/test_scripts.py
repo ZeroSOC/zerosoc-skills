@@ -57,6 +57,12 @@ class TriageRule(unittest.TestCase):
         # a merged id is the alert's own
         ledger["alerts"][0]["merged_ids"] = ["A2"]; ledger["observations"][0]["event_refs"] = ["A", "A2"]
         self.assertEqual(triage.decide(ledger)["decision"], "Close")
+        # two alerts related — the failures one reports and the success another does — is beyond either
+        ledger["alerts"].append({"id": "B", "type": "Successful sign-in after failures", "entity": "h", "confidence": "Low"})
+        ledger["observations"][0]["event_refs"] = ["A", "B"]
+        ledger["observations"][1]["covers"] = ["A", "B"]
+        r = triage.decide(ledger)
+        self.assertEqual(r["decision"], "Promote"); self.assertEqual(r["restated_alerts"], [])
 
     def test_the_verdict_a_close_carries_is_read_off_the_named_condition(self):
         # §1.5: Benign (5) when the highest-confidence covering observation names a Benign condition,

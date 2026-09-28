@@ -11,8 +11,9 @@
   playbook's list — `"condition": "false_positive"` or `"benign"` — and `triage_decide.py` closes as
   Benign when the covering observation of the highest confidence names a Benign condition, as False
   Positive otherwise, no condition named included; `resolve.py` does the same on Benign proven. A
-  Malicious observation whose event references are all alert records is set aside as a restatement
-  (`restated_alerts`) and never promotes by itself. `--close-as` and `--benign-kind` are read only for
+  Malicious observation that cites one alert and nothing else is set aside as a restatement of it
+  (`restated_alerts`) and never promotes by itself; one that relates two alerts, or reads an item
+  of an alert's evidence, stands beyond them. `--close-as` and `--benign-kind` are read only for
   a ledger written before the field existed. The rules the executor reads say the same: name the
   condition by its place in the list, never the kind; write `ID (Name)` where the name is known, and
   a bare identifier is never a failure.

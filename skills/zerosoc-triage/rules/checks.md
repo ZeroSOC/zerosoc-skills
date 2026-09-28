@@ -35,7 +35,8 @@ executor puts that language in its place; read as it is, it means the language o
   decides the verdict, and it is read off the playbook. An observation that fits no entry of either
   list still carries its side and confidence; it names nothing.
 - Do not decide; do not write the alerts themselves as observations, they are already the first
-  Malicious observations, and an observation that rests on the alert records alone restates them
-  and is not evidence beyond them; never guess the impact.
+  Malicious observations, and an observation that says of one alert what its detection asserted
+  restates it and is not evidence beyond it. Cite what a reading rests on: the item of the alert's
+  own evidence you read further, each alert you relate, the result you read; never guess the impact.
 - Write the observation texts in $language. Write technique codes `ID (Name)` where the name is
   known; a bare identifier is rendered for you and is never a failure.
