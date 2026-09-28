@@ -186,7 +186,7 @@
       "items": {
         "$ref": "#/$defs/ocsf_ticket"
       },
-      "description": "Tickets the Case raised; the Phase 1 tuning ticket carries type tuning."
+      "description": "Tickets the Case raised; a False Positive raises one of kind tuning to Phase 1, a Benign close one of kind exception, the Knowledge Base entry a person confirms."
     },
     "zerosoc": {
       "$ref": "#/$defs/zerosoc_extension"
@@ -428,11 +428,11 @@
             "type": "string",
             "enum": [
               "alert",
-              "observation",
+              "event",
               "action"
             ]
           },
-          "description": "alert for an aggregated Alert, observation for the result of a check or query, action for a response action."
+          "description": "What the entry rests on: alert for an aggregated Alert, event for the result of a check or query, action for a response action."
         },
         "analytic": {
           "$ref": "#/$defs/ocsf_analytic"
@@ -502,6 +502,10 @@
         "uid": {
           "type": "string"
         },
+        "title": {
+          "type": "string",
+          "description": "What the ticket asks for, in a line. Rendered by the Note's Response Actions element."
+        },
         "type_id": {
           "type": "integer",
           "enum": [
@@ -521,6 +525,38 @@
         "type": {
           "type": "string",
           "description": "The type_id caption, as OCSF names it: Internal or External."
+        },
+        "status_id": {
+          "type": "integer",
+          "enum": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            99
+          ],
+          "x-enum-captions": {
+            "0": "Unknown",
+            "1": "New",
+            "2": "In Progress",
+            "3": "Notified",
+            "4": "On Hold",
+            "5": "Resolved",
+            "6": "Closed",
+            "7": "Canceled",
+            "8": "Reopened",
+            "99": "Other"
+          },
+          "description": "Where the ticket stands. A planned remediation is open; one the Case acted on is resolved."
+        },
+        "status": {
+          "type": "string",
+          "description": "The status_id caption."
         },
         "src_url": {
           "type": "string",
