@@ -107,7 +107,7 @@ def close_verdict(covering):
     return 1, "False Positive"
 
 
-EMIT = {1: "tuning ticket to Phase 1", 5: "SOC Knowledge Base entry if the exception was not recorded"}
+EMIT = {1: "tuning ticket to Phase 1", 5: "exception ticket: the Knowledge Base entry proposed for a person to confirm, unless the Knowledge Base already holds it"}
 
 
 def _decide(ledger):

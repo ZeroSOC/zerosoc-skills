@@ -181,8 +181,9 @@ Read per alert: the playbook section the script prints.
    Summarize evidence in the Note and never paste raw logs — what the Note summarizes, the Case
    keeps: the events each Observation rests on stay on the Case and the Note cites them
    ([Case Schema §3](references/framework/02-Taxonomy/case_schema.md)).
-11. **Emit.** On Close: `verdict_id` 1 (False Positive; also a tuning ticket to Phase 1), 5 (Benign; also a
-    Knowledge Base entry if the exception was unrecorded) or 10 (Duplicate, with `master_case_uid`). Which of
+11. **Emit.** On Close: `verdict_id` 1 (False Positive; also a `tuning` ticket to Phase 1), 5 (Benign; also an
+    `exception` ticket — the Knowledge Base entry you propose and a person confirms — unless the Knowledge
+    Base already holds it) or 10 (Duplicate, with `master_case_uid`). Which of
     1 and 5 is the rule's, and `triage_decide.py` prints it: each covering Benign observation carries in the
     ledger the kind of the condition it named, read off the list the condition is in — `"condition":
     "false_positive"` or `"benign"` — and the Case closes as Benign when the covering observation of the

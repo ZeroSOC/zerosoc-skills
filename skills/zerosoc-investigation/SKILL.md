@@ -141,8 +141,9 @@ per Case: the playbook the script prints.
     shorter than the window; an unbound `cases.store` is a visibility gap; every match is flagged for QA
     review, never dismissed); pass the scope to response. At Low
     confidence the Incident is still declared; every containment action then requires approval.
-12. **On Benign proven**: `verdict_id` 1 (False Positive, plus a tuning ticket to Phase 1) or 5 (Benign,
-    plus a Knowledge Base entry if the exception was unrecorded). Which of the two is the rule's, and
+12. **On Benign proven**: `verdict_id` 1 (False Positive, plus a `tuning` ticket to Phase 1) or 5 (Benign,
+    plus an `exception` ticket — the Knowledge Base entry you propose and a person confirms — unless the
+    Knowledge Base already holds it). Which of the two is the rule's, and
     `resolve.py` prints it: a Benign observation carries in the ledger the kind of the triage playbook
     condition it named, read off the list the condition is in — `"condition": "false_positive"` or
     `"benign"` — and the Case closes as Benign when the Benign observation of the highest confidence

@@ -77,7 +77,7 @@ class TriageRule(unittest.TestCase):
         self.assertEqual(r["verdict_id"], 1, "the higher confidence decides")
         r = triage.decide(ledger({"id": "B1", "confidence": "High", "condition": "benign"},
                                  {"id": "B2", "confidence": "Low", "condition": "false_positive"}))
-        self.assertEqual(r["verdict_id"], 5); self.assertEqual(r["emit"], "SOC Knowledge Base entry if the exception was not recorded")
+        self.assertEqual(r["verdict_id"], 5); self.assertTrue(r["emit"].startswith("exception ticket"))
         r = triage.decide(ledger({"id": "B1", "confidence": "High", "condition": "benign"},
                                  {"id": "B2", "confidence": "High", "condition": "false_positive"}))
         self.assertEqual(r["verdict_id"], 1, "both kinds at the same confidence: False Positive")
