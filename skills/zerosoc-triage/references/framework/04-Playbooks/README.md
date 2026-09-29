@@ -4,7 +4,7 @@ type: index
 last_updated: 2026-09-10
 license: Apache-2.0
 ---
-<!-- generated from zerosoc-framework@b36b20817602 : 04-Playbooks/README.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@159c7ec5f0c1 : 04-Playbooks/README.md — do not edit; regenerate with tools/build_references.py -->
 
 # Playbook Operating Guide (Start Here)
 
