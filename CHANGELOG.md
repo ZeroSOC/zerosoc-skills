@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **Office 365 alert-policy alerts are typed.** Where Defender for Office 365 is Plan 1, the alerts of
+  Office 365 alert policies never reach the Defender XDR alert stream; an implementation reads them from
+  the Microsoft 365 audit log instead (zerosoc-mcp#8) and hands them to triage with the policy's name
+  as the title. The Defender source profile now types those names: *Elevation of Exchange admin
+  privilege*, a role "assigned" and a mailbox FullAccess grant as `Privileged role / group grant`
+  (the framework has no mailbox-delegation type; the grant is an account manipulation, T1098.002);
+  "Consent to application" as `OAuth app consent / token-session theft`; an audit bypass or a change
+  to audit settings as `Logging / guardrail disabled`, a type the profile did not map before. The
+  titles of the activity alert policies an onboarding creates (e.g. "ZeroSOC - Mailbox audit bypass")
+  are in the test table beside the built-in ones.
+
 - **The verdict a Close carries is the rule's, and a restated alert is not evidence beyond it.**
   Replaying one recorded false positive against a live model closed it as `1` and as `5` on the same
   evidence, because the executor labelled the *kind* of condition itself, and once promoted it,

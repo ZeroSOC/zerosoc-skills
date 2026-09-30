@@ -249,6 +249,15 @@ class AlertTypeMapping(unittest.TestCase):
             ("Suspicious service registration", "Persistence mechanism created"),
             ("Event log was cleared", "Security-tool / AMSI tampering"),
             ("Creation of forwarding/redirect rule", "Inbox forwarding / redirect or hide rule"),
+            # Office 365 alert-policy alerts, read from the audit log where they never reach the alert stream
+            ("Email reported by user as malware or phish", "User-reported phishing"),
+            ("Elevation of Exchange admin privilege", "Privileged role / group grant"),
+            ("ZeroSOC - Entra role assigned", "Privileged role / group grant"),
+            ("ZeroSOC - Mailbox FullAccess granted", "Privileged role / group grant"),
+            ("ZeroSOC - Consent to application", "OAuth app consent / token-session theft"),
+            ("ZeroSOC - Mailbox audit bypass", "Logging / guardrail disabled"),
+            ("ZeroSOC - Audit log settings changed", "Logging / guardrail disabled"),
+            ("ZeroSOC - Organization audit settings", "Logging / guardrail disabled"),
             ("Suspicious credential dump from NTDS.dit", "Credential dumping"),
         ]:
             with self.subTest(title=title):
