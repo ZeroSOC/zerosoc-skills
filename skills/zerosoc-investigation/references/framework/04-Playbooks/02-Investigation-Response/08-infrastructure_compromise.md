@@ -25,7 +25,7 @@ required_data_sources:
   - Vendor advisories / threat intelligence
 status: draft
 ---
-<!-- generated from zerosoc-framework@159c7ec5f0c1 : 04-Playbooks/02-Investigation-Response/08-infrastructure_compromise.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@6df6b4988807 : 04-Playbooks/02-Investigation-Response/08-infrastructure_compromise.md — do not edit; regenerate with tools/build_references.py -->
 
 # 08-Infrastructure Compromise Investigation & Response
 
