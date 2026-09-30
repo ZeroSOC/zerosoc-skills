@@ -748,6 +748,7 @@
         "title_patterns": [
           "oauth",
           "app(lication)? consent",
+          "consent to app(lication)?",
           "consent grant",
           "token (theft|replay|stolen)",
           "session cookie",
@@ -761,8 +762,19 @@
         "title_patterns": [
           "(privileged|admin(istrator)?) (role|group)",
           "added to (a )?(privileged|admin)",
-          "role assignment",
-          "elevation of privilege"
+          "role (assignment|assigned)",
+          "elevation of (\\w+ ){0,3}privilege",
+          "(full ?access|mailbox permission)s? grant"
+        ]
+      },
+      {
+        "alert_type": "Logging / guardrail disabled",
+        "domain": "Cloud",
+        "detector_ids": [],
+        "title_patterns": [
+          "audit (bypass|log settings|settings)",
+          "audit(ing)? (disabled|turned off|off)",
+          "mailbox audit"
         ]
       },
       {
