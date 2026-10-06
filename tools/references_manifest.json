@@ -28,7 +28,8 @@
         "alert_metadata.py",
         "evidence_inventory.py",
         "process_chain.py",
-        "note_elements.py"
+        "note_elements.py",
+        "timeline.py"
       ]
     },
     "zerosoc-investigation": {

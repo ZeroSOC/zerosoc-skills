@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- **The Case Timeline says what happened, and triage compiles it.** The pin follows the framework to
+  `6df6b49` (ZeroSOC/zerosoc-framework#84), which fixed the timeline as the account of what happened: the Alerts, the actions the
+  Observations establish and the response actions that ran, a remediation the source performed
+  included. The work on the Case is not on it. Triage now compiles the timeline: the triage skill ships
+  `timeline.py`, its procedure builds the Case Timeline from its own ledger (one `detection` entry per
+  Alert, one `action` entry per remediation that ran, the Observations flagged `timeline`), and
+  `note_elements.py` no longer accepts "None." for it, because the framework no longer does and a Case
+  always has its Alerts. A Case closed at triage keeps that timeline; investigation extends it whatever
+  the verdict, where it used to build one only on Malicious proven. `timeline.py` refuses an
+  `investigation`, `handover` or `note` entry as a failure, where it used to place it at the gate's
+  time: a check or a query is the Observation it produced, and a handover is a lifecycle event.
+
 - **Office 365 alert-policy alerts are typed.** Where Defender for Office 365 is Plan 1, the alerts of
   Office 365 alert policies never reach the Defender XDR alert stream; an implementation reads them from
   the Microsoft 365 audit log instead (zerosoc-mcp#8) and hands them to triage with the policy's name

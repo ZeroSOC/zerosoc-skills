@@ -125,12 +125,14 @@ per Case: the playbook the script prints.
 10. **Assign correctly.** The moment a Crown Jewel asset or a privileged identity enters the scope, the
    assignee becomes a human (`handover_reason`); keep running queries and proposing, the human decides.
 11. **On Malicious proven** (§3.1): set `verdict_id = 2`; assign the definitive Incident Category and the
-    observed techniques as `ID (Name)`; build the **Case Timeline** (the course of the attack interleaved
-    with detection and response actions, each entry timestamped in UTC with its event reference; the
-    `timeline` of `process_chain.py --json` gives the process entries with their alerts as references).
-    The timeline is not a field the Case stores: it is the Observations flagged `zerosoc:timeline`, rendered
-    in `first_seen_time` order. Give each observation its `first_seen` (when the thing happened, never when the
-    observation was made) and `"timeline": true` where the narrative shows it; `python3 scripts/timeline.py ledger.json --json`
+    observed techniques as `ID (Name)`; extend the **Case Timeline** triage compiled with the course of the
+    attack (interleaved with the detection and the response actions that ran, each entry timestamped in UTC
+    with its event reference; the `timeline` of `process_chain.py --json` gives the process entries with their
+    alerts as references). The timeline says what happened and is not a field the Case stores: it is the
+    Observations flagged `zerosoc:timeline`, rendered in `first_seen_time` order, with a `detection` entry per
+    Alert and an `action` entry per response action that ran. Your validation queries are not entries: each is
+    the Observation it produced, and a handover is a lifecycle event. Give each observation its `first_seen` (when the thing happened, never when the
+    observation was made) and `"timeline": true` where it establishes something that happened; `python3 scripts/timeline.py ledger.json --json`
     orders them, **derives T0** — the earliest Malicious `first_seen`; context may come before it — flags the one
     entry that carries it, and fails a T0 no entry carries or a Malicious entry earlier than the T0 the Case states. The Case's `start_time` opens at the earliest Alert and moves earlier
     whenever a Malicious Observation cites an earlier event; on a confirmed Incident it is **T0**, the
@@ -163,7 +165,8 @@ per Case: the playbook the script prints.
     it rests on by OCSF identifier; the Alerts also render what their detection asserted, as in the
     Triage Note, with the remediation state of each entity **as it stands at this gate**, and any
     recommended action run at this gate renders as the Observation it produced);
-    **Re-classification Pivots**; **Case Timeline**; **Response Actions** (as the Triage Note, at this
+    **Re-classification Pivots**; **Case Timeline** (whatever the verdict: the one triage compiled, extended by
+    what this investigation established; `timeline.py` on this ledger builds it); **Response Actions** (as the Triage Note, at this
     gate: the remediation the Case references and the open tickets it raised, with their kinds — on a confirmed
     Incident this is what Response is handed, so a ticket awaiting approval renders as such); **Visibility Gaps** (or
     "None."); **Provenance**, with the preserved-evidence pointer once §3.3 preservation has happened.

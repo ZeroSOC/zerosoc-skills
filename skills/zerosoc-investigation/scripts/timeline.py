@@ -3,9 +3,13 @@
 
   timeline.py ledger.json [--t0 <time>] [--json]
 
-The timeline is a **reconstruction of the Case, not a listing of it** (Case Schema §5): its entries
-are the ones flagged for the narrative, ordered by **when the thing happened** rather than when it
-was recorded. T0 is the earliest Malicious event of the Case — its `start_time`, which only a
+The timeline says **what happened**, and is a reconstruction rather than a listing (Case Schema §3,
+§5): the Alerts, the actions the Observations establish (the adversary's, where there is one) and
+the response actions that ran, a remediation the source performed included, ordered by **when the
+thing happened** rather than when it was recorded. The work on the Case is not on it: a check or a
+query is the Observation it produced, and an acknowledgment, a promotion or a handover is a lifecycle
+event. Triage compiles the timeline and investigation extends it, so both gates run this script on
+their own ledger, and a Case closed at triage keeps the timeline triage built. T0 is the earliest Malicious event of the Case — its `start_time`, which only a
 Malicious Observation moves: a benign precursor or a piece of context earlier than it is part of the
 account and moves nothing. Exactly one entry carries T0: two detections of the same activity share
 a time, and the first of them is the anchor while the rest are entries like any other. It is **T0**,
@@ -14,16 +18,17 @@ until then the same moment is the Case's `start_time`, and the output gives it u
 `confirmed_incident` saying which it is.
 
 Input: **the ledger** of triage_decide.py or resolve.py, whose observations say when the thing they
-report happened and whether the narrative shows them:
+report happened and whether the timeline shows them:
 
 {"now": "2026-09-14T15:12:00Z",                    when this gate ran
  "t0": null,                                        the Case's start_time if it states one; it is checked
  "observations": [{"id": "F1", "desc": "...", "side": "Malicious"|"Benign"|null, "retracted": false,
                "first_seen": "2026-09-14T14:55:41Z",   when it happened — never "at", when it was made
-               "timeline": true,                      flagged for the narrative (the zerosoc:timeline tag)
+               "timeline": true,                      on the timeline (the zerosoc:timeline attribute)
                "event_refs": ["..."]}],
- "entries": [{"kind": "handover"|"action"|"note"|"investigation"|"detection", "desc": "...",
-              "time": "..."}]}                        what is on the timeline and is not an observation
+ "entries": [{"kind": "detection"|"action", "desc": "...",
+              "time": "..."}]}                        what is on the timeline and is not an observation:
+                                                      an Alert, or a response action that ran
 
 T0 is **derived**: the earliest `first_seen` among the Malicious observations that are not retracted,
 flagged or not, and the `detection` entries. A `t0` the ledger states is the one the timeline must carry,
@@ -31,8 +36,9 @@ and it is compared with the derived one: they differ when the Case or the ledger
 ISO 8601 with a date and a time of day (any offset, any fraction of a second) or milliseconds since the
 epoch; both may meet in one ledger, and a time outside this century is not read — it is a slip, or seconds
 given for milliseconds. A time written to the second holds the whole of that second.
-An entry that is not an observation and has no time happened at this gate and is stamped `now`. An observation
-has no such fallback: one flagged for the narrative with no `first_seen` cannot be placed, and says so.
+A response action with no time ran at this gate and is stamped `now`. A detection has no such fallback, and
+neither has an observation: one flagged for the timeline with no `first_seen` cannot be placed, and says so.
+An entry of any other kind is the work on the Case, not what happened: it is not placed, and it is a failure.
 
 Output: the entries in order, each with `time` (milliseconds), `time_utc` and `is_t0`; `t0`, `t0_utc`
 and `t0_entry`; and `failures`, on any of which the script exits 1.
@@ -40,7 +46,8 @@ and `t0_entry`; and `failures`, on any of which the script exits 1.
 import argparse, json, math, re, sys
 from datetime import datetime, timezone
 
-KINDS = ("detection", "observation", "investigation", "handover", "action", "note")
+KINDS = ("detection", "observation", "action")
+ENTRY_KINDS = ("detection", "action")  # what the ledger's entries may be: an Alert, or a response action that ran
 # a time of a Case is of this century; outside it, it is a typing slip or seconds given for milliseconds
 EARLIEST, LATEST = 946684800000, 4102444800000  # 2000-01-01 and 2100-01-01, in milliseconds
 TIME = re.compile(r"^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})(?:\.(\d+))?(Z|[+-]\d{2}:?\d{2})?$")
@@ -125,18 +132,24 @@ def build(ledger):
         if not observation.get("timeline"):
             continue
         if when is None:
-            unplaced.append(dict(observation, why="an observation flagged for the narrative with no first_seen: it is placed "
+            unplaced.append(dict(observation, why="an observation flagged for the timeline with no first_seen: it is placed "
                                               "by when the thing happened, never by when the observation was made"))
             continue
         placed.append(dict(observation, kind=observation.get("kind") or "observation", when=when, moves_t0=moves_t0))
 
     for entry in others:
+        if entry.get("kind") not in ENTRY_KINDS:
+            problems.append(f"entry {entry.get('desc', '?')!r} of kind {entry.get('kind')!r} is not what happened: "
+                            "the timeline holds the Alerts, the actions the Observations establish and the response "
+                            "actions that ran; a check or a query is the Observation it produced, and an "
+                            "acknowledgment, a promotion or a handover is a lifecycle event")
+            continue
         when = parse_time(entry.get("time"))
         if entry.get("time") not in (None, "") and when is None:
             problems.append(f"entry {entry.get('desc', '?')!r}: time {entry['time']!r} is not a time this can read")
             continue
-        if when is None and entry.get("kind") != "detection":
-            when = now  # a step of the work happened when this gate ran
+        if when is None and entry.get("kind") == "action":
+            when = now  # a response action with no time of its own ran when this gate ran
         if when is None:
             unplaced.append(dict(entry, why="an entry with no time, and none could be given it"))
             continue
@@ -155,8 +168,8 @@ def build(ledger):
     t0 = stated or derived  # what the Case states is what its Note will state: the timeline must carry that one
     anchor = None
     for entry in placed:
-        # only what can define T0 can carry it: a Benign observation, a piece of context or a handover at
-        # the same instant is an entry like any other
+        # only what can define T0 can carry it: a Benign observation, a piece of context or a response
+        # action at the same instant is an entry like any other
         entry["is_t0"] = anchor is None and t0 is not None and entry["moves_t0"] and _same(t0, entry["when"])
         if entry["is_t0"]:
             anchor = entry

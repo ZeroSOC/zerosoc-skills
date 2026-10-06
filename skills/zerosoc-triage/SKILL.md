@@ -167,7 +167,12 @@ Read per alert: the playbook section the script prints.
    detection asserted: its techniques as `ID (Name)`, the threat name and family, the detection source and detector,
    and the remediation state of each entity it names; a **recommended action you ran** renders as the Observation it
    produced, naming the recommendation it came from, and one you did not run renders nowhere); **Case Timeline**
-   (only the Observations flagged for it, which at triage is usually none — write "None."); **Response Actions**
+   (what happened, as far as triage establishes it: the Alerts, the actions your Observations establish, and the
+   response actions that ran, the source's own remediation included. Triage compiles it and a Case closed here keeps
+   it, so it is never "None.": give the ledger one `detection` entry per Alert, timed when its activity began, one
+   `action` entry per remediation that ran, and `first_seen` with `"timeline": true` on each Observation that
+   establishes something that happened; `python3 scripts/timeline.py ledger.json --json` orders them and fails what
+   it cannot place. Your checks are not entries: each is the Observation it produced); **Response Actions**
    (the remediation the Case carries in one place: each Remediation Activity it references, with the entity it acted on
    and whether it succeeded, and each open ticket it raised, with its kind — a remediation the source performed before
    you opened the Case renders here too; write "None." when it carries neither); **Visibility Gaps** (or

@@ -47,7 +47,7 @@ class TheMethodSurface(unittest.TestCase):
             "entries": [
                 {"time": T + 100, "kind": "detection", "desc": "ransomware behaviour"},
                 {"time": T + 100, "kind": "detection", "desc": "the same activity, seen twice"},
-                {"kind": "investigation", "desc": "Q1: what ran before it?"},
+                {"time": T + 300, "kind": "action", "desc": "ws-01 isolated"},
             ],
         })
 
@@ -55,12 +55,27 @@ class TheMethodSurface(unittest.TestCase):
         self.assertEqual(built["t0_entry"], "ransomware behaviour")
         self.assertEqual(timeline.check(built), [])
 
-    def test_an_entry_without_a_time_happens_when_this_gate_ran(self):
-        built = timeline.build({"t0": None, "now": T + 500, "entries": [
-            {"kind": "investigation", "desc": "Q1"}, {"kind": "handover", "desc": "a human"}]})
+    def test_a_response_action_without_a_time_ran_when_this_gate_ran(self):
+        built = timeline.build({"t0": None, "now": T + 500, "entries": [{"kind": "action", "desc": "ws-01 isolated"}]})
 
-        self.assertEqual([e["time"] for e in built["entries"]], [T + 500, T + 500])
+        self.assertEqual([e["time"] for e in built["entries"]], [T + 500])
         self.assertEqual(built["unplaced"], [])
+        self.assertEqual(timeline.check(built), [])
+
+    def test_the_work_on_the_case_is_not_on_its_timeline(self):
+        """The timeline says what happened (Case Schema §3): the Alerts, the actions the Observations
+        establish and the response actions that ran. A check or a query is the Observation it produced,
+        and a handover is a lifecycle event: offered as entries, they are refused, and not placed."""
+        built = timeline.build({"t0": None, "now": T + 500, "entries": [
+            {"time": T + 100, "kind": "detection", "desc": "ransomware behaviour"},
+            {"kind": "investigation", "desc": "Q1: what ran before it?"},
+            {"kind": "handover", "desc": "a human"},
+            {"kind": "note", "desc": "the Triage Note was written"}]})
+
+        self.assertEqual([e["kind"] for e in built["entries"]], ["detection"])
+        failures = timeline.check(built)
+        self.assertEqual(len(failures), 3)
+        self.assertTrue(all("not what happened" in f for f in failures), failures)
 
     def test_a_detection_with_no_time_cannot_be_placed_and_says_so(self):
         built = timeline.build({"t0": None, "now": T + 500, "entries": [
@@ -180,6 +195,8 @@ class TheMethodSurface(unittest.TestCase):
                 {"n": 2, "observation": "the device belongs to finance",
                  "tag": {"side": "context", "confidence_id": None}, "event_refs": ["EVT-1"]},
             ],
+            "timeline": [{"time_utc": "2026-09-14T14:55:41Z", "kind": "detection", "desc": "ransomware behaviour",
+                          "is_t0": True}],
         }
 
 
@@ -201,6 +218,9 @@ def ledger_note(**changes):
              "confidence": "High", "event_refs": ["EVT-1"], "first_seen": "2026-09-14T14:55:41Z", "timeline": True},
             {"id": "F2", "desc": "the device belongs to finance", "side": None, "event_refs": ["CMDB-7"]},
         ],
+        # triage compiles the Case Timeline, and it always holds at least the Alerts that opened the Case
+        "timeline": [{"time_utc": "2026-09-14T14:55:41Z", "kind": "detection", "desc": "Malware / loader execution on ws-01",
+                      "is_t0": True}],
     }
     note.update(changes)
     return note
@@ -429,7 +449,8 @@ class AFrameworkChangeIsASkillsReleaseAndNothingElse(unittest.TestCase):
     def test_which_elements_may_be_empty_is_the_frameworks_and_is_pinned(self):
         def optional(kind):
             return sorted(e["element"] for e in note_elements.elements(kind, FRAMEWORK) if e["may_be_empty"])
-        self.assertEqual(optional("triage"), ["response_actions", "timeline", "visibility_gaps"])
+        # triage compiles the timeline, and a Case always has an Alert: it is never "None." (Case Schema §3)
+        self.assertEqual(optional("triage"), ["response_actions", "visibility_gaps"])
         self.assertEqual(optional("investigation"), ["reclassification_pivots", "response_actions", "visibility_gaps"])
 
     def test_none_quoted_about_something_else_does_not_make_an_element_optional(self):
@@ -650,18 +671,19 @@ class TheRuleText(unittest.TestCase):
 class FromTheCommandLine(unittest.TestCase):
     """As an executor runs them: on the ledger the decision rule ran on, exit code and all."""
 
-    def run_script(self, name, *args, document=None):
+    def run_script(self, name, *args, document=None, skill="zerosoc-investigation"):
         base = tempfile.mkdtemp()
         if document is not None:
             with open(os.path.join(base, "ledger.json"), "w", encoding="utf-8") as f:
                 json.dump(document, f)
-        script = os.path.join(ROOT, "skills", "zerosoc-investigation", "scripts", name)
+        script = os.path.join(ROOT, "skills", skill, "scripts", name)
         return subprocess.run([sys.executable, script, *args], cwd=base, capture_output=True, text=True)
 
     def investigation(self):
         note = ledger_note(kind="investigation", started_at="2026-09-14T15:00:00Z", severity="High",
                            incident_category="IC-02", now="2026-09-14T15:12:00Z")
         note["observations"][0]["at"] = "2026-09-14T15:03:10Z"
+        del note["timeline"]  # what timeline.py builds from this same ledger, not something the ledger holds
         return note
 
     def test_one_ledger_serves_the_rule_the_note_check_and_the_timeline(self):
@@ -673,11 +695,31 @@ class FromTheCommandLine(unittest.TestCase):
         self.assertEqual(json.loads(built.stdout)["t0_utc"], "2026-09-14T14:55:41Z")
         unfinished = self.run_script("note_elements.py", "--kind", "investigation", "--note", "ledger.json", document=document)
         self.assertIn("renders no Case Timeline", unfinished.stderr,
-                      "only a Triage Note may have nothing on its timeline: a Case under investigation has its alerts")
+                      "a Note renders the timeline built from its ledger: a Case always has its alerts to put on it")
         document["timeline"] = json.loads(built.stdout)["entries"]
         checked = self.run_script("note_elements.py", "--kind", "investigation", "--note", "ledger.json", document=document)
         self.assertEqual((checked.returncode, checked.stderr), (0, ""))
         self.assertIn("5. Re-classification Pivots (reclassification_pivots)", checked.stdout)
+
+    def test_triage_compiles_the_timeline_from_its_own_ledger(self):
+        """Triage compiles the Case Timeline, and a Case closed at triage keeps it: the triage skill ships
+        the same timeline.py, reads the ledger triage_decide.py reads, and its Note renders what it built."""
+        document = ledger_note()
+        del document["timeline"]
+        document["now"] = "2026-09-14T15:12:00Z"
+        document["entries"] = [{"kind": "detection", "desc": "Malware / loader execution on ws-01",
+                                "time": "2026-09-14T14:55:41Z", "related_events": [{"uid": "DF-1"}]}]
+        unfinished = self.run_script("note_elements.py", "--kind", "triage", "--note", "ledger.json",
+                                     document=document, skill="zerosoc-triage")
+        self.assertIn("renders no Case Timeline", unfinished.stderr)
+        built = self.run_script("timeline.py", "ledger.json", "--json", document=document, skill="zerosoc-triage")
+        self.assertEqual(built.returncode, 0, built.stderr)
+        entries = json.loads(built.stdout)["entries"]
+        self.assertEqual([e["kind"] for e in entries], ["detection", "observation"])
+        document["timeline"] = entries
+        checked = self.run_script("note_elements.py", "--kind", "triage", "--note", "ledger.json",
+                                  document=document, skill="zerosoc-triage")
+        self.assertEqual((checked.returncode, checked.stderr), (0, ""))
 
     def test_a_note_that_is_not_conformant_exits_1_and_says_why(self):
         document = self.investigation()
