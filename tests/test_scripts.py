@@ -1221,6 +1221,28 @@ class Procedures(unittest.TestCase):
 
 
 class AutonomyMatrix(unittest.TestCase):
+    def test_an_identity_action_on_a_hosts_own_identity_is_not_selected(self):
+        # live: a confirmed Incident named the computer account a scheduled task ran under, and an executor
+        # asked a person to approve disabling it (Incident Response §1, §2.1)
+        for target in ("VWIN01$", "SYSTEM", "NT AUTHORITY\\NETWORK SERVICE", "Administrators"):
+            for preset in auto.IDENTITY_ACTIONS:
+                r = auto.classify(f"{preset} {target}", "High", "High", preset=preset, target=target)
+                self.assertEqual(r["tier"], "not selected", (preset, target))
+                self.assertIn("isolate", r["instead"])
+                self.assertNotIn("presentation_payload", r, "never sent for approval")
+
+    def test_a_stated_kind_wins_over_what_the_name_states(self):
+        r = auto.classify("disable svc$", "High", "High", preset="disable-service-identity", target="svc$", target_kind="service")
+        self.assertEqual(r["tier"], "requires approval")
+        self.assertEqual(auto.classify("disable app01", "High", "High", preset="disable-user-identity", target="app01", target_kind="host")["tier"], "not selected")
+
+    def test_a_persons_account_follows_the_matrix_and_the_payload_names_it(self):
+        r = auto.classify("disable elena", "Low", "High", preset="disable-user-identity", target="elena@contoso.example", target_kind="person")
+        self.assertEqual(r["tier"], "requires approval")
+        self.assertIn("on elena@contoso.example (person)", r["presentation_payload"]["3_action_and_matrix_entry"])
+        self.assertEqual(auto.classify("isolate VWIN01", "High", "High", preset="isolate-workstation", target="VWIN01$")["tier"], "pre-authorized",
+                         "a host action on the host is unaffected")
+
     def test_workstation_isolation_preauthorized_immediate(self):
         r = auto.classify("isolate WS-07", "High", "High", preset="isolate-workstation")
         self.assertEqual(r["tier"], "pre-authorized"); self.assertIn("immediately", r["timing"])

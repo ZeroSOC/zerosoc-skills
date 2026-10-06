@@ -4,7 +4,7 @@ description: Respond to a confirmed Incident under the ZeroSOC Framework (Phase 
 license: Apache-2.0
 metadata:
   version: "0.4.1"
-  framework: "zerosoc-framework@b36b208 (2026-09-24)"
+  framework: "zerosoc-framework@2a89f16 (2026-10-06)"
   status: draft
   author: ZeroSOC
 ---
@@ -45,8 +45,14 @@ and the autonomy matrix, §2.1) and [Guardrails §2–§3](references/framework/
 1. **Confirm scope** (§1). From the contract confirm the affected entities and the category, read the
    confidence and severity Investigation resolved (they set what may run without approval), and check
    whether any entity is a Crown Jewel asset or a privileged identity: if so and the assignee is not
-   human, the handover happens now and does not delay pre-authorized containment. Scope that expands
-   during the response is recorded on the Case and the actions re-selected for the new entities.
+   human, the handover happens now and does not delay pre-authorized containment. Read what each affected
+   **identity** is: a person's account, a service identity (an account or service principal software runs
+   under), or a host's own identity (the computer account a directory gives a joined device, an operating
+   system's built-in principal such as `SYSTEM`; OCSF's User of type System). An identity action is
+   selected only for a person's account or a service identity the Case shows was used or exposed; a host's
+   own identity is in the scope because something ran under it, and the host is contained instead. Scope
+   that expands during the response is recorded on the Case and the actions re-selected for the new
+   entities.
 2. **Regulatory clock** (§6, and Detection & Analysis §3.2). If the Incident is `significant`, the
    deadlines run from awareness: NIS2 early warning within 24 hours, notification within 72 hours, final
    report within one month; DORA initial, intermediate and final reports on the regulation's deadlines.
@@ -64,7 +70,10 @@ and the autonomy matrix, §2.1) and [Guardrails §2–§3](references/framework/
    is pre-authorized subject to the Case confidence. When no playbook exists for the category at this
    framework pin, select actions from the matrix in §2.1 directly.
 4. **Classify each action** under the autonomy matrix:
-   `python3 scripts/autonomy.py --action "isolate WS-07" --preset isolate-workstation --confidence High --severity High`.
+   `python3 scripts/autonomy.py --action "isolate WS-07" --preset isolate-workstation --confidence High --severity High`;
+   for an identity action add `--target` and `--target-kind person|service|host`. An identity action on a
+   host's own identity is **not selected** (the script exits 1 and names the host action to take instead):
+   it is neither proposed nor sent for approval.
    Pre-authorized actions are reversible and leave the entity's service running (isolate a workstation,
    suspend sessions, disable an identity no critical service runs under, revoke a key or token, block an
    indicator, quarantine a file or message); they apply to any entity, a Crown Jewel included. Approval
@@ -80,7 +89,13 @@ and the autonomy matrix, §2.1) and [Guardrails §2–§3](references/framework/
    modified, rejected) on the action's entry; a rejection is a review event. While pending, apply the
    pre-authorized actions and continue investigating residual observations. Waiting time is HITL dwell, never
    containment time.
-6. **Apply and record** each containment action: entity, timestamp, how it is reversed. Verify from
+6. **Apply and record** each containment action: entity, timestamp, how it is reversed. An identity is
+   contained **where it is held** (§2): an on-premises account is disabled in the directory that manages it
+   and its synchronized cloud copy as well; sessions are ended by each system that granted them; a
+   credential is reset where it is managed; a local account is disabled on the host that holds it. An
+   action no means you hold reaches is handed to a person as a task stating the steps, keeps its place in
+   the matrix (approved first where it requires approval), and is recorded under the name of whoever
+   applied it. Verify from
    telemetry that contained activity has stopped before eradicating (no lateral movement from isolated
    hosts, no traffic to blocked infrastructure, no successful authentication by disabled identities);
    correct containment that has not held.

@@ -3,13 +3,15 @@
 
 Files are copied verbatim, preserving the framework's directory layout so that the relative links
 inside them keep resolving. A provenance line is inserted after the YAML frontmatter. Shared scripts
-listed in the manifest are copied from tools/shared/ into the skill's scripts/ directory.
+listed in the manifest are copied from tools/shared/ into the skill's scripts/ directory. The
+`framework:` line of every SKILL.md's metadata is written from the pin too: it is what a Note's
+provenance names, and a stamp nothing maintained once named a commit two pins behind the rules applied.
 
 Usage:
   python3 tools/build_references.py          # (re)generate
   python3 tools/build_references.py --check  # exit 1 if the generated tree is stale
 """
-import glob, hashlib, json, os, shutil, subprocess, sys
+import glob, hashlib, json, os, re, shutil, subprocess, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MANIFEST = json.load(open(os.path.join(ROOT, "tools", "references_manifest.json")))
@@ -19,6 +21,19 @@ FW = os.path.join(ROOT, MANIFEST["framework_dir"])
 def framework_commit():
     out = subprocess.run(["git", "-C", FW, "rev-parse", "HEAD"], capture_output=True, text=True, check=True)
     return out.stdout.strip()
+
+
+def framework_date():
+    out = subprocess.run(["git", "-C", FW, "log", "-1", "--format=%cs"], capture_output=True, text=True, check=True)
+    return out.stdout.strip()
+
+
+STAMP = re.compile(r'^(\s+framework: )"zerosoc-framework@[^"]*"$', re.M)
+
+
+def stamped_skill(text, commit, date):
+    """SKILL.md with its `framework:` metadata naming the pinned commit, or the text unchanged without one."""
+    return STAMP.sub(lambda m: f'{m.group(1)}"zerosoc-framework@{commit[:7]} ({date})"', text)
 
 
 def stamp(text, rel, commit):
@@ -59,7 +74,18 @@ def expected_tree(skill, spec, commit):
 def main():
     check = "--check" in sys.argv
     commit = framework_commit()
+    date = framework_date()
     stale = []
+    for skill_md in sorted(glob.glob(os.path.join(ROOT, "skills", "*", "SKILL.md"))):
+        text = open(skill_md, encoding="utf-8").read()
+        stamped = stamped_skill(text, commit, date)
+        if stamped == text:
+            continue
+        if check:
+            stale.append(os.path.basename(os.path.dirname(skill_md)) + " (SKILL.md framework stamp)")
+            continue
+        with open(skill_md, "w", encoding="utf-8") as f:
+            f.write(stamped)
     for skill, spec in MANIFEST["skills"].items():
         base = os.path.join(ROOT, "skills", skill)
         tree = expected_tree(skill, spec, commit)

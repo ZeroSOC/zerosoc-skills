@@ -5,7 +5,7 @@ last_updated: 2026-09-30
 license: Apache-2.0
 status: draft
 ---
-<!-- generated from zerosoc-framework@6df6b4988807 : 06-Deliverables/investigation_note.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@2a89f166ea50 : 06-Deliverables/investigation_note.md — do not edit; regenerate with tools/build_references.py -->
 
 # Investigation Note
 
