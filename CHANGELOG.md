@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- **An identity action targets a person's account or a service identity.** The pin follows the
+  framework to `2a89f16` (ZeroSOC/zerosoc-framework#86, #87). Incident Response §1 now names three kinds of
+  identity (a person's account, a service identity, a host's own identity: a directory's computer
+  account or an operating system's built-in principal) and selects an identity action only for the
+  first two; §2 says an identity is contained where it is held, and an action no means of the executor
+  reaches goes to a person as a task; the Guardrails request an action only on an entity of the kind it
+  acts on. `zerosoc-response` follows: its scope step reads each identity's kind, its apply step
+  contains an identity in each place that holds it, and `autonomy.py` takes `--target` and
+  `--target-kind person|service|host` and answers **not selected** (exit 1, with the host action to
+  take instead) for an identity action on a host's own identity, read from the name where the kind is
+  not stated (a trailing `$`, a built-in principal). The approval payload names the target and its
+  kind. Found in a live run: an executor asked a person to approve disabling the computer account a
+  scheduled task ran under.
+- **The `framework:` stamp in every SKILL.md follows the pin.** `build_references.py` writes it from the
+  pinned commit and its date, and `--check` fails when it is stale: nothing maintained it, so a Note's
+  provenance named `b36b208` two pins after the rules it applied had moved on.
+
 - **The Case Timeline says what happened, and triage compiles it.** The pin follows the framework to
   `6df6b49` (ZeroSOC/zerosoc-framework#84), which fixed the timeline as the account of what happened: the Alerts, the actions the
   Observations establish and the response actions that ran, a remediation the source performed

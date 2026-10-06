@@ -2,10 +2,10 @@
 title: Definitions
 type: concept
 status: development
-last_updated: 2026-09-27
+last_updated: 2026-10-06
 license: Apache-2.0
 ---
-<!-- generated from zerosoc-framework@6df6b4988807 : 01-Foundation/definitions.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@2a89f166ea50 : 01-Foundation/definitions.md — do not edit; regenerate with tools/build_references.py -->
 
 # Standard SecOps Definitions
 
