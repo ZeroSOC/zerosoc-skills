@@ -1,6 +1,6 @@
 # Generated framework references
 
-Source: zerosoc-framework@2a89f166ea50c7afb12d215cfda3338cb2b2cf94 (Apache-2.0).
+Source: zerosoc-framework@36fc702847087d88686ac5b1c489df1dd9dc2e6e (Apache-2.0).
 
 Do not edit these files; regenerate with `python3 tools/build_references.py`.
 
