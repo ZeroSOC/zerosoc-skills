@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **The executor's own write-back is not a source input.** The pin follows the framework to `36fc702`
+  (ZeroSOC/zerosoc-framework#89), whose Detection & Analysis §1.1 notes that what the executor itself
+  wrote into a source's record (its Note, its verdict, the Case) is not one of the inputs the source
+  asserts. The Defender XDR source profile says so of the incident's description, which the executor
+  writes back in live mode and which the profile otherwise maps as the source's own narrative.
 - **An identity action targets a person's account or a service identity.** The pin follows the
   framework to `2a89f16` (ZeroSOC/zerosoc-framework#86, #87). Incident Response §1 now names three kinds of
   identity (a person's account, a service identity, a host's own identity: a directory's computer

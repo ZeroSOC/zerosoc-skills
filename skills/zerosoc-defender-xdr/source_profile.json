@@ -1500,7 +1500,7 @@
       "description": {
         "type": "string",
         "from": "description",
-        "description": "The source's own narrative of the incident, seeded from the alert that raised it. It says what the incident is about in the source's words, which the per-alert descriptions do not give on their own, so triage reads it as an input the source asserts. It is the source's account and never the Case's: the Case's account is its Notes."
+        "description": "The source's own narrative of the incident, seeded from the alert that raised it. It says what the incident is about in the source's words, which the per-alert descriptions do not give on their own, so triage reads it as an input the source asserts. It is the source's account and never the Case's: the Case's account is its Notes. A description the executor itself wrote there (its Note and the Case, written back for the analysts who work in the source) is not the source's account and is not read as one (Detection & Analysis §1.1)."
       },
       "classification": {
         "type": "string",
