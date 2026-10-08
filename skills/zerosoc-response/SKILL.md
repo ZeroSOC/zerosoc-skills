@@ -56,9 +56,9 @@ and the autonomy matrix, §2.1) and [Guardrails §2–§3](references/framework/
 2. **Regulatory clock** (§6, and Detection & Analysis §3.2). If the Incident is `significant`, the
    deadlines run from awareness: NIS2 early warning within 24 hours, notification within 72 hours, final
    report within one month; DORA initial, intermediate and final reports on the regulation's deadlines.
-   `python3 scripts/regulatory_clock.py --awareness TIME --regulation nis2 [--sent KIND=TIME] --now TIME`
-   prints each report with its deadline, a report that follows another counted from when that one was
-   sent, and exits 1 when one is overdue. Notification is the SOC Manager's responsibility; prepare the content from the Note and the timeline
+   `python3 scripts/regulatory_clock.py --awareness TIME --severity High --regulation nis2 [--sent KIND=TIME] --now TIME`
+   prints the internal notification the severity sets and each report with its deadline, a report that
+   follows another counted from when that one was sent, and exits 1 when one is overdue. Notification is the SOC Manager's responsibility; prepare the content from the Note and the timeline
    and record each notification (`notifications`: kind, recipient, deadline, sent time). Internal
    notification by severity: High within 30 minutes to asset owners and the security lead; Critical
    within 15 minutes to the CISO, legal, risk and executives (reference times).

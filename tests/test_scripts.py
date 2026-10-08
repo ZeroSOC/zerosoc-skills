@@ -1303,6 +1303,18 @@ class RegulatoryClock(unittest.TestCase):
     def test_no_regulation_no_report(self):
         self.assertEqual(clock.clock(self.AWARE, []), [])
 
+    def test_internal_notification_follows_the_severity(self):
+        # Detection & Analysis §3.2: High within 30 minutes, Critical within 15, Medium a ticket
+        high = clock.clock(self.AWARE, [], severity="High")[0]
+        self.assertEqual((high["kind"], high["deadline_utc"]), ("internal", "2026-01-31T10:30:00Z"))
+        self.assertIn("security lead", high["recipient"])
+        critical = clock.clock(self.AWARE, ["nis2"], severity="Critical")
+        self.assertEqual(critical[0]["deadline_utc"], "2026-01-31T10:15:00Z")
+        self.assertEqual(critical[1]["kind"], "nis2-early-warning")
+        medium = clock.clock(self.AWARE, [], severity="Medium")[0]
+        self.assertIsNone(medium["deadline"]); self.assertIn("ticket", medium["recipient"])
+        self.assertEqual(clock.clock(self.AWARE, [], severity="Informational"), [])
+
 
 class ResponseMetrics(unittest.TestCase):
     # Operational Metrics §4: from T0; MTTC less the HITL dwell of the first containment applied

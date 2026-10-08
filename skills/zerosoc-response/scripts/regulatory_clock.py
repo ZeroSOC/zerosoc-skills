@@ -1,11 +1,19 @@
 #!/usr/bin/env python3
-"""The reports a significant Incident owes, and by when (Incident Response §6). Standard library only.
+"""The notifications a confirmed Incident owes, and by when (Detection & Analysis §3.2, Incident Response
+§6). Standard library only.
 
-  regulatory_clock.py --awareness 2026-10-08T09:30:00Z --regulation nis2 [--regulation dora]
+  regulatory_clock.py --awareness 2026-10-08T09:30:00Z [--severity High] [--regulation nis2 ...]
                       [--sent nis2-notification=2026-10-10T16:00:00Z ...] [--now TIME] [--json]
 
 Times are ISO 8601 in UTC or milliseconds since the epoch. Deadlines run from awareness, which is at the
-latest the Incident's confirmation:
+latest the Incident's confirmation.
+
+Internal notification, by severity (reference response times, an organization policy knob), for every
+confirmed Incident: High, the affected asset owners and the security lead within 30 minutes; Critical,
+the CISO, legal counsel, risk management and executive leadership within 15 minutes; Low or Medium, an
+incident ticket to the affected asset owners, with no deadline and no out-of-hours notification.
+
+Regulatory notification, for a significant Incident of an organization in scope (`--regulation`):
 
 - NIS2 (Article 23): early warning within 24 hours; incident notification within 72 hours; final report
   within one month of the incident notification.
@@ -37,6 +45,14 @@ STEPS = (
     ("dora-final", "dora", "dora-intermediate", None),
 )
 REGULATIONS = ("nis2", "dora")
+SEVERITIES = ("Informational", "Low", "Medium", "High", "Critical")
+INTERNAL = {
+    # severity: (minutes, recipients); None minutes: a ticket, with no deadline
+    "High": (30, "the affected asset owners and the security lead"),
+    "Critical": (15, "the CISO, legal counsel, risk management and executive leadership"),
+    "Medium": (None, "the affected asset owners, as an incident ticket"),
+    "Low": (None, "the affected asset owners, as an incident ticket"),
+}
 
 
 def millis(value):
@@ -61,12 +77,22 @@ def month_after(ms):
     return int(moment.replace(year=year, month=month, day=day).timestamp() * 1000)
 
 
-def clock(awareness, regulations, sent=None, now=None):
-    """Every report the regulations require, each with its deadline, in the order they are set."""
+def clock(awareness, regulations, sent=None, now=None, severity=None):
+    """Every notification owed, each with its deadline: the internal one the severity sets first,
+    then the reports the regulations require, in the order they are set."""
     sent = dict(sent or {})
     wanted = [r for r in REGULATIONS if r in set(regulations)]
     held = {}
     reports = []
+    if severity in INTERNAL:
+        minutes, recipient = INTERNAL[severity]
+        deadline = awareness + minutes * 60_000 if minutes is not None else None
+        reports.append({"kind": "internal", "regulation": None, "recipient": recipient,
+                        "counted_from": "awareness", "deadline": deadline,
+                        "deadline_utc": utc(deadline) if deadline is not None else None,
+                        "sent_at": sent.get("internal"),
+                        "overdue": deadline is not None and now is not None
+                        and sent.get("internal") is None and now > deadline})
     for kind, regulation, after, hours in STEPS:
         if regulation not in wanted:
             continue
@@ -89,28 +115,30 @@ def clock(awareness, regulations, sent=None, now=None):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--awareness", required=True, help="when the organization became aware: at the latest the confirmation")
+    ap.add_argument("--severity", choices=SEVERITIES, help="the Incident's severity: what the internal notification is")
     ap.add_argument("--regulation", action="append", choices=REGULATIONS, default=[],
                     help="a regulation the organization is in scope of; repeatable")
     ap.add_argument("--sent", action="append", default=[], metavar="KIND=TIME", help="a report already sent; repeatable")
     ap.add_argument("--now", help="the moment overdue is read at; omitted, nothing is overdue")
     ap.add_argument("--json", action="store_true")
     a = ap.parse_args()
-    known = {kind for kind, *_ in STEPS}
+    known = {kind for kind, *_ in STEPS} | {"internal"}
     sent = {}
     for item in a.sent:
         kind, _, when = item.partition("=")
         if kind not in known or not when:
             ap.error(f"--sent {item}: expected one of {', '.join(sorted(known))} = a time")
         sent[kind] = millis(when)
-    reports = clock(millis(a.awareness), a.regulation, sent, millis(a.now) if a.now else None)
+    reports = clock(millis(a.awareness), a.regulation, sent, millis(a.now) if a.now else None, a.severity)
     if a.json:
         print(json.dumps(reports, indent=2))
     else:
         for r in reports:
             state = f"sent {utc(r['sent_at'])}" if r["sent_at"] is not None else ("OVERDUE" if r["overdue"] else "due")
-            print(f"{r['kind']}: by {r['deadline_utc']} (from {r['counted_from']}), {state}")
+            by = f"by {r['deadline_utc']} (from {r['counted_from']})" if r["deadline"] is not None else "no deadline"
+            print(f"{r['kind']}: {by}, {state}" + (f" — to {r['recipient']}" if r.get("recipient") else ""))
         if not reports:
-            print("no regulation named: no report is owed")
+            print("no severity and no regulation named: no notification is owed")
     sys.exit(1 if any(r["overdue"] for r in reports) else 0)
 
 

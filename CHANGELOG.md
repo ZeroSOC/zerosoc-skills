@@ -3,9 +3,11 @@
 ## Unreleased
 
 - **The regulatory clock and the speed metrics are scripts.** `zerosoc-response` ships
-  `regulatory_clock.py`, which prints the reports a significant Incident owes with their deadlines
-  (Incident Response §6: NIS2's early warning, notification and final report; DORA's initial,
-  intermediate and final reports), a report that follows another counted from when that one was sent,
+  `regulatory_clock.py`, which prints the notifications a confirmed Incident owes with their deadlines:
+  the internal one its severity sets (Detection & Analysis §3.2) and, for a significant Incident, the
+  regulatory reports (Incident Response §6: NIS2's early warning, notification and final report; DORA's
+  initial, intermediate and final reports), a report that follows another counted from when that one
+  was sent,
   and `response_metrics.py`, which computes MTTD, MTTC and MTTR from T0 (Operational Metrics §4), MTTC
   less the HITL dwell of the first containment applied and MTTD with its population named. Steps 2 and 9
   of the skill point at them. An executor that implemented this arithmetic itself had a second copy of
