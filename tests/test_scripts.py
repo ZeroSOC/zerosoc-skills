@@ -11,6 +11,8 @@ def load(rel, name):
 triage = load("skills/zerosoc-triage/scripts/triage_decide.py", "triage_decide")
 inv = load("skills/zerosoc-investigation/scripts/resolve.py", "resolve")
 auto = load("skills/zerosoc-response/scripts/autonomy.py", "autonomy")
+clock = load("skills/zerosoc-response/scripts/regulatory_clock.py", "regulatory_clock")
+speed = load("skills/zerosoc-response/scripts/response_metrics.py", "response_metrics")
 alert_types = load("tools/shared/alert_types.py", "alert_types")
 evidence = load("tools/shared/evidence_inventory.py", "evidence_inventory")
 selector = load("tools/shared/select_playbook.py", "select_playbook")
@@ -1257,6 +1259,89 @@ class AutonomyMatrix(unittest.TestCase):
     def test_disable_user_identity_on_crown_jewel_case_is_preauthorized(self):
         # §2.1 example: a personal admin account on a domain controller Incident
         self.assertEqual(auto.classify("disable admin account", "High", "High", preset="disable-user-identity")["tier"], "pre-authorized")
+
+
+
+class RegulatoryClock(unittest.TestCase):
+    # Incident Response §6: deadlines from awareness, a following report from the one before it
+    AWARE = clock.millis("2026-01-31T10:00:00Z")
+
+    def kinds(self, reports):
+        return {r["kind"]: r for r in reports}
+
+    def test_nis2_runs_24_and_72_hours_and_a_month_after_the_notification(self):
+        r = self.kinds(clock.clock(self.AWARE, ["nis2"]))
+        self.assertEqual(r["nis2-early-warning"]["deadline_utc"], "2026-02-01T10:00:00Z")
+        self.assertEqual(r["nis2-notification"]["deadline_utc"], "2026-02-03T10:00:00Z")
+        self.assertEqual(r["nis2-final-report"]["deadline_utc"], "2026-03-03T10:00:00Z")
+        self.assertNotIn("dora-initial", r)
+
+    def test_a_report_that_follows_another_is_counted_from_when_it_was_sent(self):
+        sent = {"nis2-notification": clock.millis("2026-02-02T08:00:00Z")}
+        r = self.kinds(clock.clock(self.AWARE, ["nis2"], sent))
+        self.assertEqual(r["nis2-final-report"]["deadline_utc"], "2026-03-02T08:00:00Z")
+        self.assertEqual(r["nis2-final-report"]["counted_from"], "nis2-notification sent")
+
+    def test_one_month_ends_on_the_last_day_of_a_shorter_month(self):
+        self.assertEqual(clock.utc(clock.month_after(clock.millis("2026-01-31T00:00:00Z"))), "2026-02-28T00:00:00Z")
+
+    def test_dora_chains_its_three_reports(self):
+        r = self.kinds(clock.clock(self.AWARE, ["dora"]))
+        self.assertEqual(r["dora-initial"]["deadline_utc"], "2026-01-31T14:00:00Z")
+        self.assertEqual(r["dora-intermediate"]["deadline_utc"], "2026-02-03T14:00:00Z")
+        self.assertEqual(r["dora-final"]["deadline_utc"], "2026-03-03T14:00:00Z")
+
+    def test_overdue_is_an_unsent_report_past_its_deadline(self):
+        now = clock.millis("2026-02-02T00:00:00Z")
+        sent = {"nis2-early-warning": clock.millis("2026-01-31T20:00:00Z")}
+        r = self.kinds(clock.clock(self.AWARE, ["nis2"], sent, now))
+        self.assertFalse(r["nis2-early-warning"]["overdue"])
+        self.assertFalse(r["nis2-notification"]["overdue"])
+        late = self.kinds(clock.clock(self.AWARE, ["nis2"], {}, now))
+        self.assertTrue(late["nis2-early-warning"]["overdue"])
+
+    def test_no_regulation_no_report(self):
+        self.assertEqual(clock.clock(self.AWARE, []), [])
+
+    def test_internal_notification_follows_the_severity(self):
+        # Detection & Analysis §3.2: High within 30 minutes, Critical within 15, Medium a ticket
+        high = clock.clock(self.AWARE, [], severity="High")[0]
+        self.assertEqual((high["kind"], high["deadline_utc"]), ("internal", "2026-01-31T10:30:00Z"))
+        self.assertIn("security lead", high["recipient"])
+        critical = clock.clock(self.AWARE, ["nis2"], severity="Critical")
+        self.assertEqual(critical[0]["deadline_utc"], "2026-01-31T10:15:00Z")
+        self.assertEqual(critical[1]["kind"], "nis2-early-warning")
+        medium = clock.clock(self.AWARE, [], severity="Medium")[0]
+        self.assertIsNone(medium["deadline"]); self.assertIn("ticket", medium["recipient"])
+        self.assertEqual(clock.clock(self.AWARE, [], severity="Informational"), [])
+
+
+class ResponseMetrics(unittest.TestCase):
+    # Operational Metrics §4: from T0; MTTC less the HITL dwell of the first containment applied
+    def incident(self, **fields):
+        held = {"verdict_id": 2, "t0": 0, "detected_at": 300_000, "recovered_at": 7_200_000,
+                "containment": [{"requested": 400_000, "decided": 1_000_000, "applied": 1_060_000},
+                                {"requested": 400_000, "decided": 400_000, "applied": 2_000_000}]}
+        held.update(fields)
+        return held
+
+    def test_mttc_leaves_out_the_wait_for_the_approver(self):
+        r = speed.metrics(self.incident())
+        self.assertEqual(r["mttd_ms"], 300_000)
+        self.assertEqual(r["hitl_dwell_ms"], 600_000)
+        self.assertEqual(r["mttc_ms"], 1_060_000 - 600_000)
+        self.assertEqual(r["mttr_ms"], 7_200_000)
+
+    def test_only_a_confirmed_incident_has_a_t0(self):
+        self.assertIn("error", speed.metrics(self.incident(verdict_id=1)))
+
+    def test_the_hunting_population_is_named(self):
+        r = speed.metrics(self.incident(entry_path="hunt"))
+        self.assertEqual(r["mttd_population"], "threat hunting or out-of-band intake")
+
+    def test_a_metric_whose_stop_has_not_come_is_not_computed(self):
+        r = speed.metrics(self.incident(recovered_at=None, containment=[]))
+        self.assertIsNone(r["mttr_ms"]); self.assertIsNone(r["mttc_ms"])
 
 
 if __name__ == "__main__":
