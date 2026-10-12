@@ -21,7 +21,7 @@ nothing is copied into a second shape, plus one field per element the framework 
 
 {"kind": "triage",
  "classification": {...}, "summary": "...", "rationale": "...", "provenance": {...},
- "observations": [{"id": "F1", "desc": "...", "side": "Malicious"|"Benign"|null,
+ "observations": [{"id": "1", "desc": "...", "side": "Malicious"|"Benign"|null,
                "confidence": "Low|Medium|High", "event_refs": ["<event id or link>"]}],
  "alerts": [...], "detection_metadata": {...}, "visibility_gaps": [{"data_source", "check_prevented"}],
  "timeline": [...], "reclassification_pivots": [...]}

@@ -30,8 +30,8 @@ class TriageRule(unittest.TestCase):
     def test_oauth_consent_closes_as_benign_high(self):
         # Detection & Analysis §1.5, first example
         ledger = {"alerts": [{"id": "A", "type": "OAuth app consent", "entity": "u1", "confidence": "Medium"}],
-                  "observations": [{"id": "F2", "side": "Benign", "confidence": "High"}, {"id": "F3", "side": "Benign", "confidence": "Medium"},
-                               {"id": "F4", "side": "Benign", "confidence": "Low"}, {"id": "F1", "side": None}]}
+                  "observations": [{"id": "2", "side": "Benign", "confidence": "High"}, {"id": "3", "side": "Benign", "confidence": "Medium"},
+                               {"id": "4", "side": "Benign", "confidence": "Low"}, {"id": "1", "side": None}]}
         r = triage.decide(ledger)
         self.assertEqual(r["decision"], "Close"); self.assertEqual(r["confidence"], "High")
 
@@ -492,7 +492,7 @@ class DecisionReadsWhatTheDetectionAsserts(unittest.TestCase):
 
     def test_investigation_reads_the_same_record_at_its_own_gate(self):
         led = self.ledger()
-        led["observations"] = [{"id": "F1", "side": "Malicious", "confidence": "High"}]
+        led["observations"] = [{"id": "1", "side": "Malicious", "confidence": "High"}]
         r = inv.resolve(led)
         self.assertIn("loader.exe", " ".join(r["detection_notes"]))
         self.assertEqual(r["verdict_id"], 2, "the resolution rule is unchanged")
@@ -998,9 +998,9 @@ class RunCheck(unittest.TestCase):
                                   "detection": {"source": "antivirus", "analytic_type_id": 5, "analytic_type": "Fingerprinting"},
                                   "description": "d", "absent": [],
                                   "recommended_actions": [{"id": "RA1", "action": "Run a full scan",
-                                                           "disposition": "followed", "observation": "F1"}]}],
+                                                           "disposition": "followed", "observation": "1"}]}],
                       "remediation": [], "visibility_gaps": []},
-                  "observations": [{"id": "F1", "side": "Malicious", "confidence": "High", "at": "2026-09-14T15:01:00Z",
+                  "observations": [{"id": "1", "side": "Malicious", "confidence": "High", "at": "2026-09-14T15:01:00Z",
                                 "alert_type": "Credential dumping", "entity": "ws-01"}]}
         ledger.update(overrides)
         alerts = [{"id": "A1", "title": "Possible credential dumping (LSASS)", "entity": "ws-01",
@@ -1122,9 +1122,9 @@ class RunCheck(unittest.TestCase):
         self.assertIn("ok    triage: visibility gaps recorded — 1 in the ledger", out)
 
     def test_one_observation_counted_twice_fails(self):
-        doubled = [{"id": "F1", "side": "Malicious", "confidence": "High", "at": "2026-09-14T15:01:00Z",
+        doubled = [{"id": "1", "side": "Malicious", "confidence": "High", "at": "2026-09-14T15:01:00Z",
                     "alert_type": "Credential dumping", "entity": "ws-01"},
-                   {"id": "F2", "side": "Malicious", "confidence": "High", "at": "2026-09-14T15:02:00Z",
+                   {"id": "2", "side": "Malicious", "confidence": "High", "at": "2026-09-14T15:02:00Z",
                     "alert_type": "credential dumping", "entity": "WS-01"}]
         code, out = self.check(self.run_dir(observations=doubled))
         self.assertEqual(code, 1)

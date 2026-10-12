@@ -214,9 +214,9 @@ def ledger_note(**changes):
                                            "techniques": [{"id": "T1114.003", "rendered": "T1114.003 (Email Forwarding Rule)"}],
                                            "recommended_actions": []}]},
         "observations": [
-            {"id": "F1", "desc": "Forwarding rule created: T1114.003 (Email Forwarding Rule)", "side": "Malicious",
+            {"id": "1", "desc": "Forwarding rule created: T1114.003 (Email Forwarding Rule)", "side": "Malicious",
              "confidence": "High", "event_refs": ["EVT-1"], "first_seen": "2026-09-14T14:55:41Z", "timeline": True},
-            {"id": "F2", "desc": "the device belongs to finance", "side": None, "event_refs": ["CMDB-7"]},
+            {"id": "2", "desc": "the device belongs to finance", "side": None, "event_refs": ["CMDB-7"]},
         ],
         # triage compiles the Case Timeline, and it always holds at least the Alerts that opened the Case
         "timeline": [{"time_utc": "2026-09-14T14:55:41Z", "kind": "detection", "desc": "Malware / loader execution on ws-01",
@@ -331,7 +331,7 @@ class TheNoteCheck(unittest.TestCase):
         self.assertNotIn("disposition of the recommended actions", observations["renders"])
 
     def test_something_that_is_not_a_note_is_a_failure_and_not_a_traceback(self):
-        for broken in ([], {"observations": "F1"}, ledger_note(observations=[{"id": "F1", "tag": "Malicious (High)"}])):
+        for broken in ([], {"observations": "1"}, ledger_note(observations=[{"id": "1", "tag": "Malicious (High)"}])):
             with self.subTest(note=str(broken)[:40]):
                 self.assertTrue(note_elements.check(broken, "triage", FRAMEWORK))
 
@@ -357,7 +357,7 @@ class TheNoteCheck(unittest.TestCase):
         self.assertEqual(len([f for f in self.failures(one_per_letter) if "did not supply" in f]), 1)
 
     def test_an_investigation_ledger_holds_its_alerts_among_its_observations(self):
-        note = ledger_note(kind="investigation", timeline=[{"id": "F1"}])
+        note = ledger_note(kind="investigation", timeline=[{"id": "1"}])
         del note["alerts"], note["detection_metadata"]
         note["observations"][0].update(alert_type="Malware / loader execution", entity="ws-01")
         self.assertTrue(any("what its detection asserted" in f for f in self.failures(note, "investigation")))
@@ -381,7 +381,7 @@ class TheNoteCheck(unittest.TestCase):
         self.assertTrue(any("Summary" in f for f in self.failures(ledger_note(summary=5))))
         note = ledger_note()
         del note["observations"][0]["desc"]
-        self.assertTrue(any("F1" in f and "says nothing" in f for f in self.failures(note)))
+        self.assertTrue(any("observation 1 says nothing" in f for f in self.failures(note)))
 
     def test_a_kind_the_framework_does_not_have_is_said(self):
         self.assertTrue(note_elements.check(ledger_note(kind="bogus"), None, FRAMEWORK))
@@ -478,38 +478,38 @@ class TheCaseTimeline(unittest.TestCase):
 
     def test_t0_is_derived_from_the_earliest_malicious_observation(self):
         built = timeline.build(self.ledger(
-            self.observation("F2", "2026-09-14T14:58:00Z"), self.observation("F1", "2026-09-14T14:55:41Z"),
-            self.observation("F0", "2026-09-14T14:40:00Z", side=None)))
-        self.assertEqual([e["id"] for e in built["entries"]], ["F0", "F1", "F2"])
+            self.observation("2", "2026-09-14T14:58:00Z"), self.observation("1", "2026-09-14T14:55:41Z"),
+            self.observation("0", "2026-09-14T14:40:00Z", side=None)))
+        self.assertEqual([e["id"] for e in built["entries"]], ["0", "1", "2"])
         self.assertEqual([e["is_t0"] for e in built["entries"]], [False, True, False])
         self.assertEqual(built["t0_utc"], "2026-09-14T14:55:41Z")
         self.assertEqual(timeline.check(built), [], "context before T0 is part of the account, not a failure")
 
     def test_only_the_observations_flagged_for_the_narrative_are_entries(self):
-        built = timeline.build(self.ledger(self.observation("F1", "2026-09-14T14:55:41Z"),
-                                           self.observation("F2", "2026-09-14T14:56:00Z", timeline=False)))
-        self.assertEqual([e["id"] for e in built["entries"]], ["F1"])
+        built = timeline.build(self.ledger(self.observation("1", "2026-09-14T14:55:41Z"),
+                                           self.observation("2", "2026-09-14T14:56:00Z", timeline=False)))
+        self.assertEqual([e["id"] for e in built["entries"]], ["1"])
 
     def test_a_retracted_observation_moves_nothing(self):
-        built = timeline.build(self.ledger(self.observation("F0", "2026-09-14T13:00:00Z", retracted=True),
-                                           self.observation("F1", "2026-09-14T14:55:41Z")))
+        built = timeline.build(self.ledger(self.observation("0", "2026-09-14T13:00:00Z", retracted=True),
+                                           self.observation("1", "2026-09-14T14:55:41Z")))
         self.assertEqual(built["t0_utc"], "2026-09-14T14:55:41Z")
 
     def test_the_earliest_malicious_observation_left_off_the_timeline_is_a_failure(self):
-        built = timeline.build(self.ledger(self.observation("F1", "2026-09-14T14:55:41Z", timeline=False),
-                                           self.observation("F2", "2026-09-14T14:58:00Z")))
+        built = timeline.build(self.ledger(self.observation("1", "2026-09-14T14:55:41Z", timeline=False),
+                                           self.observation("2", "2026-09-14T14:58:00Z")))
         self.assertTrue(any("no entry carries it" in f for f in timeline.check(built)))
 
     def test_a_stated_t0_that_is_not_the_earliest_malicious_observation_is_a_failure(self):
-        built = timeline.build(self.ledger(self.observation("F1", "2026-09-14T14:55:41Z"), t0="2026-09-14T14:58:00Z"))
+        built = timeline.build(self.ledger(self.observation("1", "2026-09-14T14:55:41Z"), t0="2026-09-14T14:58:00Z"))
         self.assertTrue(any("earliest Malicious" in f for f in timeline.check(built)))
 
     def test_the_same_instant_is_the_same_instant_however_it_is_written(self):
-        built = timeline.build(self.ledger(self.observation("F1", "2026-09-14T16:55:41+02:00"),
-                                           self.observation("F2", "2026-09-14T14:55:41.5000000Z"),
+        built = timeline.build(self.ledger(self.observation("1", "2026-09-14T16:55:41+02:00"),
+                                           self.observation("2", "2026-09-14T14:55:41.5000000Z"),
                                            t0="2026-09-14T14:55:41Z"))
         self.assertEqual(timeline.check(built), [])
-        self.assertEqual([e["id"] for e in built["entries"]], ["F1", "F2"])
+        self.assertEqual([e["id"] for e in built["entries"]], ["1", "2"])
         self.assertEqual([e["is_t0"] for e in built["entries"]], [True, False])
 
     def test_epoch_milliseconds_and_iso_times_may_meet_in_one_timeline(self):
@@ -520,12 +520,12 @@ class TheCaseTimeline(unittest.TestCase):
         self.assertEqual(built["entries"][0]["is_t0"], True)
 
     def test_a_time_nobody_can_read_is_a_failure_and_not_a_traceback(self):
-        built = timeline.build(self.ledger(self.observation("F1", "yesterday, around three")))
-        self.assertTrue(any("F1" in f for f in timeline.check(built)))
-        self.assertTrue(timeline.check(timeline.build({"entries": "F1"})))
+        built = timeline.build(self.ledger(self.observation("1", "yesterday, around three")))
+        self.assertTrue(any("observation 1:" in f for f in timeline.check(built)))
+        self.assertTrue(timeline.check(timeline.build({"entries": "1"})))
 
     def test_a_observation_is_placed_by_when_the_thing_happened_never_by_when_it_was_made(self):
-        found = self.observation("F1", None, at="2026-09-14T15:03:10Z")
+        found = self.observation("1", None, at="2026-09-14T15:03:10Z")
         built = timeline.build(self.ledger(found))
         self.assertEqual(built["entries"], [])
         self.assertTrue(any("first_seen" in f for f in timeline.check(built)))
@@ -559,12 +559,12 @@ class TheCaseTimeline(unittest.TestCase):
 
     def test_a_time_out_of_any_case_is_unreadable_and_seconds_are_not_milliseconds(self):
         for bad in (1789397741, 1e400, float("nan"), 10 ** 18, "9999-12-31T23:59:59-05:00", -5):
-            built = timeline.build(self.ledger(self.observation("F1", bad)))
+            built = timeline.build(self.ledger(self.observation("1", bad)))
             with self.subTest(first_seen=str(bad)):
-                self.assertTrue(any("F1" in f for f in timeline.check(built)))
+                self.assertTrue(any("observation 1:" in f for f in timeline.check(built)))
 
     def test_what_is_not_a_observation_or_a_readable_now_is_said(self):
-        built = timeline.build({"now": "soon", "observations": ["F1", 3]})
+        built = timeline.build({"now": "soon", "observations": ["1", 3]})
         found = " | ".join(timeline.check(built))
         self.assertIn("now", found)
         self.assertIn("observations", found)
@@ -723,11 +723,11 @@ class FromTheCommandLine(unittest.TestCase):
 
     def test_a_note_that_is_not_conformant_exits_1_and_says_why(self):
         document = self.investigation()
-        document["timeline"] = [{"id": "F1", "time_utc": "2026-09-14T14:55:41Z", "is_t0": True}]
+        document["timeline"] = [{"id": "1", "time_utc": "2026-09-14T14:55:41Z", "is_t0": True}]
         document["observations"][0]["event_refs"] = []
         ran = self.run_script("note_elements.py", "--kind", "investigation", "--note", "ledger.json", document=document)
         self.assertEqual(ran.returncode, 1)
-        self.assertIn("FAIL: observation F1: cites no event", ran.stderr)
+        self.assertIn("FAIL: observation 1: cites no event", ran.stderr)
 
     def test_a_timeline_that_fails_exits_1_and_a_ledger_that_is_not_there_exits_2(self):
         document = self.investigation()
