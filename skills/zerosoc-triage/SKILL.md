@@ -4,7 +4,7 @@ description: Triage a security alert under the ZeroSOC Framework (Phase 2.a). Se
 license: Apache-2.0
 metadata:
   version: "0.4.1"
-  framework: "zerosoc-framework@36fc702 (2026-10-07)"
+  framework: "zerosoc-framework@56165ea (2026-10-12)"
   status: draft
   author: ZeroSOC
 ---
@@ -40,9 +40,12 @@ Read per alert: the playbook section the script prints.
 
 ## Procedure
 
-1. **Reception** (§1.1). Correlate to an open Case on the same host, identity or IP and append rather
-   than open a new Case; consolidate repeats of one alert type from one source in the window into a
-   summary signal (throttled alerts never enter triage). Set `status_id` to In Progress. Then **read the
+1. **Reception** (§1.1). Correlate to an open Case on the same host, identity, IP or operation (one
+   request or job identifier) and append rather than open a new Case; consolidate repeats of one alert
+   type from one source in the window into a summary signal (throttled alerts never enter triage). A
+   shared service identity (built-in principals, the cloud provider's own service identities, a service
+   account the Knowledge Base records as shared) is on its own no key for either: it stays an entity of
+   the Case. Set `status_id` to In Progress. Then **read the
    alerts**: detection logic, key fields, the relationships between aggregated alerts and entities. Form a
    first impression that directs the enrichment. Re-read the Case before every later step: tools append
    alerts and change severity while you work.

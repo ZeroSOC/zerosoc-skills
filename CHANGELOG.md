@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **The cloud provider's own operations are a False Positive condition, and a shared service identity
+  is no correlation key.** The pin follows the framework to `56165ea` (ZeroSOC/zerosoc-framework#90,
+  #91): a detection firing on the cloud provider's own provisioning or maintenance of the tenant is a
+  False Positive condition the source's records establish (one request or job identifier, the
+  provider's own infrastructure, no session of the organization's), in the cloud triage playbook's
+  *Logging / guardrail disabled* and the identity triage playbook's *Privileged role / group grant*,
+  whose checks no longer tag such a change Malicious; an update that enabled or strengthened logging
+  and disabled nothing is a False Positive condition. Detection & Analysis §1.1 appends alerts of the
+  same operation to one Case, and a shared service identity is on its own no key for correlation or
+  throttling. `zerosoc-triage`'s reception step says so.
 - **The executor's own write-back is not a source input.** The pin follows the framework to `36fc702`
   (ZeroSOC/zerosoc-framework#89), whose Detection & Analysis §1.1 notes that what the executor itself
   wrote into a source's record (its Note, its verdict, the Case) is not one of the inputs the source
