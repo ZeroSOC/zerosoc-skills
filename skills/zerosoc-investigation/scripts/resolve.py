@@ -8,6 +8,7 @@ Ledger (JSON):
   "case_uid": "CASE-1", "severity": "High" (or "severity_id": 4), "started_at": "2026-09-14T15:00:00Z",
   "playbook": "04-Playbooks/02-Investigation-Response/02-malware.md", "playbook_version": "2026-09-16",
   "incident_category": "IC-02",
+  "alerts": [{"id": "<source alert id>", "confidence": "Low|Medium|High"}],
   "observations": [{"id": "T1", "desc": "...", "side": "Malicious"|"Benign"|null, "confidence": "Low|Medium|High",
                 "condition": "false_positive"|"benign"|null,
                 "at": "2026-09-14T15:03:10Z", "artifact": "hash:...", "alert_type": "...", "entity": "...",
@@ -21,8 +22,11 @@ Ledger (JSON):
   "timebox_minutes": null, "resolved_at": null, "timebox_expired": false
 }
 "at" is when the observation was made; "first_seen" is when the thing it reports happened, "event_refs" the
-events it rests on and "timeline" whether the Case Timeline shows it — this rule reads none of the three, and
-note_elements.py and timeline.py read them from this same ledger.
+events it rests on and "timeline" whether the Case Timeline shows it; note_elements.py and timeline.py read
+them from this same ledger. This rule reads "event_refs" with "alerts" (the Case's alerts and each one's own
+confidence): a Malicious observation that cites one alert and nothing else counts as that alert, whatever it
+is tagged, and Malicious is proven at 3 only when an alert's own confidence is High or a Malicious observation
+stands beyond the alerts (§2.4). A ledger that names no alerts is resolved by the score alone, and says so.
 "condition" on a Benign observation is the kind of the triage playbook condition it named, read off the list
 the condition belongs to (Playbook Architecture §4.1), never a kind the executor labelled itself; on Benign
 proven the verdict is Benign (5) when the Benign observation of the highest confidence names a Benign
@@ -132,6 +136,35 @@ def benign_verdict(ben):
     return 1, "False Positive"
 
 
+def alert_bound(f, owner):
+    """The alert a Malicious observation only restates: the one alert all its references belong to, or None
+    when it cites anything else, two alerts, or nothing at all (§1.5)."""
+    refs = [str(r) for r in (f.get("event_refs") or []) if r]
+    if f.get("alert_type"):
+        return refs[0] if refs else f.get("id")
+    alerts = {owner[r] for r in refs if r in owner}
+    if refs and len(alerts) == 1 and all(r in owner for r in refs):
+        return alerts.pop()
+    return None
+
+
+def proof_beyond(mal, ledger):
+    """§2.4: why a Malicious score of 3 does not prove Malicious, or None when it does. The alerts at Medium
+    or Low confidence, and every restatement of them, never prove it alone."""
+    alerts = ledger.get("alerts")
+    if not alerts:
+        return None
+    owner = {str(a["id"]): str(a["id"]) for a in alerts if a.get("id")}
+    own = {str(a["id"]): a.get("confidence") for a in alerts if a.get("id")}
+    bound = {f["id"]: alert_bound(f, owner) for f in mal}
+    if any(alert is None for alert in bound.values()):
+        return None
+    if any(own.get(alert) == "High" for alert in bound.values()):
+        return None
+    return ("the score rests on the alerts alone, none at High confidence: nothing stands beyond the alerts"
+            " (Detection & Analysis §2.4)")
+
+
 def resolve(ledger, now=None):
     active = dedupe([f for f in ledger.get("observations", []) if not f.get("retracted") and f.get("side") in ("Malicious", "Benign")])
     mal = [f for f in active if f["side"] == "Malicious"]
@@ -140,12 +173,17 @@ def resolve(ledger, now=None):
     ben_score = sum(W[f["confidence"]] for f in ben)
     uncovered_mh = [f for f in mal if f["confidence"] in ("Medium", "High") and not f.get("covered")]
     residual_low = [f for f in mal if f["confidence"] == "Low" and not f.get("covered")]
-    malicious_proven = mal_score >= 3
+    unproven = proof_beyond(mal, ledger) if mal_score >= 3 else None
+    malicious_proven = mal_score >= 3 and unproven is None
     benign_proven = ben_score >= 3 and not uncovered_mh
     r = {"case_uid": ledger.get("case_uid"), "malicious_score": mal_score, "benign_score": ben_score,
          "malicious_observations": [f["id"] for f in mal], "benign_observations": [f["id"] for f in ben],
          "retracted": [f["id"] for f in ledger.get("observations", []) if f.get("retracted")],
          "uncovered_medium_high_malicious": [f["id"] for f in uncovered_mh], "residual_low_malicious": [f["id"] for f in residual_low]}
+    if unproven:
+        r["malicious_not_proven"] = unproven
+    if not ledger.get("alerts"):
+        r["alerts_note"] = "the ledger names no alerts: Malicious is resolved by the score alone, without the §2.4 test of what stands beyond the alerts"
     box, box_notes = timebox(ledger, now)
     r["timebox"] = box
     if box_notes: r["timebox_note"] = "; ".join(box_notes)
