@@ -10,7 +10,7 @@ required_data_sources:
   - Data classification labels
 status: draft
 ---
-<!-- generated from zerosoc-framework@36fc70284708 : 04-Playbooks/01-Triage/data.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@56165ea542a3 : 04-Playbooks/01-Triage/data.md — do not edit; regenerate with tools/build_references.py -->
 
 # Data Triage Playbook
 
