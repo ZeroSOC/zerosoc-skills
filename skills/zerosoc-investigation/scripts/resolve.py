@@ -8,7 +8,7 @@ Ledger (JSON):
   "case_uid": "CASE-1", "severity": "High" (or "severity_id": 4), "started_at": "2026-09-14T15:00:00Z",
   "playbook": "04-Playbooks/02-Investigation-Response/02-malware.md", "playbook_version": "2026-09-16",
   "incident_category": "IC-02",
-  "alerts": [{"id": "<source alert id>", "confidence": "Low|Medium|High"}],
+  "alerts": [{"id": "<alert id>", "confidence": "Low|Medium|High", "ids": ["<merged source alert ids>"]}],
   "observations": [{"id": "T1", "desc": "...", "side": "Malicious"|"Benign"|null, "confidence": "Low|Medium|High",
                 "condition": "false_positive"|"benign"|null,
                 "at": "2026-09-14T15:03:10Z", "artifact": "hash:...", "alert_type": "...", "entity": "...",
@@ -154,7 +154,8 @@ def proof_beyond(mal, ledger):
     alerts = ledger.get("alerts")
     if not alerts:
         return None
-    owner = {str(a["id"]): str(a["id"]) for a in alerts if a.get("id")}
+    # an alert that stands for several merged source alerts is one alert under each of its ids
+    owner = {str(i): str(a["id"]) for a in alerts if a.get("id") for i in [a["id"], *(a.get("ids") or [])]}
     own = {str(a["id"]): a.get("confidence") for a in alerts if a.get("id")}
     bound = {f["id"]: alert_bound(f, owner) for f in mal}
     if any(alert is None for alert in bound.values()):

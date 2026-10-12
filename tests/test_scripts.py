@@ -1294,6 +1294,12 @@ class AlertsAloneDoNotProve(unittest.TestCase):
         r = inv.resolve({"alerts": self.ALERTS, "observations": self._obs(related)})
         self.assertEqual(r["outcome"], "Malicious proven")
 
+    def test_an_observation_citing_two_ids_of_one_merged_alert_restates_it(self):
+        alerts = [{"id": "x1", "confidence": "Medium", "ids": ["x1", "x1b"]}, {"id": "x2", "confidence": "Medium"}]
+        merged = {"id": "F3", "side": "Malicious", "confidence": "Low", "event_refs": ["x1", "x1b"]}
+        r = inv.resolve({"alerts": alerts, "observations": self._obs(merged)})
+        self.assertEqual(r["outcome"], "Neither proven")
+
     def test_an_alert_at_high_confidence_proves_it_alone(self):
         alerts = [{"id": "x1", "confidence": "High"}]
         f = [{"id": "F1", "side": "Malicious", "confidence": "High", "event_refs": ["x1"]}]
