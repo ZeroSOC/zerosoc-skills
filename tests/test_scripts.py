@@ -1261,3 +1261,55 @@ class AutonomyMatrix(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AlertsAloneDoNotProve(unittest.TestCase):
+    """Detection & Analysis §2.4 (#88 item 7): Malicious is proven at 3 only when an alert is at High
+    confidence or an observation stands beyond the alerts; a restatement counts as its alert."""
+
+    ALERTS = [{"id": "x1", "confidence": "Medium"}, {"id": "x2", "confidence": "Medium"}]
+
+    def _obs(self, *extra):
+        return [{"id": "F1", "side": "Malicious", "confidence": "Medium", "event_refs": ["x1"]},
+                {"id": "F2", "side": "Malicious", "confidence": "Medium", "event_refs": ["x2"]}, *extra]
+
+    def test_two_medium_alerts_nobody_could_check_are_neither_proven(self):
+        r = inv.resolve({"alerts": self.ALERTS, "observations": self._obs()})
+        self.assertEqual(r["malicious_score"], 4)
+        self.assertEqual(r["outcome"], "Neither proven")
+        self.assertIn("beyond the alerts", r["malicious_not_proven"])
+
+    def test_a_restatement_tagged_high_is_still_the_alert(self):
+        restated = {"id": "F3", "side": "Malicious", "confidence": "High", "event_refs": ["x1"]}
+        r = inv.resolve({"alerts": self.ALERTS, "observations": self._obs(restated)})
+        self.assertEqual(r["outcome"], "Neither proven")
+
+    def test_one_observation_beyond_the_alerts_proves_it(self):
+        found = {"id": "F3", "side": "Malicious", "confidence": "Low", "event_refs": ["EVT-1", "x1"]}
+        r = inv.resolve({"alerts": self.ALERTS, "observations": self._obs(found)})
+        self.assertEqual(r["outcome"], "Malicious proven")
+
+    def test_two_alerts_related_by_one_observation_stand_beyond_them(self):
+        related = {"id": "F3", "side": "Malicious", "confidence": "Low", "event_refs": ["x1", "x2"]}
+        r = inv.resolve({"alerts": self.ALERTS, "observations": self._obs(related)})
+        self.assertEqual(r["outcome"], "Malicious proven")
+
+    def test_an_observation_citing_two_ids_of_one_merged_alert_restates_it(self):
+        alerts = [{"id": "x1", "confidence": "Medium", "ids": ["x1", "x1b"]}, {"id": "x2", "confidence": "Medium"}]
+        merged = {"id": "F3", "side": "Malicious", "confidence": "Low", "event_refs": ["x1", "x1b"]}
+        r = inv.resolve({"alerts": alerts, "observations": self._obs(merged)})
+        self.assertEqual(r["outcome"], "Neither proven")
+
+    def test_an_alert_at_high_confidence_proves_it_alone(self):
+        alerts = [{"id": "x1", "confidence": "High"}]
+        f = [{"id": "F1", "side": "Malicious", "confidence": "High", "event_refs": ["x1"]}]
+        self.assertEqual(inv.resolve({"alerts": alerts, "observations": f})["outcome"], "Malicious proven")
+
+    def test_at_the_timebox_the_unchecked_alerts_close_as_insufficient_data(self):
+        r = inv.resolve({"alerts": self.ALERTS, "observations": self._obs(), "timebox_expired": True})
+        self.assertEqual((r["verdict_id"], r["outcome"]), (7, "Neither proven at timebox/budget expiry"))
+
+    def test_a_ledger_that_names_no_alerts_is_resolved_as_before_and_says_so(self):
+        r = inv.resolve({"observations": self._obs()})
+        self.assertEqual(r["outcome"], "Malicious proven")
+        self.assertIn("names no alerts", r["alerts_note"])

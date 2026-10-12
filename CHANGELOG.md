@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **The alerts alone do not prove Malicious at investigation unless one is at High confidence.** The
+  pin follows the framework to `411fe93` (ZeroSOC/zerosoc-framework#92, item 7 of #88): Detection &
+  Analysis §2.4 proves Malicious at 3 only when an alert's own confidence is High or a Malicious
+  observation stands beyond the alerts; a restatement of an alert counts as the alert. `resolve.py`
+  reads the ledger's new `alerts` (each alert's id, its merged ids and its own confidence) and every
+  observation's `event_refs`; alerts below High confidence that nothing beyond them corroborates
+  leave the Case neither proven, and the output says why (`malicious_not_proven`). A ledger that
+  names no alerts is resolved by the score alone, and says so (`alerts_note`). The investigation
+  skill's resolve step says it.
 - **The cloud provider's own operations are a False Positive condition, and a shared service identity
   is no correlation key.** The pin follows the framework to `56165ea` (ZeroSOC/zerosoc-framework#90,
   #91): a detection firing on the cloud provider's own provisioning or maintenance of the tenant is a

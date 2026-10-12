@@ -4,7 +4,7 @@ description: Investigate a promoted Case under the ZeroSOC Framework (Phase 2.b)
 license: Apache-2.0
 metadata:
   version: "0.4.1"
-  framework: "zerosoc-framework@56165ea (2026-10-12)"
+  framework: "zerosoc-framework@411fe93 (2026-10-12)"
   status: draft
   author: ZeroSOC
 ---
@@ -111,7 +111,9 @@ per Case: the playbook the script prints.
 7. **Mark coverage.** When the Benign explanation accounts for a Medium or High Malicious observation, set
    `covered: true` on it; uncovered Low Malicious observations never block a Benign verdict, they lower its
    confidence and are listed as residual observations.
-8. **Resolve**: set `resolved_at` (UTC) in the ledger and run `python3 scripts/resolve.py ledger.json`. Malicious is proven at a score of 3 or more;
+8. **Resolve**: set `resolved_at` (UTC) in the ledger, with `alerts` (each alert's id and own confidence), and run
+   `python3 scripts/resolve.py ledger.json`. Malicious is proven at a score of 3 or more when an alert is at High
+   confidence or an observation stands beyond the alerts (one that only restates an alert counts as it);
    Benign at 3 or more *and* every Medium or High Malicious observation retracted or covered; the verdict and
    confidence follow the §2.4 table (confidence is the strongest carrying observation, never an average). If neither side is proven, run the remaining discriminating
    queries. The script measures the timebox from `started_at` to `resolved_at` (the current time when absent)
