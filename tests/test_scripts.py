@@ -1313,3 +1313,47 @@ class AlertsAloneDoNotProve(unittest.TestCase):
         r = inv.resolve({"observations": self._obs()})
         self.assertEqual(r["outcome"], "Malicious proven")
         self.assertIn("names no alerts", r["alerts_note"])
+
+
+class NoInformationCarriesNoWeight(unittest.TestCase):
+    """Detection & Analysis §2.4 (#88 item 2): a result that yields no information carries neither
+    side. On the Malicious side, an observation resting only on such results and an alert counts as
+    the alert; one resting on them alone counts for nothing."""
+
+    ALERTS = [{"id": "x1", "confidence": "Medium"}, {"id": "x2", "confidence": "Medium"}]
+    EMPTY = ["EVT-c-002"]
+
+    def _obs(self, *extra):
+        return [{"id": "F1", "side": "Malicious", "confidence": "Medium", "event_refs": ["x1"]},
+                {"id": "F2", "side": "Malicious", "confidence": "Medium", "event_refs": ["x2"]}, *extra]
+
+    def test_an_alert_and_a_lookup_that_found_nothing_is_the_alert(self):
+        """The 2026-10-11 run: "no enrichment result supports a benign reading", tagged Malicious."""
+        f8 = {"id": "F8", "side": "Malicious", "confidence": "Medium", "event_refs": ["x2", "EVT-c-002"]}
+        r = inv.resolve({"alerts": self.ALERTS, "observations": self._obs(f8), "no_information_refs": self.EMPTY})
+        self.assertEqual(r["outcome"], "Neither proven")
+
+    def test_an_observation_on_nothing_but_empty_results_carries_no_weight(self):
+        empty = {"id": "F3", "side": "Malicious", "confidence": "High", "event_refs": ["EVT-c-002"]}
+        r = inv.resolve({"alerts": self.ALERTS, "observations": self._obs(empty), "no_information_refs": self.EMPTY})
+        self.assertEqual(r["malicious_score"], 4)
+        self.assertEqual(r["no_information"], ["F3"])
+
+    def test_a_result_that_found_something_still_stands_beyond_the_alerts(self):
+        found = {"id": "F3", "side": "Malicious", "confidence": "Low", "event_refs": ["x1", "EVT-c-003"]}
+        r = inv.resolve({"alerts": self.ALERTS, "observations": self._obs(found), "no_information_refs": self.EMPTY})
+        self.assertEqual(r["outcome"], "Malicious proven")
+
+    def test_a_benign_observation_on_an_empty_result_keeps_its_weight(self):
+        """A scoped negative (no child process on a covered host) is a real Benign observation."""
+        scoped = {"id": "B1", "side": "Benign", "confidence": "Medium", "event_refs": ["EVT-c-002"]}
+        r = inv.resolve({"alerts": self.ALERTS, "observations": self._obs(scoped), "no_information_refs": self.EMPTY})
+        self.assertEqual(r["benign_score"], 2)
+
+    def test_at_triage_it_does_not_stand_beyond_the_alerts(self):
+        ledger = {"alerts": [{"id": "x1", "type": "Privileged role / group grant", "entity": "svc", "confidence": "Medium"}],
+                  "observations": [{"id": "F2", "side": "Malicious", "confidence": "Medium", "event_refs": ["x1", "EVT-c-002"]},
+                                   {"id": "F3", "side": "Benign", "confidence": "High", "event_refs": ["x1"], "covers": ["x1"], "condition": "false_positive"}],
+                  "no_information_refs": self.EMPTY}
+        r = triage.decide(ledger)
+        self.assertEqual(r["decision"], "Close")

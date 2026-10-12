@@ -27,6 +27,10 @@ them from this same ledger. This rule reads "event_refs" with "alerts" (the Case
 confidence): a Malicious observation that cites one alert and nothing else counts as that alert, whatever it
 is tagged, and Malicious is proven at 3 only when an alert's own confidence is High or a Malicious observation
 stands beyond the alerts (§2.4). A ledger that names no alerts is resolved by the score alone, and says so.
+"no_information_refs" are the references whose result carried no information (a lookup that found nothing
+or was not answered): on the Malicious side they are not read, so an observation resting on them and one
+alert counts as that alert, and one resting on them alone carries no weight ("no_information"). The Benign
+side reads them as cited: a scoped negative is a real Benign observation.
 "condition" on a Benign observation is the kind of the triage playbook condition it named, read off the list
 the condition belongs to (Playbook Architecture §4.1), never a kind the executor labelled itself; on Benign
 proven the verdict is Benign (5) when the Benign observation of the highest confidence names a Benign
@@ -136,10 +140,16 @@ def benign_verdict(ben):
     return 1, "False Positive"
 
 
-def alert_bound(f, owner):
+def informative(f, empty):
+    """The references an observation rests on, less those whose result carried no information."""
+    return [str(r) for r in (f.get("event_refs") or []) if r and str(r) not in empty]
+
+
+def alert_bound(f, owner, empty=frozenset()):
     """The alert a Malicious observation only restates: the one alert all its references belong to, or None
-    when it cites anything else, two alerts, or nothing at all (§1.5)."""
-    refs = [str(r) for r in (f.get("event_refs") or []) if r]
+    when it cites anything else, two alerts, or nothing at all (§1.5). A reference whose result carried no
+    information is not read."""
+    refs = informative(f, empty)
     if f.get("alert_type"):
         return refs[0] if refs else f.get("id")
     alerts = {owner[r] for r in refs if r in owner}
@@ -157,7 +167,8 @@ def proof_beyond(mal, ledger):
     # an alert that stands for several merged source alerts is one alert under each of its ids
     owner = {str(i): str(a["id"]) for a in alerts if a.get("id") for i in [a["id"], *(a.get("ids") or [])]}
     own = {str(a["id"]): a.get("confidence") for a in alerts if a.get("id")}
-    bound = {f["id"]: alert_bound(f, owner) for f in mal}
+    empty = {str(e) for e in ledger.get("no_information_refs") or []}
+    bound = {f["id"]: alert_bound(f, owner, empty) for f in mal}
     if any(alert is None for alert in bound.values()):
         return None
     if any(own.get(alert) == "High" for alert in bound.values()):
@@ -168,7 +179,11 @@ def proof_beyond(mal, ledger):
 
 def resolve(ledger, now=None):
     active = dedupe([f for f in ledger.get("observations", []) if not f.get("retracted") and f.get("side") in ("Malicious", "Benign")])
-    mal = [f for f in active if f["side"] == "Malicious"]
+    empty = {str(e) for e in ledger.get("no_information_refs") or []}
+    # a Malicious observation resting on nothing but results that carried no information is none (§2.4)
+    weightless = [f for f in active if f["side"] == "Malicious" and f.get("event_refs") and empty
+                  and not informative(f, empty)]
+    mal = [f for f in active if f["side"] == "Malicious" and f not in weightless]
     ben = [f for f in active if f["side"] == "Benign"]
     mal_score = sum(W[f["confidence"]] for f in mal)
     ben_score = sum(W[f["confidence"]] for f in ben)
@@ -183,6 +198,8 @@ def resolve(ledger, now=None):
          "uncovered_medium_high_malicious": [f["id"] for f in uncovered_mh], "residual_low_malicious": [f["id"] for f in residual_low]}
     if unproven:
         r["malicious_not_proven"] = unproven
+    if weightless:
+        r["no_information"] = [f["id"] for f in weightless]
     if not ledger.get("alerts"):
         r["alerts_note"] = "the ledger names no alerts: Malicious is resolved by the score alone, without the §2.4 test of what stands beyond the alerts"
     box, box_notes = timebox(ledger, now)

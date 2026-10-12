@@ -30,7 +30,10 @@ holds nothing up.
 of the ledger (its own id and the ids merged into it) says of that alert what its detection asserted — it
 **restates** it (§1.5), is set aside however it is tagged, and is reported under "restated_alerts". One that
 cites a check's result, an item of the alert's own evidence it read further, or two or more alerts it
-relates, stands beyond the alerts. "first_seen" is when the thing it reports
+relates, stands beyond the alerts. "no_information_refs" are the results that carried no information (a
+lookup that found nothing or was not answered): a Malicious observation is read without them, so one that
+rests on them and an alert restates the alert, and one that rests on them alone carries no weight and is
+reported under "no_information" (§2.4). "first_seen" is when the thing it reports
 happened (not when the observation was made) and "timeline" flags it for the Case Timeline: this rule reads
 neither, and note_elements.py and timeline.py read them from this same ledger.
 "condition" on a Benign observation is the kind of the playbook condition it named, read off the list the
@@ -82,13 +85,20 @@ def alert_ids(ledger):
     return out
 
 
-def restates_alerts(f, ids):
+def restates_alerts(f, ids, empty=frozenset()):
     """A Malicious observation that cites one alert and nothing else says of it what its detection already
     asserted: the alert is weighed by the coverage rule and is not counted twice as evidence beyond itself.
     One that cites two alerts relates them, and one that cites an evidence item or a check's result read
     something the detection did not state — both stand beyond the alerts (§1.5)."""
-    refs = [str(r) for r in (f.get("event_refs") or []) if r]
+    refs = [str(r) for r in (f.get("event_refs") or []) if r and str(r) not in empty]
     return bool(refs) and all(r in ids for r in refs) and len({ids[r] for r in refs}) == 1
+
+
+def carries_nothing(f, empty):
+    """A Malicious observation that rests only on results that carried no information — a lookup that
+    found nothing or was not answered — is no evidence of malice (§2.4)."""
+    refs = [str(r) for r in (f.get("event_refs") or []) if r]
+    return bool(refs) and bool(empty) and all(r in empty for r in refs)
 
 
 def close_verdict(covering):
@@ -114,8 +124,10 @@ def _decide(ledger):
     alerts = dedupe_alerts(ledger.get("alerts", []))
     active = [f for f in ledger.get("observations", []) if not f.get("retracted") and f.get("side") in ("Malicious", "Benign")]
     ids = alert_ids(ledger)
-    restated = [f for f in active if f["side"] == "Malicious" and restates_alerts(f, ids)]
-    mal = [f for f in active if f["side"] == "Malicious" and f not in restated]
+    empty = {str(e) for e in ledger.get("no_information_refs") or []}
+    weightless = [f for f in active if f["side"] == "Malicious" and carries_nothing(f, empty)]
+    restated = [f for f in active if f["side"] == "Malicious" and f not in weightless and restates_alerts(f, ids, empty)]
+    mal = [f for f in active if f["side"] == "Malicious" and f not in restated and f not in weightless]
     ben = [f for f in active if f["side"] == "Benign"]
     coverage = []
     for a in alerts:
@@ -132,6 +144,7 @@ def _decide(ledger):
     close_ok = not mal and all_covered
     result = {"case_uid": ledger.get("case_uid"), "alerts_considered": [a["id"] for a in alerts], "coverage": coverage,
               "malicious_beyond_alerts": [f["id"] for f in mal], "restated_alerts": [f["id"] for f in restated],
+              "no_information": [f["id"] for f in weightless],
               "benign_observations": [f["id"] for f in ben]}
     if ledger.get("duplicate_of"):
         result.update(decision="Close", verdict_id=10, verdict="Duplicate", master_case_uid=ledger["duplicate_of"],
