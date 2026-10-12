@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **A result that carried no information carries no weight on the Malicious side.** Detection &
+  Analysis §2.4 already said it (item 2 of ZeroSOC/zerosoc-framework#88); `triage_decide.py` and
+  `resolve.py` now apply it. The ledger names `no_information_refs`, the references whose result
+  carried nothing (a lookup that found nothing or was not answered). A Malicious observation is read
+  without them: one that rests on them and one alert restates the alert, and one that rests on them
+  alone carries no weight (`no_information`). The Benign side reads them as cited, since a scoped
+  negative is a real Benign observation. Found in a live run: "no enrichment result supports a benign
+  reading", citing an alert and a prior-incident lookup that found none, was tagged Malicious and
+  proved the Case.
 - **The alerts alone do not prove Malicious at investigation unless one is at High confidence.** The
   pin follows the framework to `411fe93` (ZeroSOC/zerosoc-framework#92, item 7 of #88): Detection &
   Analysis §2.4 proves Malicious at 3 only when an alert's own confidence is High or a Malicious
