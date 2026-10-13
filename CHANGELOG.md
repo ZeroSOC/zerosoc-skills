@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **One client connection ties the provider's own job together.** The pin follows the framework to
+  `5505eb9` (ZeroSOC/zerosoc-framework#96): the False Positive condition for the cloud provider's
+  own operations, and Active Case Correlation, name one client connection beside one request or job
+  identifier. A provisioning run can give each operation its own request identifier.
 - **A search that finds no approval carries no weight.** The pin follows the framework to `df886fd`
   (ZeroSOC/zerosoc-framework#95): Detection & Analysis §2.4 names it with the lookup that knows
   nothing, and the cloud triage check *Change-control correlation* and IC-05 Query 6 no longer tag
