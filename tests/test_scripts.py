@@ -30,8 +30,8 @@ class TriageRule(unittest.TestCase):
     def test_oauth_consent_closes_as_benign_high(self):
         # Detection & Analysis §1.5, first example
         ledger = {"alerts": [{"id": "A", "type": "OAuth app consent", "entity": "u1", "confidence": "Medium"}],
-                  "observations": [{"id": "2", "side": "Benign", "confidence": "High"}, {"id": "3", "side": "Benign", "confidence": "Medium"},
-                               {"id": "4", "side": "Benign", "confidence": "Low"}, {"id": "1", "side": None}]}
+                  "observations": [{"id": "O2", "side": "Benign", "confidence": "High"}, {"id": "O3", "side": "Benign", "confidence": "Medium"},
+                               {"id": "O4", "side": "Benign", "confidence": "Low"}, {"id": "O1", "side": None}]}
         r = triage.decide(ledger)
         self.assertEqual(r["decision"], "Close"); self.assertEqual(r["confidence"], "High")
 
@@ -492,7 +492,7 @@ class DecisionReadsWhatTheDetectionAsserts(unittest.TestCase):
 
     def test_investigation_reads_the_same_record_at_its_own_gate(self):
         led = self.ledger()
-        led["observations"] = [{"id": "1", "side": "Malicious", "confidence": "High"}]
+        led["observations"] = [{"id": "O1", "side": "Malicious", "confidence": "High"}]
         r = inv.resolve(led)
         self.assertIn("loader.exe", " ".join(r["detection_notes"]))
         self.assertEqual(r["verdict_id"], 2, "the resolution rule is unchanged")
@@ -1000,7 +1000,7 @@ class RunCheck(unittest.TestCase):
                                   "recommended_actions": [{"id": "RA1", "action": "Run a full scan",
                                                            "disposition": "followed", "observation": "1"}]}],
                       "remediation": [], "visibility_gaps": []},
-                  "observations": [{"id": "1", "side": "Malicious", "confidence": "High", "at": "2026-09-14T15:01:00Z",
+                  "observations": [{"id": "O1", "side": "Malicious", "confidence": "High", "at": "2026-09-14T15:01:00Z",
                                 "alert_type": "Credential dumping", "entity": "ws-01"}]}
         ledger.update(overrides)
         alerts = [{"id": "A1", "title": "Possible credential dumping (LSASS)", "entity": "ws-01",
@@ -1122,9 +1122,9 @@ class RunCheck(unittest.TestCase):
         self.assertIn("ok    triage: visibility gaps recorded — 1 in the ledger", out)
 
     def test_one_observation_counted_twice_fails(self):
-        doubled = [{"id": "1", "side": "Malicious", "confidence": "High", "at": "2026-09-14T15:01:00Z",
+        doubled = [{"id": "O1", "side": "Malicious", "confidence": "High", "at": "2026-09-14T15:01:00Z",
                     "alert_type": "Credential dumping", "entity": "ws-01"},
-                   {"id": "2", "side": "Malicious", "confidence": "High", "at": "2026-09-14T15:02:00Z",
+                   {"id": "O2", "side": "Malicious", "confidence": "High", "at": "2026-09-14T15:02:00Z",
                     "alert_type": "credential dumping", "entity": "WS-01"}]
         code, out = self.check(self.run_dir(observations=doubled))
         self.assertEqual(code, 1)
@@ -1270,8 +1270,8 @@ class AlertsAloneDoNotProve(unittest.TestCase):
     ALERTS = [{"id": "x1", "confidence": "Medium"}, {"id": "x2", "confidence": "Medium"}]
 
     def _obs(self, *extra):
-        return [{"id": "F1", "side": "Malicious", "confidence": "Medium", "event_refs": ["x1"]},
-                {"id": "F2", "side": "Malicious", "confidence": "Medium", "event_refs": ["x2"]}, *extra]
+        return [{"id": "O1", "side": "Malicious", "confidence": "Medium", "event_refs": ["x1"]},
+                {"id": "O2", "side": "Malicious", "confidence": "Medium", "event_refs": ["x2"]}, *extra]
 
     def test_two_medium_alerts_nobody_could_check_are_neither_proven(self):
         r = inv.resolve({"alerts": self.ALERTS, "observations": self._obs()})
@@ -1280,29 +1280,29 @@ class AlertsAloneDoNotProve(unittest.TestCase):
         self.assertIn("beyond the alerts", r["malicious_not_proven"])
 
     def test_a_restatement_tagged_high_is_still_the_alert(self):
-        restated = {"id": "F3", "side": "Malicious", "confidence": "High", "event_refs": ["x1"]}
+        restated = {"id": "O3", "side": "Malicious", "confidence": "High", "event_refs": ["x1"]}
         r = inv.resolve({"alerts": self.ALERTS, "observations": self._obs(restated)})
         self.assertEqual(r["outcome"], "Neither proven")
 
     def test_one_observation_beyond_the_alerts_proves_it(self):
-        found = {"id": "F3", "side": "Malicious", "confidence": "Low", "event_refs": ["EVT-1", "x1"]}
+        found = {"id": "O3", "side": "Malicious", "confidence": "Low", "event_refs": ["EVT-1", "x1"]}
         r = inv.resolve({"alerts": self.ALERTS, "observations": self._obs(found)})
         self.assertEqual(r["outcome"], "Malicious proven")
 
     def test_two_alerts_related_by_one_observation_stand_beyond_them(self):
-        related = {"id": "F3", "side": "Malicious", "confidence": "Low", "event_refs": ["x1", "x2"]}
+        related = {"id": "O3", "side": "Malicious", "confidence": "Low", "event_refs": ["x1", "x2"]}
         r = inv.resolve({"alerts": self.ALERTS, "observations": self._obs(related)})
         self.assertEqual(r["outcome"], "Malicious proven")
 
     def test_an_observation_citing_two_ids_of_one_merged_alert_restates_it(self):
         alerts = [{"id": "x1", "confidence": "Medium", "ids": ["x1", "x1b"]}, {"id": "x2", "confidence": "Medium"}]
-        merged = {"id": "F3", "side": "Malicious", "confidence": "Low", "event_refs": ["x1", "x1b"]}
+        merged = {"id": "O3", "side": "Malicious", "confidence": "Low", "event_refs": ["x1", "x1b"]}
         r = inv.resolve({"alerts": alerts, "observations": self._obs(merged)})
         self.assertEqual(r["outcome"], "Neither proven")
 
     def test_an_alert_at_high_confidence_proves_it_alone(self):
         alerts = [{"id": "x1", "confidence": "High"}]
-        f = [{"id": "F1", "side": "Malicious", "confidence": "High", "event_refs": ["x1"]}]
+        f = [{"id": "O1", "side": "Malicious", "confidence": "High", "event_refs": ["x1"]}]
         self.assertEqual(inv.resolve({"alerts": alerts, "observations": f})["outcome"], "Malicious proven")
 
     def test_at_the_timebox_the_unchecked_alerts_close_as_insufficient_data(self):
@@ -1324,23 +1324,23 @@ class NoInformationCarriesNoWeight(unittest.TestCase):
     EMPTY = ["EVT-c-002"]
 
     def _obs(self, *extra):
-        return [{"id": "F1", "side": "Malicious", "confidence": "Medium", "event_refs": ["x1"]},
-                {"id": "F2", "side": "Malicious", "confidence": "Medium", "event_refs": ["x2"]}, *extra]
+        return [{"id": "O1", "side": "Malicious", "confidence": "Medium", "event_refs": ["x1"]},
+                {"id": "O2", "side": "Malicious", "confidence": "Medium", "event_refs": ["x2"]}, *extra]
 
     def test_an_alert_and_a_lookup_that_found_nothing_is_the_alert(self):
         """The 2026-10-11 run: "no enrichment result supports a benign reading", tagged Malicious."""
-        f8 = {"id": "F8", "side": "Malicious", "confidence": "Medium", "event_refs": ["x2", "EVT-c-002"]}
+        f8 = {"id": "O8", "side": "Malicious", "confidence": "Medium", "event_refs": ["x2", "EVT-c-002"]}
         r = inv.resolve({"alerts": self.ALERTS, "observations": self._obs(f8), "no_information_refs": self.EMPTY})
         self.assertEqual(r["outcome"], "Neither proven")
 
     def test_an_observation_on_nothing_but_empty_results_carries_no_weight(self):
-        empty = {"id": "F3", "side": "Malicious", "confidence": "High", "event_refs": ["EVT-c-002"]}
+        empty = {"id": "O3", "side": "Malicious", "confidence": "High", "event_refs": ["EVT-c-002"]}
         r = inv.resolve({"alerts": self.ALERTS, "observations": self._obs(empty), "no_information_refs": self.EMPTY})
         self.assertEqual(r["malicious_score"], 4)
-        self.assertEqual(r["no_information"], ["F3"])
+        self.assertEqual(r["no_information"], ["O3"])
 
     def test_a_result_that_found_something_still_stands_beyond_the_alerts(self):
-        found = {"id": "F3", "side": "Malicious", "confidence": "Low", "event_refs": ["x1", "EVT-c-003"]}
+        found = {"id": "O3", "side": "Malicious", "confidence": "Low", "event_refs": ["x1", "EVT-c-003"]}
         r = inv.resolve({"alerts": self.ALERTS, "observations": self._obs(found), "no_information_refs": self.EMPTY})
         self.assertEqual(r["outcome"], "Malicious proven")
 
@@ -1352,8 +1352,8 @@ class NoInformationCarriesNoWeight(unittest.TestCase):
 
     def test_at_triage_it_does_not_stand_beyond_the_alerts(self):
         ledger = {"alerts": [{"id": "x1", "type": "Privileged role / group grant", "entity": "svc", "confidence": "Medium"}],
-                  "observations": [{"id": "F2", "side": "Malicious", "confidence": "Medium", "event_refs": ["x1", "EVT-c-002"]},
-                                   {"id": "F3", "side": "Benign", "confidence": "High", "event_refs": ["x1"], "covers": ["x1"], "condition": "false_positive"}],
+                  "observations": [{"id": "O2", "side": "Malicious", "confidence": "Medium", "event_refs": ["x1", "EVT-c-002"]},
+                                   {"id": "O3", "side": "Benign", "confidence": "High", "event_refs": ["x1"], "covers": ["x1"], "condition": "false_positive"}],
                   "no_information_refs": self.EMPTY}
         r = triage.decide(ledger)
         self.assertEqual(r["decision"], "Close")
