@@ -214,9 +214,9 @@ def ledger_note(**changes):
                                            "techniques": [{"id": "T1114.003", "rendered": "T1114.003 (Email Forwarding Rule)"}],
                                            "recommended_actions": []}]},
         "observations": [
-            {"id": "1", "desc": "Forwarding rule created: T1114.003 (Email Forwarding Rule)", "side": "Malicious",
+            {"id": "O1", "desc": "Forwarding rule created: T1114.003 (Email Forwarding Rule)", "side": "Malicious",
              "confidence": "High", "event_refs": ["EVT-1"], "first_seen": "2026-09-14T14:55:41Z", "timeline": True},
-            {"id": "2", "desc": "the device belongs to finance", "side": None, "event_refs": ["CMDB-7"]},
+            {"id": "O2", "desc": "the device belongs to finance", "side": None, "event_refs": ["CMDB-7"]},
         ],
         # triage compiles the Case Timeline, and it always holds at least the Alerts that opened the Case
         "timeline": [{"time_utc": "2026-09-14T14:55:41Z", "kind": "detection", "desc": "Malware / loader execution on ws-01",
@@ -331,7 +331,7 @@ class TheNoteCheck(unittest.TestCase):
         self.assertNotIn("disposition of the recommended actions", observations["renders"])
 
     def test_something_that_is_not_a_note_is_a_failure_and_not_a_traceback(self):
-        for broken in ([], {"observations": "1"}, ledger_note(observations=[{"id": "1", "tag": "Malicious (High)"}])):
+        for broken in ([], {"observations": "1"}, ledger_note(observations=[{"id": "O1", "tag": "Malicious (High)"}])):
             with self.subTest(note=str(broken)[:40]):
                 self.assertTrue(note_elements.check(broken, "triage", FRAMEWORK))
 
@@ -381,7 +381,7 @@ class TheNoteCheck(unittest.TestCase):
         self.assertTrue(any("Summary" in f for f in self.failures(ledger_note(summary=5))))
         note = ledger_note()
         del note["observations"][0]["desc"]
-        self.assertTrue(any("observation 1 says nothing" in f for f in self.failures(note)))
+        self.assertTrue(any("observation O1 says nothing" in f for f in self.failures(note)))
 
     def test_a_kind_the_framework_does_not_have_is_said(self):
         self.assertTrue(note_elements.check(ledger_note(kind="bogus"), None, FRAMEWORK))
@@ -727,7 +727,7 @@ class FromTheCommandLine(unittest.TestCase):
         document["observations"][0]["event_refs"] = []
         ran = self.run_script("note_elements.py", "--kind", "investigation", "--note", "ledger.json", document=document)
         self.assertEqual(ran.returncode, 1)
-        self.assertIn("FAIL: observation 1: cites no event", ran.stderr)
+        self.assertIn("FAIL: observation O1: cites no event", ran.stderr)
 
     def test_a_timeline_that_fails_exits_1_and_a_ledger_that_is_not_there_exits_2(self):
         document = self.investigation()

@@ -10,7 +10,7 @@ required_data_sources:
   - File-integrity monitoring
 status: draft
 ---
-<!-- generated from zerosoc-framework@466f53a88934 : 04-Playbooks/01-Triage/endpoint.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@4f0ef75753d1 : 04-Playbooks/01-Triage/endpoint.md — do not edit; regenerate with tools/build_references.py -->
 
 # Endpoint Triage Playbook
 

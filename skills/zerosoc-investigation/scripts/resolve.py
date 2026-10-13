@@ -9,7 +9,7 @@ Ledger (JSON):
   "playbook": "04-Playbooks/02-Investigation-Response/02-malware.md", "playbook_version": "2026-09-16",
   "incident_category": "IC-02",
   "alerts": [{"id": "<alert id>", "confidence": "Low|Medium|High", "ids": ["<merged source alert ids>"]}],
-  "observations": [{"id": "T1", "desc": "...", "side": "Malicious"|"Benign"|null, "confidence": "Low|Medium|High",
+  "observations": [{"id": "O1", "desc": "...", "side": "Malicious"|"Benign"|null, "confidence": "Low|Medium|High",
                 "condition": "false_positive"|"benign"|null,
                 "at": "2026-09-14T15:03:10Z", "artifact": "hash:...", "alert_type": "...", "entity": "...",
                 "retracted": false, "retraction_reason": "", "covered": false,

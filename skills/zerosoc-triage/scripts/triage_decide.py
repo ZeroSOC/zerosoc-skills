@@ -12,7 +12,7 @@ Ledger (JSON):
   "detection_metadata": {...},   the output of scripts/alert_metadata.py: what each Alert's detection
                                  asserts (§1.1), the remediation the source already performed, and the
                                  assertions it did not supply
-  "observations": [{"id": "1", "desc": "...", "side": "Malicious"|"Benign"|null, "confidence": "Low|Medium|High",
+  "observations": [{"id": "O1", "desc": "...", "side": "Malicious"|"Benign"|null, "confidence": "Low|Medium|High",
                 "covers": ["DF-1"], "condition": "false_positive"|"benign"|null, "artifact": "hash:...",
                 "retracted": false, "event_refs": ["<event id or link>"], "first_seen": "2026-09-14T14:55:41Z",
                 "timeline": false}],
