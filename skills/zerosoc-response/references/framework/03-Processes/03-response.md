@@ -5,7 +5,7 @@ status: draft
 last_updated: 2026-10-06
 license: Apache-2.0
 ---
-<!-- generated from zerosoc-framework@5505eb98c7fb : 03-Processes/03-response.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@ffd559a6339d : 03-Processes/03-response.md — do not edit; regenerate with tools/build_references.py -->
 
 # Phase 3: Incident Response
 

@@ -5,7 +5,7 @@ status: development
 last_updated: 2026-10-12
 license: Apache-2.0
 ---
-<!-- generated from zerosoc-framework@5505eb98c7fb : 01-Foundation/definitions.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@ffd559a6339d : 01-Foundation/definitions.md — do not edit; regenerate with tools/build_references.py -->
 
 # Standard SecOps Definitions
 
