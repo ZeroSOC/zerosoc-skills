@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **A prior incident is found by its alerts' evidence, never by its title.** The Defender source
+  profile's `cases.store` limits and `related_cases` recipe say where an incident's entities are:
+  a Defender incident's title names the attack ("Multi-stage incident on one endpoint") and never a
+  device or an account, so an executor that matched the entity against the title found no prior
+  incident on any Case. The recipe matches each alert's evidence on the entity's identifiers, and
+  an account on its principal name, security identifier or `DOMAIN\name`, never on the bare name
+  that every machine's local account shares.
 - **A result that carried no information carries no weight on the Malicious side.** Detection &
   Analysis §2.4 already said it (item 2 of ZeroSOC/zerosoc-framework#88); `triage_decide.py` and
   `resolve.py` now apply it. The ledger names `no_information_refs`, the references whose result
