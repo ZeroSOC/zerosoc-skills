@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **A search that finds no approval carries no weight.** The pin follows the framework to `df886fd`
+  (ZeroSOC/zerosoc-framework#95): Detection & Analysis §2.4 names it with the lookup that knows
+  nothing, and the cloud triage check *Change-control correlation* and IC-05 Query 6 no longer tag
+  a missing approval `Malicious`. The investigation's tag rules already said so ("the absence of
+  such a record proves nothing either way").
 - **A prior incident is found by its alerts' evidence, never by its title.** The Defender source
   profile's `cases.store` limits and `related_cases` recipe say where an incident's entities are:
   a Defender incident's title names the attack ("Multi-stage incident on one endpoint") and never a
