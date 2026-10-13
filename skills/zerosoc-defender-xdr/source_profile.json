@@ -1565,7 +1565,8 @@
       "cases.store": {
         "answers": "Has this entity been in an incident before, and how were those incidents determined.",
         "limits": [
-          "the source's own incident history only, bounded by its retention"
+          "the source's own incident history only, bounded by its retention",
+          "an incident's title names the attack, never a device or an account: the entities are in its alerts' evidence, and an incident is matched there"
         ],
         "operation": "list_incidents"
       },
@@ -1661,9 +1662,11 @@
     },
     "related_cases": {
       "asks": "Has this entity been in an incident before?",
-      "recipe": "list_incidents(filter: lastUpdateDateTime ge {since})",
+      "recipe": "list_alerts(filter: lastUpdateDateTime ge {since}), each alert's evidence matched on the entity's identifiers (device DNS name or device id; account principal name, security identifier or DOMAIN\\name); list_incidents(filter: lastUpdateDateTime ge {since}) for the matching incidents' status and classification",
       "limits": [
-        "the source's own incidents only"
+        "the source's own incidents only",
+        "an incident's title names the attack, never an entity: a title match finds nothing",
+        "a bare account name is not an identity: the same local account name exists on every machine"
       ]
     },
     "directory_changes": {
