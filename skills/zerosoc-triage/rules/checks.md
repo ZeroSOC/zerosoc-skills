@@ -40,3 +40,4 @@ executor puts that language in its place; read as it is, it means the language o
   own evidence you read further, each alert you relate, the result you read; never guess the impact.
 - Write the observation texts in $language. Write technique codes `ID (Name)` where the name is
   known; a bare identifier is rendered for you and is never a failure.
+- Name an alert by its title, entity and time; ids stay in the event references.
