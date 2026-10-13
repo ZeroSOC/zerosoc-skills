@@ -42,3 +42,4 @@ executor puts that language in its place; read as it is, it means the language o
   exceeds the candidate one, and say why.
 - Never state a verdict, a score or a confidence for the Case: the resolution rule computes them.
 - Write in $language. Technique codes are always `ID (Name)`.
+- Name an alert by its title, entity and time; ids stay in the event references.

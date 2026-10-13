@@ -18,4 +18,4 @@ There is no Actions Taken element and no Executed Queries element: a query that 
 is recorded beside that observation. The confidence belongs to the Classification: the Rationale says
 how it was reached, not what it is. State the scores and the side proven as the resolution rule
 computed them; do not change them, do not add observations, do not paste raw logs. Technique codes are always
-`ID (Name)`.
+`ID (Name)`. Name an alert by its title, entity and time; ids stay in the event references.
