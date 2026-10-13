@@ -22,7 +22,7 @@ report happened and whether the timeline shows them:
 
 {"now": "2026-09-14T15:12:00Z",                    when this gate ran
  "t0": null,                                        the Case's start_time if it states one; it is checked
- "observations": [{"id": "O1", "desc": "...", "side": "Malicious"|"Benign"|null, "retracted": false,
+ "observations": [{"id": "1", "desc": "...", "side": "Malicious"|"Benign"|null, "retracted": false,
                "first_seen": "2026-09-14T14:55:41Z",   when it happened — never "at", when it was made
                "timeline": true,                      on the timeline (the zerosoc:timeline attribute)
                "event_refs": ["..."]}],
