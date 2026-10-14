@@ -1171,7 +1171,8 @@ class BindingProfiles(unittest.TestCase):
         self.assertIn("alert evidence", g["EDR / endpoint process telemetry"]["reason"])
         self.assertEqual(g["Anti-virus / anti-malware"]["status"], "available")
 
-    def test_hunting_is_not_bound_and_the_case_store_is(self):
+    def test_open_search_is_not_bound_and_the_case_store_is(self):
+        # hunting answers the identity table at this licence, but none of the activity tables a search runs over
         self.assertIn("cases.store", self.profile["capabilities"])
         self.assertNotIn("siem.search", self.profile["capabilities"])
 

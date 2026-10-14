@@ -1,13 +1,31 @@
 {
-  "deployment": "reference shape: Microsoft 365 Business Premium tenant (Defender for Business, Defender for Office 365 Plan 1, Entra ID P1) reached through the defender-xdr MCP server; no advanced hunting, polling only. A capability probe run against the tenant supersedes this file.",
+  "deployment": "reference shape: Microsoft 365 Business Premium tenant (Defender for Business, Defender for Office 365 Plan 1, Entra ID P1) reached through the microsoft-security MCP server; advanced hunting answers the identity and vulnerability tables, while the raw endpoint, email and cloud-app activity tables stay empty at this licence. It is what the server's capability probe binds on a tenant meeting reference.provides, which tools/check_binding.py verifies against the manifest; a probe run against the tenant itself supersedes this file.",
+  "reference": {
+    "manifest": "https://raw.githubusercontent.com/ZeroSOC/zerosoc-mcp/microsoft-security-v0.5.1/servers/microsoft-security/capabilities.manifest.json",
+    "provides": [
+      "always:local",
+      "api:graph.alerts",
+      "api:graph.incidents",
+      "api:graph.directory_audits",
+      "api:graph.sign_ins",
+      "api:mde.machines",
+      "api:mde.software",
+      "hunting:IdentityInfo",
+      "role:graph/SecurityIncident.ReadWrite.All",
+      "role:mde/File.Read.All",
+      "role:mde/Machine.Isolate",
+      "role:mde/Machine.StopAndQuarantine",
+      "role:mde/Ti.ReadWrite.All"
+    ]
+  },
   "capabilities": {
     "asset.cmdb": {
       "tool": "mcp:defender-xdr/defender_get_machine_by_id",
       "notes": "device role, OS, exposure and tags (defender_get_software for the software inventory); business criticality comes from the SOC Knowledge Base"
     },
     "identity.directory": {
-      "tool": "mcp:defender-xdr/defender_get_user_machines",
-      "notes": "logon relationships only; role and privilege need a directory tool bound here"
+      "tool": "mcp:defender-xdr/defender_run_hunting_query",
+      "notes": "the IdentityInfo table: department, title, group membership, assigned roles"
     },
     "soc.knowledge_base": {
       "tool": "file:./soc-kb/"
@@ -20,9 +38,17 @@
       "tool": "mcp:defender-xdr/defender_get_file_info",
       "notes": "prevalence and first-seen by hash; hashes only leave the environment"
     },
+    "decode": {
+      "tool": "mcp:defender-xdr/defender_decode_command",
+      "notes": "encoded PowerShell commands; timestamp_to_utc for time zones"
+    },
     "telemetry.endpoint": {
-      "tool": "mcp:defender-xdr/defender_get_incident_alerts",
-      "notes": "alert evidence only: there is no query language to translate playbook questions into; every unanswered question is a visibility gap"
+      "tool": "mcp:defender-xdr/defender_get_incident_evidence",
+      "notes": "alert evidence only: there is no query language to translate playbook questions into; every question the evidence does not answer is a visibility gap"
+    },
+    "telemetry.identity": {
+      "tool": "mcp:defender-xdr/entra_list_sign_ins",
+      "notes": "sign-in log (list_directory_audits for directory changes)"
     },
     "containment.isolate_host": {
       "tool": "mcp:defender-xdr/defender_isolate_machine",
@@ -71,8 +97,8 @@
     "Data Loss Prevention (DLP)": false,
     "Data classification labels": false,
     "Database audit logs": false,
-    "Directory / identity-provider audit logs": false,
-    "Directory audit logs": false,
+    "Directory / identity-provider audit logs": true,
+    "Directory audit logs": true,
     "EDR": false,
     "EDR / endpoint process telemetry": false,
     "EDR on web servers": false,
@@ -92,10 +118,10 @@
     "HR context (joiner-mover-leaver)": false,
     "Host-application logs for AI features": false,
     "Hypervisor management-plane audit logs": false,
-    "Identity Provider / directory audit logs": false,
-    "Identity provider sign-in logs": false,
+    "Identity Provider / directory audit logs": true,
+    "Identity provider sign-in logs": true,
     "LLM / inference API logs (prompts + completions)": false,
-    "MFA logs": false,
+    "MFA logs": true,
     "Mailbox audit logs": false,
     "Mailbox audit logs (pivot)": false,
     "Model registry & ML-pipeline audit logs": false,
@@ -117,7 +143,7 @@
     "Server EDR": false,
     "Software inventory / SBOM": true,
     "Storage / hypervisor audit logs": false,
-    "Threat-intel / reputation enrichment (hash, IP, domain)": false,
+    "Threat-intel / reputation enrichment (hash, IP, domain)": true,
     "Training-data lineage": false,
     "Update-infrastructure logs": false,
     "Upstream ISP / scrubbing-provider telemetry": false,
@@ -128,28 +154,25 @@
     "Web Application Firewall (WAF)": false
   },
   "data_source_notes": {
-    "EDR": "no raw process telemetry at this licence level (no hunting tables); the process, file, registry and network entities cited by the alerts are available as alert evidence",
-    "EDR / endpoint process telemetry": "no raw process telemetry at this licence level (no hunting tables); the process, file, registry and network entities cited by the alerts are available as alert evidence",
-    "EDR on web servers": "no raw process telemetry at this licence level (no hunting tables); the process, file, registry and network entities cited by the alerts are available as alert evidence",
+    "Anti-virus / anti-malware": "antivirus detections arrive as alerts; antivirus health through the device health operations",
+    "EDR": "no raw process telemetry at this licence level (the Device* hunting tables stay empty); the process, file, registry and network entities cited by the alerts are available as alert evidence",
+    "EDR / endpoint process telemetry": "no raw process telemetry at this licence level (the Device* hunting tables stay empty); the process, file, registry and network entities cited by the alerts are available as alert evidence",
+    "EDR on web servers": "no raw process telemetry at this licence level (the Device* hunting tables stay empty); the process, file, registry and network entities cited by the alerts are available as alert evidence",
     "Email detonation / sandbox": "no analyzed-email data (message events, detonation results) at this licence level; alert-policy alerts such as the user-report alert still arrive as alerts",
     "Email gateway / attachment sandbox logs": "no analyzed-email data (message events, detonation results) at this licence level; alert-policy alerts such as the user-report alert still arrive as alerts",
     "Email gateway / sandbox": "no analyzed-email data (message events, detonation results) at this licence level; alert-policy alerts such as the user-report alert still arrive as alerts",
     "Email gateway / secure email gateway": "no analyzed-email data (message events, detonation results) at this licence level; alert-policy alerts such as the user-report alert still arrive as alerts",
     "Email gateway logs": "no analyzed-email data (message events, detonation results) at this licence level; alert-policy alerts such as the user-report alert still arrive as alerts",
-    "Endpoint telemetry": "no raw process telemetry at this licence level (no hunting tables); the process, file, registry and network entities cited by the alerts are available as alert evidence",
-    "Engineering-workstation / HMI endpoint telemetry": "no raw process telemetry at this licence level (no hunting tables); the process, file, registry and network entities cited by the alerts are available as alert evidence",
-    "Identity provider sign-in logs": "the tenant exposes it through the directory reporting API, but no tool bound in this profile reads it: bind telemetry.identity to make it available",
-    "MFA logs": "the tenant exposes it through the directory reporting API, but no tool bound in this profile reads it: bind telemetry.identity to make it available",
-    "Mailbox audit logs": "current inbox rules are readable as state through the mail API; the audit trail of who created them is not bound",
-    "Mailbox audit logs (pivot)": "current inbox rules are readable as state through the mail API; the audit trail of who created them is not bound",
-    "Server EDR": "no raw process telemetry at this licence level (no hunting tables); the process, file, registry and network entities cited by the alerts are available as alert evidence",
+    "Endpoint telemetry": "no raw process telemetry at this licence level (the Device* hunting tables stay empty); the process, file, registry and network entities cited by the alerts are available as alert evidence",
+    "Engineering-workstation / HMI endpoint telemetry": "no raw process telemetry at this licence level (the Device* hunting tables stay empty); the process, file, registry and network entities cited by the alerts are available as alert evidence",
+    "MFA logs": "authentication details of the sign-in log",
+    "Mailbox audit logs": "the mailbox audit trail reaches the server through the cloud-apps hunting table, which this licence does not populate; current inbox rules are readable as state through the mail API",
+    "Mailbox audit logs (pivot)": "the mailbox audit trail reaches the server through the cloud-apps hunting table, which this licence does not populate; current inbox rules are readable as state through the mail API",
+    "Server EDR": "no raw process telemetry at this licence level (the Device* hunting tables stay empty); the process, file, registry and network entities cited by the alerts are available as alert evidence",
     "Software inventory / SBOM": "endpoint software inventory from vulnerability management; no SBOM",
-    "Threat-intel / reputation enrichment (hash, IP, domain)": "not bound in this profile: bind a reputation service (reputation.multi_engine) to make it available",
+    "Threat-intel / reputation enrichment (hash, IP, domain)": "file reputation by hash only (defender_get_file_info: prevalence, first seen, signer and determination; defender_get_file_statistics for the organization). Address and domain reputation are not covered: defender_get_ip_statistics and defender_get_domain_statistics give this tenant's prevalence, not a verdict, so bind reputation.multi_engine for those",
     "User-reported phishing mailbox": "through the platform's native user-report alert",
-    "Vendor advisories / threat intelligence": "not bound in this profile: bind a reputation service (reputation.multi_engine) to make it available",
-    "Directory / identity-provider audit logs": "the tenant exposes it through the directory reporting API, but no tool bound in this profile reads it: bind telemetry.identity to make it available",
-    "Directory audit logs": "the tenant exposes it through the directory reporting API, but no tool bound in this profile reads it: bind telemetry.identity to make it available",
-    "Identity Provider / directory audit logs": "the tenant exposes it through the directory reporting API, but no tool bound in this profile reads it: bind telemetry.identity to make it available"
+    "Vendor advisories / threat intelligence": "not bound in this profile: bind a reputation service (reputation.multi_engine) to make it available"
   },
   "source_profiles": {
     "defender-xdr": "zerosoc-defender-xdr/source_profile.json"
