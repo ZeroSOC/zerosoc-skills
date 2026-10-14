@@ -59,7 +59,8 @@ per Case: the playbook the script prints.
    triage inventory is a starting point, not the answer. List every entity the source attaches to the
    Case's alerts as `evidence.json` and run
    `python3 scripts/evidence_inventory.py evidence.json --source-count N` (N: the distinct evidence items
-   the source shows for the Case, not its rows per alert). Record the printed `evidence_inventory` object
+   the source shows for the Case, not its rows per alert; `--source-basis reproduction` when a tool rebuilt
+   N from the same evidence, which leaves a match unverified). Record the printed `evidence_inventory` object
    in the ledger; extract what is missing before scoring. For a hunt-opened Case the inventory is what
    the hunt collected, and N is unverified.
    When it holds processes, rebuild the lineage with `python3 scripts/process_chain.py evidence.json --alerts alerts.json`
@@ -101,7 +102,10 @@ per Case: the playbook the script prints.
    evidence too (a clean hash is a `Benign` observation, not silence). Tag each result as the query's mapping
    prescribes (`Malicious (…)` if …, `Benign (…)` if …), or as context; decide by judgment only when a
    result fits neither stated outcome. Observations from the same telemetry artifact count once. Record
-   every query run, listed or added, with its outcome and tag. Egress rule as in triage: indicators only.
+   every query run, listed or added, with its outcome and tag, and list each result that carried no
+   information under the ledger's `no_information_refs` and each query that covered the question and found
+   nothing under `scoped_negative_refs`, as in triage: `resolve.py` gives the first no weight on either side.
+   Egress rule as in triage: indicators only.
 6. **What the source already did is not coverage.** An entity the source blocked, quarantined or removed
    carries no side and no confidence at this gate either: it is an action the Case records, and the
    questions it leaves open — how the entity arrived, what ran before it was stopped, whether the same

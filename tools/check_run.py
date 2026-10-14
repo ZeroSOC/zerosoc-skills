@@ -113,15 +113,18 @@ def check_inventory(report, run, ledger, label):
     report.check(built["count"] == recorded.get("extracted"), f"{label}: extracted count matches the evidence",
                  f"{built['count']} entities from {len(rows)} rows", f"extracted={recorded.get('extracted')}")
     source_count = recorded.get("source_count")
+    basis = recorded.get("source_count_basis") or "source"
     if source_count is None:
         report.skip(f"{label}: completeness verified", "source_count not recorded (the source showed no count)")
     else:
-        fresh = evidence_inventory.completeness(built, source_count)
+        fresh = evidence_inventory.completeness(built, source_count, basis)
         report.check(fresh["complete"] == recorded.get("complete"), f"{label}: completeness as recomputed",
-                     f"complete={fresh['complete']} against the source's {source_count}",
+                     f"complete={fresh['complete']} against the {basis} count {source_count}",
                      f"complete={recorded.get('complete')}")
         if fresh["complete"] is False:
             report.ok(f"{label}: incompleteness is visible", evidence_inventory.note(fresh))
+        elif basis == "reproduction":
+            report.skip(f"{label}: completeness verified", "the count was reproduced from the same evidence")
 
 
 def override_of(run, profile_path):
