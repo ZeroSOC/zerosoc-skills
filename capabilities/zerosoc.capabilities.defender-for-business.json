@@ -1,9 +1,8 @@
 {
   "deployment": "reference shape: Microsoft 365 Business Premium tenant (Defender for Business, Defender for Office 365 Plan 1, Entra ID P1) reached through the microsoft-security MCP server; advanced hunting answers the identity and vulnerability tables, while the raw endpoint, email and cloud-app activity tables stay empty at this licence. It is what the server's capability probe binds on a tenant meeting reference.provides, which tools/check_binding.py verifies against the manifest; a probe run against the tenant itself supersedes this file.",
   "reference": {
-    "manifest": "https://raw.githubusercontent.com/ZeroSOC/zerosoc-mcp/microsoft-security-v0.5.1/servers/microsoft-security/capabilities.manifest.json",
+    "manifest": "https://raw.githubusercontent.com/ZeroSOC/zerosoc-mcp/248231a72744372109063b7cdbf7437341c8901c/servers/microsoft-security/capabilities.manifest.json",
     "provides": [
-      "always:local",
       "api:graph.alerts",
       "api:graph.incidents",
       "api:graph.directory_audits",
@@ -16,7 +15,8 @@
       "role:mde/Machine.Isolate",
       "role:mde/Machine.StopAndQuarantine",
       "role:mde/Ti.ReadWrite.All"
-    ]
+    ],
+    "release": "microsoft-security-v0.5.1"
   },
   "capabilities": {
     "asset.cmdb": {

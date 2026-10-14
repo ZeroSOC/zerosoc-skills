@@ -34,12 +34,11 @@ cites a check's result, an item of the alert's own evidence it read further, or 
 relates, stands beyond the alerts. "no_information_refs" are the results that carried no information (a
 lookup that knows nothing of the indicator, a search that finds no approval, a lookup not answered) and
 "scoped_negative_refs" the checks that covered the question and found nothing, which are cited like any
-other result (§2.4). An observation is read without the first kind, on either side: a Malicious one that
-rests on them and an alert restates the alert, and one that rests on them alone carries no weight and is
-reported under "no_information", Benign or Malicious, and covers nothing. A reference is one kind or the
-other, never both. A ledger that names no "scoped_negative_refs" was written when one list held both kinds:
-its "no_information_refs" are read on the Malicious side only, as they were then, and "no_information_note"
-says so. "first_seen" is when the thing it reports
+other result (§2.4). An observation is read without the first kind, on either side: one that rests on them
+alone carries no weight, Benign or Malicious, covers nothing and is reported under "no_information", and a
+Malicious one that rests on them and an alert restates the alert. A reference is one kind or the other,
+never both. A ledger with no "scoped_negative_refs" key is read the same way, and "no_information_note" says
+so (scripts/no_information.py). "first_seen" is when the thing it reports
 happened (not when the observation was made) and "timeline" flags it for the Case Timeline: this rule reads
 neither, and note_elements.py and timeline.py read them from this same ledger.
 "condition" on a Benign observation is the kind of the playbook condition it named, read off the list the
@@ -53,6 +52,7 @@ Prints the decision, the coverage per alert, the confidence leaving triage and t
 import json, os, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import no_information  # copied next to this script by tools/build_references.py
 try:
     from evidence_inventory import note as inventory_note
 except ImportError:  # the shared script is copied next to this one by tools/build_references.py
@@ -96,35 +96,8 @@ def restates_alerts(f, ids, empty=frozenset()):
     asserted: the alert is weighed by the coverage rule and is not counted twice as evidence beyond itself.
     One that cites two alerts relates them, and one that cites an evidence item or a check's result read
     something the detection did not state — both stand beyond the alerts (§1.5)."""
-    refs = [str(r) for r in (f.get("event_refs") or []) if r and str(r) not in empty]
+    refs = no_information.informative(f, empty)
     return bool(refs) and all(r in ids for r in refs) and len({ids[r] for r in refs}) == 1
-
-
-def carries_nothing(f, empty):
-    """An observation that rests only on results that carried no information — a lookup that knows
-    nothing, a search that finds no approval, a lookup not answered — is no evidence for its side (§2.4)."""
-    refs = [str(r) for r in (f.get("event_refs") or []) if r]
-    return bool(refs) and bool(empty) and all(r in empty for r in refs)
-
-
-NO_INFORMATION_NOTE = ("the ledger names no scoped_negative_refs, so its no_information_refs were read as"
-                       " a ledger written before the two were told apart: on the Malicious side only, and a"
-                       " Benign observation resting on them kept its weight; list the checks that covered"
-                       " the question and found nothing under scoped_negative_refs, and only the results that"
-                       " carried no information under no_information_refs (Detection & Analysis §2.4)")
-
-
-def no_information(ledger):
-    """The references that carry no information, the sides they are not read on, and the note for a ledger
-    written before scoped negatives were listed apart (§2.4)."""
-    empty = {str(e) for e in ledger.get("no_information_refs") or []}
-    if "scoped_negative_refs" not in ledger:
-        return empty, ("Malicious",), (NO_INFORMATION_NOTE if empty else None)
-    both = empty & {str(e) for e in ledger.get("scoped_negative_refs") or []}
-    if both:
-        raise ValueError("a reference is listed both as a scoped negative and as a result that carried no"
-                         " information: " + ", ".join(sorted(both)))
-    return empty, ("Malicious", "Benign"), None
 
 
 def close_verdict(covering):
@@ -150,8 +123,8 @@ def _decide(ledger):
     alerts = dedupe_alerts(ledger.get("alerts", []))
     active = [f for f in ledger.get("observations", []) if not f.get("retracted") and f.get("side") in ("Malicious", "Benign")]
     ids = alert_ids(ledger)
-    empty, unread_on, empty_note = no_information(ledger)
-    weightless = [f for f in active if f["side"] in unread_on and carries_nothing(f, empty)]
+    empty, empty_note = no_information.refs(ledger)
+    weightless = [f for f in active if no_information.carries_nothing(f, empty)]
     restated = [f for f in active if f["side"] == "Malicious" and f not in weightless and restates_alerts(f, ids, empty)]
     mal = [f for f in active if f["side"] == "Malicious" and f not in restated and f not in weightless]
     ben = [f for f in active if f["side"] == "Benign" and f not in weightless]

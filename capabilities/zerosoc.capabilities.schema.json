@@ -18,7 +18,7 @@
         "manifest",
         "provides"
       ],
-      "description": "For a binding shipped as a reference shape: what it was derived from, so tools/check_binding.py can derive it again and report any difference. manifest is the URL of the server's capabilities manifest at a release tag; provides lists every requirement the deployment meets (api:..., hunting:<table>, role:..., always:local), in the manifest's own terms. A binding a probe wrote from a live tenant carries none.",
+      "description": "For a binding shipped as a reference shape: what it was derived from, so tools/check_binding.py can derive it again and report any difference. manifest is the URL of the server's capabilities manifest at a commit, release names the tag that commit carries, and provides lists every requirement the deployment meets (api:..., hunting:<table>, role:...), in the manifest's own terms; an always: requirement holds everywhere and is not listed. A binding a probe wrote from a live tenant carries none.",
       "properties": {
         "manifest": {
           "type": "string"
@@ -28,6 +28,9 @@
           "items": {
             "type": "string"
           }
+        },
+        "release": {
+          "type": "string"
         }
       }
     },

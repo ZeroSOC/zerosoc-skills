@@ -14,6 +14,7 @@ MANIFEST = {
             {"tool": "mcp:x/evidence", "requires_all": ["api:alerts"], "requires_any": []}],
         "siem.search": [{"tool": "mcp:x/hunt", "requires_all": [], "requires_any": ["hunting:DeviceProcessEvents", "hunting:EmailEvents"]}],
         "containment.isolate_host": [{"tool": "mcp:x/isolate", "requires_all": ["api:machines", "role:Isolate"], "requires_any": []}],
+        "decode": [{"tool": "mcp:x/decode", "requires_all": ["always:local"], "requires_any": []}],
     },
     "data_sources": {
         "EDR": {"any_of": ["hunting:DeviceProcessEvents"], "fallback": "alert_evidence"},
@@ -26,6 +27,7 @@ BINDING = {
     "reference": {"manifest": "https://example.invalid/manifest.json",
                   "provides": ["api:alerts", "api:machines", "role:Isolate", "role:FileRead"]},
     "capabilities": {"telemetry.endpoint": {"tool": "mcp:x/evidence"}, "containment.isolate_host": {"tool": "mcp:x/isolate"},
+                     "decode": {"tool": "mcp:x/decode"},
                      "soc.knowledge_base": {"tool": "file:./soc-kb/"}},
     "data_sources": {"EDR": False, "Anti-virus": True, "Reputation": True, "Firewall logs": False},
 }
@@ -79,6 +81,15 @@ class ReferenceBinding(unittest.TestCase):
         self.assertEqual(check.differences(b, MANIFEST),
                          ["reference.provides names api:alert, which nothing in the manifest requires"])
 
+    def test_an_always_requirement_holds_without_being_listed(self):
+        b = copy.deepcopy(BINDING)
+        del b["capabilities"]["decode"]
+        self.assertEqual(check.differences(b, MANIFEST), ["capability decode: the manifest binds mcp:x/decode, the binding nothing"])
+        b = copy.deepcopy(BINDING)
+        b["reference"]["provides"].append("always:local")
+        self.assertEqual(check.differences(b, MANIFEST),
+                         ["reference.provides names always:local, which holds on every deployment and is not listed"])
+
     def test_without_a_reference_there_is_nothing_to_check_against(self):
         b = copy.deepcopy(BINDING)
         del b["reference"]
@@ -101,11 +112,13 @@ class ReferenceBinding(unittest.TestCase):
 class ShippedReferenceBinding(unittest.TestCase):
     """The Defender for Business example declares what it was derived from, so CI can check it."""
 
-    def test_it_names_a_manifest_at_a_release_tag(self):
+    def test_it_names_the_manifest_at_a_commit_of_a_release(self):
+        """A commit cannot move under the check the way a tag can; the release names it for a reader."""
         with open(os.path.join(ROOT, "capabilities", "zerosoc.capabilities.defender-for-business.json"), encoding="utf-8") as f:
             reference = json.load(f)["reference"]
         self.assertRegex(reference["manifest"],
-                         r"^https://raw\.githubusercontent\.com/ZeroSOC/zerosoc-mcp/microsoft-security-v\d+\.\d+\.\d+/servers/microsoft-security/capabilities\.manifest\.json$")
+                         r"^https://raw\.githubusercontent\.com/ZeroSOC/zerosoc-mcp/[0-9a-f]{40}/servers/microsoft-security/capabilities\.manifest\.json$")
+        self.assertRegex(reference["release"], r"^microsoft-security-v\d+\.\d+\.\d+$")
         self.assertIn("api:graph.alerts", reference["provides"])
         self.assertNotIn("hunting:DeviceProcessEvents", reference["provides"])
 

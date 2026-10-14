@@ -31,12 +31,11 @@ stands beyond the alerts (§2.4). A ledger that names no alerts is resolved by t
 "no_information_refs" are the references whose result carried no information: a lookup that knows nothing
 of the indicator, a search that finds no approval, a query that was not answered. "scoped_negative_refs" are
 the references whose query covered the question and found nothing, such as no child process on a covered
-host in the window: something was learned, so they are cited like any other result (§2.4). On either side
-a result that carried no information is not read: an observation resting on such results and one alert
-counts as that alert, and one resting on them alone carries no weight ("no_information"). A reference is
-one or the other, never both. A ledger that names no "scoped_negative_refs" was written when one list held
-both kinds: its "no_information_refs" are read on the Malicious side only, as they were then, and
-"no_information_note" says so.
+host in the window: something was learned, so they are cited like any other result (§2.4). An observation
+is read without the first kind, on either side, and one resting on them alone carries no weight
+("no_information"); on the Malicious side, one resting on them and one alert counts as that alert. A
+reference is one kind or the other, never both. A ledger with no "scoped_negative_refs" key is read the same
+way, and "no_information_note" says so (scripts/no_information.py).
 "condition" on a Benign observation is the kind of the triage playbook condition it named, read off the list
 the condition belongs to (Playbook Architecture §4.1), never a kind the executor labelled itself; on Benign
 proven the verdict is Benign (5) when the Benign observation of the highest confidence names a Benign
@@ -51,13 +50,15 @@ to --now, else "resolved_at", else the current time, against 10 minutes at High 
 timestamps ("at") are checked against "started_at". Without "started_at" the script falls back to the
 self-reported "timebox_expired" and says so. Prints the score
 of each side, which side is proven, the verdict and confidence to record, the residual observations, the
-timebox, and the next step; with --json also "counted": per side, the observations standing (not retracted)
-and how many they count as under the rule, for a Note to quote rather than recount.
+timebox, and the next step; with --json also "counted": per side, the ids of the observations standing (not
+retracted) and of those the score counts, once the ones that carry no information are set aside and one alert
+type on one entity, or one artifact, counts once; a Note quotes it rather than recounting.
 """
 import argparse, json, os, sys
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import no_information  # copied next to this script by tools/build_references.py
 try:
     from evidence_inventory import note as inventory_note
 except ImportError:  # the shared script is copied next to this one by tools/build_references.py
@@ -147,16 +148,11 @@ def benign_verdict(ben):
     return 1, "False Positive"
 
 
-def informative(f, empty):
-    """The references an observation rests on, less those whose result carried no information."""
-    return [str(r) for r in (f.get("event_refs") or []) if r and str(r) not in empty]
-
-
 def alert_bound(f, owner, empty=frozenset()):
     """The alert a Malicious observation only restates: the one alert all its references belong to, or None
     when it cites anything else, two alerts, or nothing at all (§1.5). A reference whose result carried no
     information is not read."""
-    refs = informative(f, empty)
+    refs = no_information.informative(f, empty)
     if f.get("alert_type"):
         return refs[0] if refs else f.get("id")
     alerts = {owner[r] for r in refs if r in owner}
@@ -174,7 +170,7 @@ def proof_beyond(mal, ledger):
     # an alert that stands for several merged source alerts is one alert under each of its ids
     owner = {str(i): str(a["id"]) for a in alerts if a.get("id") for i in [a["id"], *(a.get("ids") or [])]}
     own = {str(a["id"]): a.get("confidence") for a in alerts if a.get("id")}
-    empty = {str(e) for e in ledger.get("no_information_refs") or []}
+    empty, _ = no_information.refs(ledger)
     bound = {f["id"]: alert_bound(f, owner, empty) for f in mal}
     if any(alert is None for alert in bound.values()):
         return None
@@ -184,35 +180,15 @@ def proof_beyond(mal, ledger):
             " (Detection & Analysis §2.4)")
 
 
-NO_INFORMATION_NOTE = ("the ledger names no scoped_negative_refs, so its no_information_refs were read as"
-                       " a ledger written before the two were told apart: on the Malicious side only, and a"
-                       " Benign observation resting on them kept its weight; list the queries that covered"
-                       " the question and found nothing under scoped_negative_refs, and only the results that"
-                       " carried no information under no_information_refs (Detection & Analysis §2.4)")
-
-
-def no_information(ledger):
-    """The references that carry no information, the sides they are not read on, and the note for a ledger
-    written before scoped negatives were listed apart (§2.4)."""
-    empty = {str(e) for e in ledger.get("no_information_refs") or []}
-    if "scoped_negative_refs" not in ledger:
-        return empty, ("Malicious",), (NO_INFORMATION_NOTE if empty else None)
-    both = empty & {str(e) for e in ledger.get("scoped_negative_refs") or []}
-    if both:
-        raise ValueError("a reference is listed both as a scoped negative and as a result that carried no"
-                         " information: " + ", ".join(sorted(both)))
-    return empty, ("Malicious", "Benign"), None
-
-
 def resolve(ledger, now=None):
     standing = [f for f in ledger.get("observations", []) if not f.get("retracted") and f.get("side") in ("Malicious", "Benign")]
-    active = dedupe(standing)
-    empty, unread_on, empty_note = no_information(ledger)
-    # an observation resting on nothing but results that carried no information is none (§2.4)
-    weightless = [f for f in active if f["side"] in unread_on and f.get("event_refs") and empty
-                  and not informative(f, empty)]
-    mal = [f for f in active if f["side"] == "Malicious" and f not in weightless]
-    ben = [f for f in active if f["side"] == "Benign" and f not in weightless]
+    empty, empty_note = no_information.refs(ledger)
+    # an observation resting on nothing but results that carried no information is none (§2.4); it is set
+    # aside before the count-once rule, so it can neither stand in for a real observation nor lend it weight
+    weightless = [f for f in standing if no_information.carries_nothing(f, empty)]
+    active = dedupe([f for f in standing if f not in weightless])
+    mal = [f for f in active if f["side"] == "Malicious"]
+    ben = [f for f in active if f["side"] == "Benign"]
     mal_score = sum(W[f["confidence"]] for f in mal)
     ben_score = sum(W[f["confidence"]] for f in ben)
     uncovered_mh = [f for f in mal if f["confidence"] in ("Medium", "High") and not f.get("covered")]
@@ -224,7 +200,7 @@ def resolve(ledger, now=None):
          "malicious_observations": [f["id"] for f in mal], "benign_observations": [f["id"] for f in ben],
          "retracted": [f["id"] for f in ledger.get("observations", []) if f.get("retracted")],
          "uncovered_medium_high_malicious": [f["id"] for f in uncovered_mh], "residual_low_malicious": [f["id"] for f in residual_low],
-         "counted": {side: {"standing": sum(1 for f in standing if f["side"] == side), "counted": len(kept)}
+         "counted": {side: {"standing": [f["id"] for f in standing if f["side"] == side], "counted": [f["id"] for f in kept]}
                      for side, kept in (("Malicious", mal), ("Benign", ben))}}
     if unproven:
         r["malicious_not_proven"] = unproven

@@ -107,7 +107,10 @@ def note(record):
     extracted, shown = record.get("extracted"), record.get("source_count")
     if record.get("complete") is None:
         return f"evidence inventory unverified: {extracted} entities extracted, the source count was not recorded"
-    reproduced = record.get("source_count_basis") == "reproduction"
+    basis = record.get("source_count_basis")
+    if basis not in (None, *BASES):
+        return f"evidence inventory unverified: {extracted} entities extracted, against a count of unknown basis {basis!r}"
+    reproduced = basis == "reproduction"
     if not record.get("complete"):
         against = "a count reproduced from the same evidence holds" if reproduced else "the source shows"
         if isinstance(extracted, int) and isinstance(shown, int) and extracted > shown:

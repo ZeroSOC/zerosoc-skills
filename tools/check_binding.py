@@ -9,13 +9,14 @@ missing when the server has read it for two releases.
 So a reference binding names what it was derived from under "reference":
 
   "reference": {"manifest": "<URL of the server's capabilities.manifest.json at a release tag>",
-                "provides": ["<every requirement the deployment meets: api:..., hunting:<table>, role:..., always:local>"]}
+                "provides": ["<every requirement the deployment meets: api:..., hunting:<table>, role:...>"]}
 
 and this check derives from that manifest what a capability probe would bind on a deployment that meets
 exactly those requirements, then compares it with the binding:
 
 - each capability class the manifest knows is bound to the first option whose requirements are all met
   ("requires_all", and at least one of "requires_any" when it names any), and left unbound when none is;
+  an "always:" requirement is met everywhere and is not listed;
 - each data source the manifest knows is available when any requirement of its "any_of" is met, or every
   requirement of its "all_of".
 
@@ -38,16 +39,22 @@ import urllib.request
 from typing import Any
 
 
+def _holds(requirement: str, provides: set[str]) -> bool:
+    """An "always:" requirement holds on every deployment, as the probe answers it; any other only where
+    the deployment provides it."""
+    return requirement.startswith("always:") or requirement in provides
+
+
 def _met(option: dict[str, Any], provides: set[str]) -> bool:
-    every = set(option.get("requires_all") or [])
-    some = set(option.get("requires_any") or [])
-    return every <= provides and (not some or bool(some & provides))
+    every = option.get("requires_all") or []
+    some = option.get("requires_any") or []
+    return all(_holds(r, provides) for r in every) and (not some or any(_holds(r, provides) for r in some))
 
 
 def _provided(rule: dict[str, Any], provides: set[str]) -> bool:
-    any_of = set(rule.get("any_of") or [])
-    all_of = set(rule.get("all_of") or [])
-    return bool(any_of & provides) or bool(all_of and all_of <= provides)
+    any_of = rule.get("any_of") or []
+    all_of = rule.get("all_of") or []
+    return any(_holds(r, provides) for r in any_of) or bool(all_of and all(_holds(r, provides) for r in all_of))
 
 
 def expected(manifest: dict[str, Any], provides: set[str]) -> tuple[dict[str, str | None], dict[str, bool]]:
@@ -76,6 +83,8 @@ def differences(binding: dict[str, Any], manifest: dict[str, Any]) -> list[str]:
         for r in [*(rule.get("any_of") or []), *(rule.get("all_of") or [])]
     }
     out = [f"reference.provides names {r}, which nothing in the manifest requires" for r in sorted(provides - known)]
+    out += [f"reference.provides names {r}, which holds on every deployment and is not listed"
+            for r in sorted(r for r in provides if r.startswith("always:"))]
     classes, sources = expected(manifest, provides)
     bound = {k: (v or {}).get("tool") for k, v in (binding.get("capabilities") or {}).items()}
     for klass, tool in sorted(classes.items()):
