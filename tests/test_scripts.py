@@ -109,6 +109,69 @@ class TriageRule(unittest.TestCase):
         self.assertEqual(len(r["alerts_considered"]), 1); self.assertEqual(r["decision"], "Close")
 
 
+SHA = "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f"
+
+
+def _lab_case(*benign, entities=True):
+    """Two alerts on one host naming the same test file (zerosoc-skills#59): an antivirus prevention at
+    Low and a behavioural "human-operated activity" alert at High, whose evidence is the host and the file."""
+    ledger = {"alerts": [{"id": "AV", "type": "Malware / loader execution", "entity": "host-1", "confidence": "Low"},
+                         {"id": "HO", "type": "Potential human-operated malicious activity", "entity": "host-1",
+                          "confidence": "High"}],
+              "observations": [dict(b, side="Benign", event_refs=b.get("event_refs", ["EVT-1"])) for b in benign]}
+    if entities:
+        ledger["entities"] = [
+            {"type": "file", "name": "eicar-scenario.com", "sha256": SHA, "device": "host-1", "alert_ids": ["AV", "HO"]},
+            {"type": "device", "name": "host-1", "alert_ids": ["AV", "HO"]},
+            {"type": "process", "name": "powershell.exe", "device": "host-1", "alert_ids": ["HO"]},
+        ]
+    return ledger
+
+
+class CoverageReadOffTheEvidence(unittest.TestCase):
+    """A Benign observation about an entity covers every alert whose evidence cites it (#59)."""
+
+    def test_the_test_file_explains_both_alerts_that_name_it(self):
+        r = triage.decide(_lab_case({"id": "B1", "confidence": "High", "condition": "benign", "about": [SHA],
+                                     "covers": ["AV"]}))
+        self.assertEqual(r["decision"], "Close")
+        self.assertEqual([c["covering"] for c in r["coverage"]], [["B1"], ["B1"]])
+        self.assertEqual(r["verdict_id"], 5)
+
+    def test_an_entity_is_named_by_any_value_the_inventory_holds_for_it(self):
+        for about in ("eicar-scenario.com", "EICAR-SCENARIO.COM", f"sha256:{SHA}", SHA.upper()):
+            r = triage.decide(_lab_case({"id": "B1", "confidence": "High", "about": [about]}))
+            self.assertEqual(r["decision"], "Close", about)
+
+    def test_an_observation_about_nothing_covers_nothing(self):
+        """Before, a Benign observation with no covers counted for every alert: a Medium note about anything
+        on the host stood toward the High alert."""
+        r = triage.decide(_lab_case({"id": "B1", "confidence": "High", "condition": "benign"}))
+        self.assertEqual(r["decision"], "Promote")
+        self.assertEqual([c["covering"] for c in r["coverage"]], [[], []])
+
+    def test_an_entity_only_one_alert_cites_covers_only_that_alert(self):
+        r = triage.decide(_lab_case({"id": "B1", "confidence": "High", "about": ["powershell.exe"]}))
+        covered = {c["alert"]: c["covered"] for c in r["coverage"]}
+        self.assertEqual(covered, {"AV": False, "HO": True})
+
+    def test_an_alert_is_left_out_only_with_a_reason(self):
+        reasoned = triage.decide(_lab_case({"id": "B1", "confidence": "High", "about": [SHA],
+                                            "not_covering": [{"alert": "HO", "reason": "the alert rests on the"
+                                                              " process tree, not on the file"}]}))
+        self.assertEqual(reasoned["decision"], "Promote")
+        self.assertEqual([c["covering"] for c in reasoned["coverage"]], [["B1"], []])
+        unreasoned = triage.decide(_lab_case({"id": "B1", "confidence": "High", "about": [SHA],
+                                              "not_covering": [{"alert": "HO"}]}))
+        self.assertEqual(unreasoned["decision"], "Close", "an exclusion without a reason is not one")
+        self.assertIn("B1", unreasoned["coverage_note"])
+
+    def test_a_ledger_that_names_no_entities_is_read_as_before_and_says_so(self):
+        r = triage.decide(_lab_case({"id": "B1", "confidence": "High"}, entities=False))
+        self.assertEqual(r["decision"], "Close", "no covers still covers every alert there")
+        self.assertIn("entities", r["coverage_note"])
+
+
 class ResolutionRule(unittest.TestCase):
     def test_benign_proven_carries_the_verdict_of_the_named_condition(self):
         # §2.4 applies §1.5's rule to the same two verdicts

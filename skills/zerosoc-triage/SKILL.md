@@ -55,7 +55,8 @@ Read per alert: the playbook section the script prints.
    `python3 scripts/evidence_inventory.py evidence.json --source-count N`, where N is the number of
    distinct evidence items the source itself shows for the Case (its list of unique entities, not its
    rows per alert). The script removes duplicates, joins each row to
-   its device and prints the `evidence_inventory` object to record in the ledger. A mismatch is recorded and
+   its device and prints the `evidence_inventory` object to record in the ledger; with `--json` it also
+   lists the entities, each with the alerts that cite it, which go in the ledger as `entities`. A mismatch is recorded and
    visible in every later script output: extract the rest, or state in the Note why it cannot be. When
    the source shows no count, record it as unverified. When a tool rebuilt N from the same alerts' evidence
    because the source shows no count of its own, pass `--source-basis reproduction`: a match against it is
@@ -146,7 +147,11 @@ Read per alert: the playbook section the script prints.
    change in the Knowledge Base, an authorized test window covering the host and time, a known-benign
    recurrence with the same parameters. Check the playbook's **False Positive conditions** (the detection
    misfired) and **Benign conditions** (authorized activity that legitimately matches) and record which
-   one applies, because they lead to different verdicts. A prior Case's verdict is context, never a
+   one applies, because they lead to different verdicts. Name in `about` the entities of the inventory a
+   Benign observation rests on (the file by its hash or name, the device, the account): it covers every
+   alert whose evidence cites one of them, so a test file explains each alert that names it. Leave an alert
+   out only with `not_covering` and the reason the explanation does not reach it; an observation that names
+   no entity and no alert covers nothing. A prior Case's verdict is context, never a
    verdict: verify its reasoning applies to *this* Case. A campaign firing across many entities becomes one
    campaign-level Case with severity for the campaign scope.
 8. **Classify** (§1.4). Validate or override the source `severity_id` from asset criticality, identity

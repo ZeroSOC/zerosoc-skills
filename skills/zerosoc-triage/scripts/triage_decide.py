@@ -13,10 +13,14 @@ Ledger (JSON):
                                  asserts (§1.1), the remediation the source already performed, and the
                                  assertions it did not supply
   "observations": [{"id": "O1", "desc": "...", "side": "Malicious"|"Benign"|null, "confidence": "Low|Medium|High",
-                "covers": ["DF-1"], "condition": "false_positive"|"benign"|null, "artifact": "hash:...",
+                "about": ["<entity name or hash>"], "covers": ["DF-1"],
+                "not_covering": [{"alert": "DF-2", "reason": "..."}],
+                "condition": "false_positive"|"benign"|null, "artifact": "hash:...",
                 "retracted": false, "event_refs": ["<event id or link>"], "first_seen": "2026-09-14T14:55:41Z",
                 "timeline": false}],
   "evidence_inventory": {"extracted": 31, "source_count": 31, "source_count_basis": "source", "complete": true},
+  "entities": [{"type": "file", "name": "...", "sha256": "...", "alert_ids": ["DF-1"], ...}],
+                                 the inventory's entities, as scripts/evidence_inventory.py --json lists them
   "no_information_refs": ["<event id>"], "scoped_negative_refs": ["<event id>"],
   "visibility_gaps": [{"data_source": "...", "check_prevented": "..."}],
   "duplicate_of": null | "CASE-0"
@@ -46,7 +50,14 @@ condition belongs to (Playbook Architecture §4.1) — never a kind the executor
 Close carries is the rule's (§1.5): Benign (5) when the covering observation of the highest confidence names a
 Benign condition, False Positive (1) otherwise — both kinds at that confidence, or no condition named at all.
 --close-as is read only for a ledger whose observations carry no "condition" key, written before it existed.
-Observations with side null are context and do not score. A Benign observation with no "covers" covers every alert.
+Observations with side null are context and do not score.
+Which alerts a Benign observation covers is read off the evidence, not chosen (#59): "about" names the
+entities of "entities" it rests on, each by any value the inventory holds for it (its name, a hash, a sign-in
+name, case aside), and the observation covers every alert that cites one of them, together with any alert
+"covers" names. An alert it does not explain is left out only through "not_covering" with a reason; one
+without a reason is ignored and reported under "coverage_note". A Benign observation with neither "about" nor
+"covers" covers no alert. A ledger with no "entities" key, written before them, is read as it was — a Benign
+observation with no "covers" covers every alert — and "coverage_note" says so.
 Prints the decision, the coverage per alert, the confidence leaving triage and the verdict to record.
 """
 import json, os, sys
@@ -119,6 +130,43 @@ def close_verdict(covering):
 EMIT = {1: "tuning ticket to Phase 1", 5: "exception ticket: the Knowledge Base entry proposed for a person to confirm, unless the Knowledge Base already holds it"}
 
 
+NAMES = ("name", "value", "sha256", "sha1", "md5", "upn", "account", "address")
+"""The values an inventory entity can be named by in an observation's "about"."""
+
+
+def _named(value):
+    value = str(value or "").strip().lower()
+    return value.split(":", 1)[1] if value.startswith(("sha256:", "sha1:", "md5:")) else value
+
+
+def entity_alerts(ledger):
+    """Each value an entity of the inventory is named by -> the alerts whose evidence cites that entity."""
+    out = {}
+    for entity in ledger.get("entities") or []:
+        cited = {str(i) for i in entity.get("alert_ids") or []}
+        for field in NAMES:
+            if entity.get(field):
+                out.setdefault(_named(entity[field]), set()).update(cited)
+    return out
+
+
+def covered_by(b, ledger, cites, notes):
+    """The alerts a Benign observation covers (#59). None means every alert: a ledger written before
+    "entities", where an observation with no "covers" covered everything."""
+    if "entities" not in ledger and not b.get("covers") and not b.get("about"):
+        return None
+    alerts = {str(a) for a in b.get("covers") or []}
+    for value in b.get("about") or []:
+        alerts |= cites.get(_named(value), set())
+    for left in b.get("not_covering") or []:
+        alert = str(left.get("alert") if isinstance(left, dict) else left)
+        if isinstance(left, dict) and str(left.get("reason") or "").strip():
+            alerts.discard(alert)
+        else:
+            notes.append(f"{b['id']} leaves out {alert} without a reason, and still covers it")
+    return alerts
+
+
 def _decide(ledger):
     alerts = dedupe_alerts(ledger.get("alerts", []))
     active = [f for f in ledger.get("observations", []) if not f.get("retracted") and f.get("side") in ("Malicious", "Benign")]
@@ -128,9 +176,16 @@ def _decide(ledger):
     restated = [f for f in active if f["side"] == "Malicious" and f not in weightless and restates_alerts(f, ids, empty)]
     mal = [f for f in active if f["side"] == "Malicious" and f not in restated and f not in weightless]
     ben = [f for f in active if f["side"] == "Benign" and f not in weightless]
-    coverage = []
+    coverage, notes = [], []
+    cites = entity_alerts(ledger)
+    covers = {b["id"]: covered_by(b, ledger, cites, notes) for b in ben}
+    owners = alert_ids(ledger)
     for a in alerts:
-        covering = [b for b in ben if not b.get("covers") or a["id"] in b["covers"]]
+        # an alert stands for every ledger alert of its type on its entity, and for the ids merged into it
+        mine = {i for i, n in owners.items()
+                if (ledger["alerts"][n].get("type", "").strip().lower(), ledger["alerts"][n].get("entity", "").strip().lower())
+                == (a.get("type", "").strip().lower(), a.get("entity", "").strip().lower())}
+        covering = [b for b in ben if covers[b["id"]] is None or covers[b["id"]] & (mine or {a["id"]})]
         if a["confidence"] == "High":
             covered = any(b["confidence"] == "High" for b in covering)
             rule = "High alert: needs a Benign (High) observation"
@@ -147,6 +202,11 @@ def _decide(ledger):
               "benign_observations": [f["id"] for f in ben]}
     if empty_note:
         result["no_information_note"] = empty_note
+    if "entities" not in ledger and ben:
+        notes.append("the ledger names no entities: a Benign observation with no covers is read as covering"
+                     " every alert, as before #59")
+    if notes:
+        result["coverage_note"] = "; ".join(notes)
     if ledger.get("duplicate_of"):
         result.update(decision="Close", verdict_id=10, verdict="Duplicate", master_case_uid=ledger["duplicate_of"],
                       reminder="Duplicate only if all four §1.5 criteria were validated: matching core entities, overlapping timeline, active assignment, evidence merged.")
