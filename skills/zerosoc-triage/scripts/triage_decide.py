@@ -16,7 +16,8 @@ Ledger (JSON):
                 "covers": ["DF-1"], "condition": "false_positive"|"benign"|null, "artifact": "hash:...",
                 "retracted": false, "event_refs": ["<event id or link>"], "first_seen": "2026-09-14T14:55:41Z",
                 "timeline": false}],
-  "evidence_inventory": {"extracted": 31, "source_count": 31, "complete": true},
+  "evidence_inventory": {"extracted": 31, "source_count": 31, "source_count_basis": "source", "complete": true},
+  "no_information_refs": ["<event id>"], "scoped_negative_refs": ["<event id>"],
   "visibility_gaps": [{"data_source": "...", "check_prevented": "..."}],
   "duplicate_of": null | "CASE-0"
 }
@@ -31,9 +32,13 @@ of the ledger (its own id and the ids merged into it) says of that alert what it
 **restates** it (§1.5), is set aside however it is tagged, and is reported under "restated_alerts". One that
 cites a check's result, an item of the alert's own evidence it read further, or two or more alerts it
 relates, stands beyond the alerts. "no_information_refs" are the results that carried no information (a
-lookup that found nothing or was not answered): a Malicious observation is read without them, so one that
-rests on them and an alert restates the alert, and one that rests on them alone carries no weight and is
-reported under "no_information" (§2.4). "first_seen" is when the thing it reports
+lookup that knows nothing of the indicator, a search that finds no approval, a lookup not answered) and
+"scoped_negative_refs" the checks that covered the question and found nothing, which are cited like any
+other result (§2.4). An observation is read without the first kind, on either side: one that rests on them
+alone carries no weight, Benign or Malicious, covers nothing and is reported under "no_information", and a
+Malicious one that rests on them and an alert restates the alert. A reference is one kind or the other,
+never both. A ledger with no "scoped_negative_refs" key is read the same way, and "no_information_note" says
+so (scripts/no_information.py). "first_seen" is when the thing it reports
 happened (not when the observation was made) and "timeline" flags it for the Case Timeline: this rule reads
 neither, and note_elements.py and timeline.py read them from this same ledger.
 "condition" on a Benign observation is the kind of the playbook condition it named, read off the list the
@@ -47,6 +52,7 @@ Prints the decision, the coverage per alert, the confidence leaving triage and t
 import json, os, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import no_information  # copied next to this script by tools/build_references.py
 try:
     from evidence_inventory import note as inventory_note
 except ImportError:  # the shared script is copied next to this one by tools/build_references.py
@@ -90,15 +96,8 @@ def restates_alerts(f, ids, empty=frozenset()):
     asserted: the alert is weighed by the coverage rule and is not counted twice as evidence beyond itself.
     One that cites two alerts relates them, and one that cites an evidence item or a check's result read
     something the detection did not state — both stand beyond the alerts (§1.5)."""
-    refs = [str(r) for r in (f.get("event_refs") or []) if r and str(r) not in empty]
+    refs = no_information.informative(f, empty)
     return bool(refs) and all(r in ids for r in refs) and len({ids[r] for r in refs}) == 1
-
-
-def carries_nothing(f, empty):
-    """A Malicious observation that rests only on results that carried no information — a lookup that
-    found nothing or was not answered — is no evidence of malice (§2.4)."""
-    refs = [str(r) for r in (f.get("event_refs") or []) if r]
-    return bool(refs) and bool(empty) and all(r in empty for r in refs)
 
 
 def close_verdict(covering):
@@ -124,11 +123,11 @@ def _decide(ledger):
     alerts = dedupe_alerts(ledger.get("alerts", []))
     active = [f for f in ledger.get("observations", []) if not f.get("retracted") and f.get("side") in ("Malicious", "Benign")]
     ids = alert_ids(ledger)
-    empty = {str(e) for e in ledger.get("no_information_refs") or []}
-    weightless = [f for f in active if f["side"] == "Malicious" and carries_nothing(f, empty)]
+    empty, empty_note = no_information.refs(ledger)
+    weightless = [f for f in active if no_information.carries_nothing(f, empty)]
     restated = [f for f in active if f["side"] == "Malicious" and f not in weightless and restates_alerts(f, ids, empty)]
     mal = [f for f in active if f["side"] == "Malicious" and f not in restated and f not in weightless]
-    ben = [f for f in active if f["side"] == "Benign"]
+    ben = [f for f in active if f["side"] == "Benign" and f not in weightless]
     coverage = []
     for a in alerts:
         covering = [b for b in ben if not b.get("covers") or a["id"] in b["covers"]]
@@ -146,6 +145,8 @@ def _decide(ledger):
               "malicious_beyond_alerts": [f["id"] for f in mal], "restated_alerts": [f["id"] for f in restated],
               "no_information": [f["id"] for f in weightless],
               "benign_observations": [f["id"] for f in ben]}
+    if empty_note:
+        result["no_information_note"] = empty_note
     if ledger.get("duplicate_of"):
         result.update(decision="Close", verdict_id=10, verdict="Duplicate", master_case_uid=ledger["duplicate_of"],
                       reminder="Duplicate only if all four §1.5 criteria were validated: matching core entities, overlapping timeline, active assignment, evidence merged.")
@@ -217,7 +218,10 @@ def main():
     if not args:
         print(__doc__); sys.exit(2)
     ledger = json.load(open(args[0]))
-    r = decide(ledger)
+    try:
+        r = decide(ledger)
+    except ValueError as exc:
+        sys.exit(f"invalid ledger: {exc}")
     if "--close-as" in sys.argv and r["decision"] == "Close" and r.get("verdict_id") is None:
         # a ledger written before observations carried their condition: the caller says which kind
         kind = sys.argv[sys.argv.index("--close-as") + 1].lower()
@@ -235,7 +239,9 @@ def main():
     if r.get("reminder"): print(r["reminder"])
     if r.get("candidate_incident_categories"):
         print("Candidate Incident Categories from the techniques the detections named: " + ", ".join(r["candidate_incident_categories"]))
-    if r.get("evidence_inventory_note"): print("Note: " + r["evidence_inventory_note"])
+    if r.get("no_information"): print("Carry no information (not counted): " + ", ".join(r["no_information"]))
+    for key in ("evidence_inventory_note", "no_information_note"):
+        if r.get(key): print("Note: " + r[key])
     for note in r.get("detection_notes", []): print("Note: " + note)
 
 

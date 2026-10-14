@@ -674,7 +674,7 @@ class EvidenceInventory(unittest.TestCase):
 
     def test_completeness_is_recorded_not_assumed(self):
         inv_ = evidence.build(self.ROWS, alert_devices={"A1": "ws-04", "A2": "ws-04"})
-        self.assertEqual(evidence.completeness(inv_, 4), {"extracted": 4, "rows_read": 5, "source_count": 4, "complete": True})
+        self.assertEqual(evidence.completeness(inv_, 4), {"extracted": 4, "rows_read": 5, "source_count": 4, "source_count_basis": "source", "complete": True})
         self.assertFalse(evidence.completeness(inv_, 31)["complete"])
         self.assertIsNone(evidence.completeness(inv_, None)["complete"])
         self.assertIn("4 of 31", evidence.note(evidence.completeness(inv_, 31)))
@@ -1085,6 +1085,20 @@ class RunCheck(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("FAIL  triage: an assertion the source did not supply is a recorded gap", out)
 
+    def test_an_invalid_ledger_is_a_failed_check(self):
+        base = self.run_dir()
+        for name in ("ledger.triage.json", "ledger.investigation.json"):
+            with open(os.path.join(base, name), encoding="utf-8") as f:
+                ledger = json.load(f)
+            ledger.update(no_information_refs=["EVT-1"], scoped_negative_refs=["EVT-1"])
+            ledger["evidence_inventory"]["source_count_basis"] = "reproduced"
+            with open(os.path.join(base, name), "w", encoding="utf-8") as f:
+                json.dump(ledger, f)
+        code, out = self.check(base)
+        self.assertEqual(code, 1)
+        self.assertIn("invalid ledger: a reference is listed both", out)
+        self.assertIn("unknown source count basis", out)
+
     def test_an_inventory_the_evidence_does_not_support_fails(self):
         code, out = self.check(self.run_dir(evidence_inventory={"extracted": 31, "source_count": 31, "complete": True}))
         self.assertEqual(code, 1)
@@ -1171,7 +1185,8 @@ class BindingProfiles(unittest.TestCase):
         self.assertIn("alert evidence", g["EDR / endpoint process telemetry"]["reason"])
         self.assertEqual(g["Anti-virus / anti-malware"]["status"], "available")
 
-    def test_hunting_is_not_bound_and_the_case_store_is(self):
+    def test_open_search_is_not_bound_and_the_case_store_is(self):
+        # hunting answers the identity table at this licence, but none of the activity tables a search runs over
         self.assertIn("cases.store", self.profile["capabilities"])
         self.assertNotIn("siem.search", self.profile["capabilities"])
 
@@ -1344,10 +1359,11 @@ class NoInformationCarriesNoWeight(unittest.TestCase):
         r = inv.resolve({"alerts": self.ALERTS, "observations": self._obs(found), "no_information_refs": self.EMPTY})
         self.assertEqual(r["outcome"], "Malicious proven")
 
-    def test_a_benign_observation_on_an_empty_result_keeps_its_weight(self):
+    def test_a_benign_scoped_negative_keeps_its_weight(self):
         """A scoped negative (no child process on a covered host) is a real Benign observation."""
         scoped = {"id": "B1", "side": "Benign", "confidence": "Medium", "event_refs": ["EVT-c-002"]}
-        r = inv.resolve({"alerts": self.ALERTS, "observations": self._obs(scoped), "no_information_refs": self.EMPTY})
+        r = inv.resolve({"alerts": self.ALERTS, "observations": self._obs(scoped), "no_information_refs": [],
+                         "scoped_negative_refs": self.EMPTY})
         self.assertEqual(r["benign_score"], 2)
 
     def test_at_triage_it_does_not_stand_beyond_the_alerts(self):
@@ -1357,3 +1373,153 @@ class NoInformationCarriesNoWeight(unittest.TestCase):
                   "no_information_refs": self.EMPTY}
         r = triage.decide(ledger)
         self.assertEqual(r["decision"], "Close")
+
+
+class ScopedNegativesAndNoInformation(unittest.TestCase):
+    """Detection & Analysis §2.4: a result that yields no information carries neither side, and a scoped
+    negative is a real observation. A ledger lists the two apart, and both decision scripts give
+    "no_information_refs" no weight on either side. A ledger without "scoped_negative_refs" is read the same
+    way, which can only cost a Benign observation its weight, and a note says so."""
+
+    ALERTS = [{"id": "x1", "confidence": "Medium"}, {"id": "x2", "confidence": "Medium"}]
+    NOTHING = ["EVT-ti-001"]   # a reputation lookup that knows nothing of the hash
+    SCOPED = ["EVT-q-002"]     # no child process on the covered host in the window
+
+    def ledger(self, *observations, scoped=True):
+        out = {"alerts": self.ALERTS, "observations": list(observations), "no_information_refs": self.NOTHING}
+        if scoped:
+            out["scoped_negative_refs"] = self.SCOPED
+        return out
+
+    def test_a_benign_observation_on_nothing_but_no_information_carries_no_weight(self):
+        b = {"id": "O3", "side": "Benign", "confidence": "Medium", "event_refs": self.NOTHING}
+        r = inv.resolve(self.ledger(b))
+        self.assertEqual(r["benign_score"], 0)
+        self.assertEqual(r["no_information"], ["O3"])
+        self.assertNotIn("no_information_note", r)
+
+    def test_a_benign_scoped_negative_keeps_its_weight(self):
+        b = {"id": "O3", "side": "Benign", "confidence": "Medium", "event_refs": self.SCOPED}
+        self.assertEqual(inv.resolve(self.ledger(b))["benign_score"], 2)
+
+    def test_a_malicious_observation_on_a_scoped_negative_stands_beyond_the_alerts(self):
+        m = [{"id": "O1", "side": "Malicious", "confidence": "Medium", "event_refs": ["x1"]},
+             {"id": "O2", "side": "Malicious", "confidence": "Low", "event_refs": ["x2", *self.SCOPED]}]
+        self.assertEqual(inv.resolve(self.ledger(*m))["outcome"], "Malicious proven")
+
+    def test_a_ledger_without_the_key_is_read_the_same_way_and_says_so(self):
+        b = {"id": "O3", "side": "Benign", "confidence": "Medium", "event_refs": self.NOTHING}
+        r = inv.resolve(self.ledger(b, scoped=False))
+        self.assertEqual(r["benign_score"], 0)
+        self.assertIn("scoped_negative_refs", r["no_information_note"])
+
+    def test_no_information_is_set_aside_before_counting_once(self):
+        """A weightless observation on the same artifact can neither stand in for a real one nor lend it weight."""
+        weightless = {"id": "B1", "side": "Benign", "confidence": "High", "artifact": "hash:ab", "event_refs": self.NOTHING}
+        real = {"id": "B2", "side": "Benign", "confidence": "Low", "artifact": "hash:ab", "event_refs": ["EVT-q-009"]}
+        for order in ((weightless, real), (real, weightless)):
+            r = inv.resolve(self.ledger(*order))
+            self.assertEqual((r["benign_score"], r["benign_observations"], r["no_information"]), (1, ["B2"], ["B1"]))
+
+    def test_an_empty_reference_reads_the_same_at_both_gates(self):
+        b = {"id": "O3", "side": "Benign", "confidence": "Medium", "event_refs": ["", None, *self.NOTHING], "covers": ["x1"],
+             "condition": "false_positive"}
+        self.assertEqual(inv.resolve(self.ledger(b))["no_information"], ["O3"])
+        tri = triage.decide(dict(self.ledger(b), alerts=[{"id": "x1", "type": "t", "entity": "e", "confidence": "Low"}]))
+        self.assertEqual(tri["no_information"], ["O3"])
+
+    def test_a_benign_observation_reading_the_alerts_own_evidence_keeps_its_weight(self):
+        """The restatement rule is the Malicious side's (§1.5): a Benign reading of what the alert cites,
+        a signed binary for instance, is an observation, whatever lookup sits beside it."""
+        b = {"id": "O3", "side": "Benign", "confidence": "Medium", "event_refs": ["x1", *self.NOTHING]}
+        self.assertEqual(inv.resolve(self.ledger(b))["benign_score"], 2)
+
+    def test_one_reference_cannot_be_both(self):
+        b = {"id": "O3", "side": "Benign", "confidence": "Medium", "event_refs": self.NOTHING}
+        ledger = self.ledger(b)
+        ledger["scoped_negative_refs"] = self.NOTHING
+        with self.assertRaises(ValueError):
+            inv.resolve(ledger)
+        with self.assertRaises(ValueError):
+            triage.decide(dict(ledger, alerts=[{"id": "x1", "type": "t", "entity": "e", "confidence": "Low"}]))
+
+    def test_at_triage_a_lookup_that_knows_nothing_cannot_close(self):
+        """An answered reputation lookup with no record, tagged Benign: under the old reading it closed."""
+        ledger = {"alerts": [{"id": "x1", "type": "Suspicious script / interpreter execution", "entity": "h", "confidence": "Low"}],
+                  "observations": [{"id": "O2", "side": "Benign", "confidence": "Medium", "event_refs": self.NOTHING,
+                                    "covers": ["x1"], "condition": "false_positive"}],
+                  "no_information_refs": self.NOTHING, "scoped_negative_refs": []}
+        r = triage.decide(ledger)
+        self.assertEqual(r["decision"], "Promote")
+        self.assertEqual(r["no_information"], ["O2"])
+        del ledger["scoped_negative_refs"]
+        old = triage.decide(ledger)
+        self.assertEqual(old["decision"], "Promote")
+        self.assertIn("scoped_negative_refs", old["no_information_note"])
+
+    def test_at_triage_a_scoped_negative_still_covers(self):
+        ledger = {"alerts": [{"id": "x1", "type": "Suspicious script / interpreter execution", "entity": "h", "confidence": "Low"}],
+                  "observations": [{"id": "O2", "side": "Benign", "confidence": "Medium", "event_refs": self.SCOPED,
+                                    "covers": ["x1"], "condition": "false_positive"}],
+                  "no_information_refs": self.NOTHING, "scoped_negative_refs": self.SCOPED}
+        self.assertEqual(triage.decide(ledger)["decision"], "Close")
+
+
+class ResolutionReportsWhatItCounted(unittest.TestCase):
+    """A Note's Rationale quotes the rule's own count: the observations standing on each side, and how
+    many they count as once one alert type on one entity and one artifact count once, and once the
+    observations that carry no information are set aside."""
+
+    def test_the_counts_follow_the_rule(self):
+        ledger = {"observations": [
+            {"id": "O1", "side": "Malicious", "confidence": "Medium", "alert_type": "Credential dumping", "entity": "h"},
+            {"id": "O2", "side": "Malicious", "confidence": "High", "alert_type": "credential dumping", "entity": "H"},
+            {"id": "O3", "side": "Malicious", "confidence": "Low", "event_refs": ["EVT-ti-001"]},
+            {"id": "O4", "side": "Benign", "confidence": "Medium", "artifact": "hash:ab"},
+            {"id": "O5", "side": "Benign", "confidence": "Low", "artifact": "hash:ab"},
+            {"id": "O6", "side": "Benign", "confidence": "Low", "retracted": True},
+            {"id": "O7", "side": None}],
+            "no_information_refs": ["EVT-ti-001"], "scoped_negative_refs": []}
+        r = inv.resolve(ledger)
+        self.assertEqual(r["counted"], {"Malicious": {"standing": ["O1", "O2", "O3"], "counted": ["O1"]},
+                                        "Benign": {"standing": ["O4", "O5"], "counted": ["O4"]}})
+        self.assertEqual(r["malicious_score"], 3)
+
+
+class InventoryBasis(unittest.TestCase):
+    """A count reproduced from the same evidence by the same identity rule always matches the extraction,
+    so a complete inventory reads as verified only when the source supplied the count itself."""
+
+    ROWS = EvidenceInventory.ROWS
+
+    def built(self):
+        return evidence.build(self.ROWS, alert_devices={"A1": "ws-04", "A2": "ws-04"})
+
+    def test_the_basis_is_recorded(self):
+        self.assertEqual(evidence.completeness(self.built(), 4)["source_count_basis"], "source")
+        record = evidence.completeness(self.built(), 4, basis="reproduction")
+        self.assertEqual(record["source_count_basis"], "reproduction")
+        self.assertTrue(record["complete"])
+        self.assertIsNone(evidence.completeness(self.built(), None)["source_count_basis"])
+
+    def test_a_reproduced_count_that_matches_is_unverified(self):
+        note = evidence.note(evidence.completeness(self.built(), 4, basis="reproduction"))
+        self.assertIn("unverified", note)
+        self.assertIsNone(evidence.note(evidence.completeness(self.built(), 4)))
+
+    def test_a_reproduced_count_that_disagrees_is_still_reported(self):
+        note = evidence.note(evidence.completeness(self.built(), 6, basis="reproduction"))
+        self.assertIn("4 of 6", note)
+        self.assertIn("reproduced", note)
+
+    def test_the_decisions_carry_it(self):
+        ledger = {"alerts": [{"id": "A", "type": "x", "entity": "e", "confidence": "High"}], "observations": [],
+                  "evidence_inventory": {"extracted": 4, "source_count": 4, "source_count_basis": "reproduction", "complete": True}}
+        self.assertIn("unverified", triage.decide(ledger)["evidence_inventory_note"])
+        self.assertIn("unverified", inv.resolve({"observations": [], "evidence_inventory": ledger["evidence_inventory"]})["evidence_inventory_note"])
+
+    def test_an_unknown_basis_is_refused(self):
+        with self.assertRaises(ValueError):
+            evidence.completeness(self.built(), 4, basis="guess")
+        note = evidence.note({"extracted": 4, "source_count": 4, "source_count_basis": "reproduced", "complete": True})
+        self.assertIn("unverified", note)

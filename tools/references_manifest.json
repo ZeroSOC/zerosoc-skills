@@ -29,7 +29,8 @@
         "evidence_inventory.py",
         "process_chain.py",
         "note_elements.py",
-        "timeline.py"
+        "timeline.py",
+        "no_information.py"
       ]
     },
     "zerosoc-investigation": {
@@ -52,7 +53,8 @@
         "evidence_inventory.py",
         "process_chain.py",
         "note_elements.py",
-        "timeline.py"
+        "timeline.py",
+        "no_information.py"
       ]
     },
     "zerosoc-response": {

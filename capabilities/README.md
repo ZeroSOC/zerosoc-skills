@@ -11,9 +11,16 @@ a starting point is [zerosoc.capabilities.example.json](zerosoc.capabilities.exa
 Two bindings ship as starting points: the generic example above, and
 [zerosoc.capabilities.defender-for-business.json](zerosoc.capabilities.defender-for-business.json), the
 reference shape of a licensing-limited deployment (alert evidence but no raw endpoint telemetry, no
-query language). It answers `true` or `false` for every data source the playbooks name, so
-`select_playbook.py` reports real visibility gaps, each with its reason, instead of `unbound`. A
+query language over endpoint activity). It answers `true` or `false` for every data source the playbooks
+name, so `select_playbook.py` reports real visibility gaps, each with its reason, instead of `unbound`. A
 capability probe run against the tenant supersedes it.
+
+A reference binding describes a server that keeps moving, so it says what it was derived from. Its
+`reference` names the server's capabilities manifest at a release tag and lists, under `provides`, every
+requirement the deployment meets in the manifest's own terms. `tools/check_binding.py` derives from those
+two what the server's capability probe would bind, by the probe's own rules, and fails on any class or
+data source that differs; CI runs it. When a new server release changes the manifest, move the tag, run
+the check, and update the binding until it passes.
 
 The binding file has two maps:
 

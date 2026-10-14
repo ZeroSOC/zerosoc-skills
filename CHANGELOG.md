@@ -2,6 +2,33 @@
 
 ## Unreleased
 
+- **A result that carried no information weighs nothing on either side.** Detection & Analysis §2.4
+  says a result that yields no information carries neither side, and that a scoped negative is a real
+  observation. The ledger's `no_information_refs` held both kinds, so the Benign side had to read them
+  as cited, and at triage an answered lookup that knew nothing of an indicator could close a Case. A
+  ledger now lists the checks that covered the question and found nothing under
+  `scoped_negative_refs`, and `triage_decide.py` and `resolve.py` give `no_information_refs` no weight
+  on either side: an observation resting on them alone is reported under `no_information`, covers
+  nothing, and is set aside before one artifact counts once, so it cannot stand in for a real
+  observation or lend it weight. A ledger without the new key is read the same way, which can only
+  cost a Benign observation its weight, and `no_information_note` says so. A reference listed under
+  both is an invalid ledger. The rule is one shared script, `no_information.py`, copied into both
+  skills, and both skills say what goes in each list (#57).
+- **`resolve.py` reports what it counted.** `counted` lists, per side, the observations standing and
+  those the score counts under the rule, so a Note's Rationale quotes the script instead of
+  recounting (#57).
+- **The evidence inventory says where its source count came from.** `--source-basis reproduction`
+  records a count a tool rebuilt from the same evidence. Built with the same identity rule, it always
+  matches the extraction, so a match against it is recorded as unverified and the Note says "31
+  entities extracted, unverified"; a mismatch is still reported. The record carries
+  `source_count_basis`; a record without it counts as the source's own, and one with a basis the
+  script does not know is unverified (#57).
+- **The Defender for Business binding matches the server it describes.** It had drifted from the MCP
+  server's capabilities manifest: hunting answers the identity table, endpoint telemetry is the
+  incident's evidence, and sign-ins, directory audit and hash reputation are available. The binding
+  now names the manifest at the commit of a release and the requirements the tenant meets (`reference`), and
+  `tools/check_binding.py`, run in CI, derives what the server's probe would bind and fails on any
+  difference (#57).
 - **The provider's own job, in plain terms.** The pin follows the framework to `ffd559a`
   (ZeroSOC/zerosoc-framework#97): the False Positive condition for the cloud provider's own
   provisioning or maintenance says the source's records establish it, never the actor's name alone,

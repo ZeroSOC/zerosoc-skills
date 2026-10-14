@@ -57,7 +57,11 @@ Read per alert: the playbook section the script prints.
    rows per alert). The script removes duplicates, joins each row to
    its device and prints the `evidence_inventory` object to record in the ledger. A mismatch is recorded and
    visible in every later script output: extract the rest, or state in the Note why it cannot be. When
-   the source shows no count, record it as unverified. The Note's Summary states the figures ("31 of 31 entities extracted").
+   the source shows no count, record it as unverified. When a tool rebuilt N from the same alerts' evidence
+   because the source shows no count of its own, pass `--source-basis reproduction`: a match against it is
+   recorded as unverified, because a count made from the same rows cannot show a missing one. The Note's
+   Summary states the figures, as verified only against the source's own count ("31 of 31 entities
+   extracted"; otherwise "31 entities extracted, unverified").
    When the inventory holds processes, run `python3 scripts/process_chain.py evidence.json --alerts alerts.json`
    for the parent/child lineage the [Artifact enrichment](references/framework/04-Playbooks/99-Shared/sub_enrichment_artifact.md)
    produces: one chain per alert, each process under its ancestors, as an alert story is read (`--case` joins
@@ -134,6 +138,10 @@ Read per alert: the playbook section the script prints.
 7. **Tag every result** as the playbook prescribes: `Malicious` or `Benign` at Low, Medium or High
    (Definitions §7: High establishes the side alone, Medium is a strong signal needing a second, Low is
    consistent but common in normal operation). A result that bears on neither side is context, untagged.
+   List in the ledger each result that carried no information (a lookup that knows nothing of the
+   indicator, a search that finds no approval, a lookup not answered) under `no_information_refs`, and each
+   check that covered the question and found nothing under `scoped_negative_refs`: the decision script gives
+   the first no weight on either side, whatever was tagged on it, and reads the second like any result (§2.4).
    A `Benign (High)` observation is one that **explains** an alert: an approved exception or documented
    change in the Knowledge Base, an authorized test window covering the host and time, a known-benign
    recurrence with the same parameters. Check the playbook's **False Positive conditions** (the detection

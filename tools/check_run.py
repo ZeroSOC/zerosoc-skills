@@ -113,15 +113,21 @@ def check_inventory(report, run, ledger, label):
     report.check(built["count"] == recorded.get("extracted"), f"{label}: extracted count matches the evidence",
                  f"{built['count']} entities from {len(rows)} rows", f"extracted={recorded.get('extracted')}")
     source_count = recorded.get("source_count")
+    basis = recorded.get("source_count_basis") or "source"
     if source_count is None:
         report.skip(f"{label}: completeness verified", "source_count not recorded (the source showed no count)")
     else:
-        fresh = evidence_inventory.completeness(built, source_count)
+        try:
+            fresh = evidence_inventory.completeness(built, source_count, basis)
+        except ValueError as exc:
+            return report.fail(f"{label}: completeness as recomputed", "a known source_count_basis", str(exc))
         report.check(fresh["complete"] == recorded.get("complete"), f"{label}: completeness as recomputed",
-                     f"complete={fresh['complete']} against the source's {source_count}",
+                     f"complete={fresh['complete']} against the {basis} count {source_count}",
                      f"complete={recorded.get('complete')}")
         if fresh["complete"] is False:
             report.ok(f"{label}: incompleteness is visible", evidence_inventory.note(fresh))
+        elif basis == "reproduction":
+            report.skip(f"{label}: completeness verified", "the count was reproduced from the same evidence")
 
 
 def override_of(run, profile_path):
@@ -331,7 +337,10 @@ def check_timebox(report, ledger):
     if not ledger.get("started_at"):
         return report.fail("timebox: measured, not declared", "started_at in the ledger",
                            "absent: the script falls back to the self-reported timebox_expired")
-    result = resolve_rule.resolve(ledger)
+    try:
+        result = resolve_rule.resolve(ledger)
+    except ValueError as exc:
+        return report.fail("timebox: measured, not declared", "a ledger resolve.py can read", f"invalid ledger: {exc}")
     box = result.get("timebox", {})
     report.check(box.get("source") != "self-reported", "timebox: measured from the ledger's timestamps",
                  "source measured from started_at", f"source={box.get('source')}")
@@ -347,7 +356,10 @@ def check_decision(report, ledger, result, label, decide):
     """The verdict the run recorded is the one the rule produces from the ledger it recorded."""
     if not ledger:
         return report.skip(f"{label}: verdict reproduced from the ledger", "no ledger in the run")
-    fresh = result if result is not None else decide(ledger)
+    try:
+        fresh = result if result is not None else decide(ledger)
+    except ValueError as exc:
+        return report.fail(f"{label}: verdict reproduced from the ledger", "a ledger the rule can read", f"invalid ledger: {exc}")
     recorded = ledger.get("recorded_verdict")
     printed = fresh.get("verdict") or fresh.get("decision")
     if recorded is None:

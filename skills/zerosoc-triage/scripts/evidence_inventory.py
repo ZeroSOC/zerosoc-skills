@@ -1,13 +1,20 @@
 #!/usr/bin/env python3
 """Build the evidence inventory of a Case and record its completeness. Standard library only.
 
-  evidence_inventory.py evidence.json [--source-count N] [--alert-devices devices.json] [--json]
+  evidence_inventory.py evidence.json [--source-count N [--source-basis source|reproduction]]
+                        [--alert-devices devices.json] [--json]
 
 Extraction is a step, not a side effect of reading: before the ledger is started, every entity the
 source attaches to the Case's alerts is listed once, joined to its device, with the alerts that cite it,
 and the number of distinct entities is compared with the number the source itself shows (N: its list of
 unique evidence items, not the per-alert rows). A mismatch is printed and recorded, so a ledger is never
 silently built from part of the evidence.
+
+The comparison is only as good as N. --source-basis says where it came from: "source" (the default) when
+the source itself showed it, "reproduction" when a tool rebuilt it from the same alerts' evidence, as a
+client library can to stand in for a figure the source shows only in its console. A reproduction made with
+the same identity rule always matches, so a match against one is recorded as unverified: it cannot show an
+entity the extraction missed. A mismatch against one is still a fault, and is reported.
 
 evidence.json: a list of rows {"type": "process|file|device|user|ip|url|registry|mailbox|...", "name"|"value",
 "device"?, "alert_ids": [...], ...any attributes (pid, created, sha256, path, command_line, verdict)}.
@@ -79,23 +86,42 @@ def build(rows, alert_devices=None):
     return {"count": len(entities), "rows": len(rows), "entities": entities}
 
 
-def completeness(inventory, source_count):
-    """The object to record in the ledger: extracted vs what the source shows."""
+BASES = ("source", "reproduction")
+
+
+def completeness(inventory, source_count, basis="source"):
+    """The object to record in the ledger: extracted vs the count compared with, and where that came from."""
+    if basis not in BASES:
+        raise ValueError(f"unknown source count basis {basis!r}: one of {', '.join(BASES)}")
     complete = None if source_count is None else inventory["count"] == source_count
-    return {"extracted": inventory["count"], "rows_read": inventory.get("rows"), "source_count": source_count, "complete": complete}
+    return {"extracted": inventory["count"], "rows_read": inventory.get("rows"), "source_count": source_count,
+            "source_count_basis": None if source_count is None else basis, "complete": complete}
 
 
 def note(record):
-    """One line for a decision script to print, or None when the inventory is complete."""
+    """One line for a decision script to print, or None when the inventory is complete and verified.
+
+    A record written before the basis existed counts as "source", which is what its source_count meant."""
     if not record:
         return "evidence inventory not recorded: run scripts/evidence_inventory.py before starting the ledger"
+    extracted, shown = record.get("extracted"), record.get("source_count")
     if record.get("complete") is None:
-        return f"evidence inventory unverified: {record.get('extracted')} entities extracted, the source count was not recorded"
+        return f"evidence inventory unverified: {extracted} entities extracted, the source count was not recorded"
+    basis = record.get("source_count_basis")
+    if basis not in (None, *BASES):
+        return f"evidence inventory unverified: {extracted} entities extracted, against a count of unknown basis {basis!r}"
+    reproduced = basis == "reproduction"
     if not record.get("complete"):
-        extracted, shown = record.get("extracted"), record.get("source_count")
+        against = "a count reproduced from the same evidence holds" if reproduced else "the source shows"
         if isinstance(extracted, int) and isinstance(shown, int) and extracted > shown:
-            return f"evidence inventory mismatch: {extracted} entities extracted, the source shows {shown}; check for entities listed twice under different names"
-        return f"evidence inventory incomplete: {extracted} of {shown} entities extracted; extract the rest before deciding"
+            return f"evidence inventory mismatch: {extracted} entities extracted, {against} {shown}; check for entities listed twice under different names"
+        return (f"evidence inventory incomplete: {extracted} of {shown} entities extracted"
+                + (" (the count was reproduced from the same evidence)" if reproduced else "")
+                + "; extract the rest before deciding")
+    if reproduced:
+        return (f"evidence inventory unverified: {extracted} entities extracted, matching a count reproduced from"
+                " the same evidence, which cannot show an entity the extraction missed; the source's own count"
+                " was not available")
     return None
 
 
@@ -103,12 +129,14 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("evidence")
     ap.add_argument("--source-count", type=int)
+    ap.add_argument("--source-basis", choices=BASES, default="source",
+                    help="where --source-count came from: the source itself, or a reproduction from the same evidence")
     ap.add_argument("--alert-devices")
     ap.add_argument("--json", action="store_true")
     a = ap.parse_args()
     devices = json.load(open(a.alert_devices, encoding="utf-8")) if a.alert_devices else None
     inventory = build(json.load(open(a.evidence, encoding="utf-8")), devices)
-    record = completeness(inventory, a.source_count)
+    record = completeness(inventory, a.source_count, a.source_basis)
     if a.json:
         print(json.dumps({"evidence_inventory": record, **inventory}, indent=2, ensure_ascii=False))
     else:
