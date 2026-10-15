@@ -673,6 +673,13 @@ class DetectionMetadata(unittest.TestCase):
         self.assertEqual([sorted(r) for r in a["recommended_actions"]], [["action", "id"], ["action", "id"]])
         self.assertFalse(hasattr(metadata, "dispositions"))
 
+    def test_the_case_wide_list_names_the_alert_of_each_action(self):
+        """Ids are numbered per alert: RA1 of A1 and RA1 of A2 are two actions, told apart by alert."""
+        built = metadata.build([self.ALERT, dict(self.ALERT, id="A2")], self.spec, index=self.index)
+        cited = [(a["alert"], a["id"]) for a in built["recommended_actions"]]
+        self.assertEqual(cited, [("A1", "RA1"), ("A1", "RA2"), ("A2", "RA1"), ("A2", "RA2")])
+        self.assertEqual(len(set(cited)), len(cited))
+
     def test_an_assertion_the_source_does_not_supply_is_named_not_assumed(self):
         bare = self.one({"id": "A2", "title": "Suspicious activity"})
         self.assertEqual(bare["techniques"], [])

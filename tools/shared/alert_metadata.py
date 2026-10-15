@@ -103,8 +103,13 @@ def _actions(value):
 
 
 def actions_of(record):
-    """Every recommended action the Case's detections published, across its alerts."""
-    return [a for alert in (record or {}).get("alerts", []) for a in alert.get("recommended_actions", [])]
+    """Every recommended action the Case's detections published, across its alerts.
+
+    An action's id is numbered per alert, so RA1 of one alert is another action than RA1 of the
+    next: each entry names its alert, and the pair is what cites it in the Case-wide list.
+    """
+    return [dict(a, alert=alert.get("id")) for alert in (record or {}).get("alerts", [])
+            for a in alert.get("recommended_actions", [])]
 
 
 def neutralized(record):
