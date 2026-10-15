@@ -13,10 +13,14 @@ Ledger (JSON):
                                  asserts (§1.1), the remediation the source already performed, and the
                                  assertions it did not supply
   "observations": [{"id": "O1", "desc": "...", "side": "Malicious"|"Benign"|null, "confidence": "Low|Medium|High",
-                "covers": ["DF-1"], "condition": "false_positive"|"benign"|null, "artifact": "hash:...",
+                "about": ["<entity name or hash>"], "covers": ["DF-1"],
+                "not_covering": [{"alert": "DF-2", "reason": "..."}],
+                "condition": "false_positive"|"benign"|null, "artifact": "hash:...",
                 "retracted": false, "event_refs": ["<event id or link>"], "first_seen": "2026-09-14T14:55:41Z",
                 "timeline": false}],
   "evidence_inventory": {"extracted": 31, "source_count": 31, "source_count_basis": "source", "complete": true},
+  "entities": [{"type": "file", "name": "...", "sha256": "...", "alert_ids": ["DF-1"], ...}],
+                                 the inventory's entities, as scripts/evidence_inventory.py --json lists them
   "no_information_refs": ["<event id>"], "scoped_negative_refs": ["<event id>"],
   "visibility_gaps": [{"data_source": "...", "check_prevented": "..."}],
   "duplicate_of": null | "CASE-0"
@@ -46,7 +50,13 @@ condition belongs to (Playbook Architecture §4.1) — never a kind the executor
 Close carries is the rule's (§1.5): Benign (5) when the covering observation of the highest confidence names a
 Benign condition, False Positive (1) otherwise — both kinds at that confidence, or no condition named at all.
 --close-as is read only for a ledger whose observations carry no "condition" key, written before it existed.
-Observations with side null are context and do not score. A Benign observation with no "covers" covers every alert.
+Observations with side null are context and do not score.
+Which alerts a Benign observation covers is read off the evidence, not chosen: "about" (and "artifact") name
+the entities of "entities" it rests on, by any value the inventory holds for them (a name, a hash, a sign-in
+name; case and a type prefix such as "sha256:" aside), and it covers every alert citing one of them, besides
+any alert "covers" names. An alert it does not explain is left out only through "not_covering" with a reason.
+An observation naming neither entity nor alert covers none. A ledger with no "entities", written before them,
+reads one naming no alert as covering every alert. "coverage_note" reports each of these readings.
 Prints the decision, the coverage per alert, the confidence leaving triage and the verdict to record.
 """
 import json, os, sys
@@ -71,10 +81,15 @@ def alert_confidence(a):
     return a.get("confidence") or SEV2CONF.get(a.get("severity", "Medium"), "Medium")
 
 
+def _key(a):
+    """Same type on the same entity is one alert to the rule (§1.5)."""
+    return (a.get("type", "").strip().lower(), a.get("entity", "").strip().lower())
+
+
 def dedupe_alerts(alerts):
     best = {}
     for a in alerts:
-        key = (a.get("type", "").strip().lower(), a.get("entity", "").strip().lower())
+        key = _key(a)
         c = alert_confidence(a)
         if key not in best or W[c] > W[alert_confidence(best[key])]:
             best[key] = dict(a, confidence=c)
@@ -119,6 +134,66 @@ def close_verdict(covering):
 EMIT = {1: "tuning ticket to Phase 1", 5: "exception ticket: the Knowledge Base entry proposed for a person to confirm, unless the Knowledge Base already holds it"}
 
 
+NAMES = ("name", "value", "sha256", "sha1", "md5", "upn", "account", "address")
+"""The values an inventory entity can be named by in an observation's "about"."""
+
+PREFIXES = ("sha256:", "sha1:", "md5:", "hash:", "file:", "process:", "device:", "host:", "user:", "account:",
+            "upn:", "ip:", "url:", "mailbox:")
+"""Type prefixes an executor may write before a value; the value is what names the entity."""
+
+
+def _named(value):
+    value = "" if value is None else str(value).strip().lower()
+    prefix = next((p for p in PREFIXES if value.startswith(p)), "")
+    return value[len(prefix):].strip()
+
+
+def alerts_citing(ledger):
+    """Each value an entity of the inventory is named by -> the alerts whose evidence cites that entity."""
+    out = {}
+    for entity in ledger.get("entities") or []:
+        cited = {str(i) for i in entity.get("alert_ids") or []}
+        for field in NAMES:
+            if entity.get(field) not in (None, ""):
+                out.setdefault(_named(entity[field]), set()).update(cited)
+    return out
+
+
+def alert_groups(ledger):
+    """Each alert id of the ledger -> every id that counts as the same alert: the alerts of one type on one
+    entity, which the rule counts once, and the ids merged into them."""
+    by_key = {}
+    for a in ledger.get("alerts", []):
+        by_key.setdefault(_key(a), set()).update(str(i) for i in [a.get("id"), *(a.get("merged_ids") or [])] if i)
+    return {i: ids for ids in by_key.values() for i in ids}
+
+
+def covered_alerts(b, ledger, citing, groups, notes):
+    """The alert ids a Benign observation covers, and the ones it leaves out with a reason. The first is
+    None, meaning every alert, only for a ledger written before "entities", where an observation that
+    named no alert covered them all."""
+    named = {str(a) for a in b.get("covers") or []}
+    for value in b.get("about") or []:
+        found = citing.get(_named(value))
+        if found is None:
+            notes.append(f"{b['id']}: '{value}' names no entity of the evidence inventory")
+        named |= found or set()
+    if b.get("artifact"):  # what it counts once by is what it rests on, where the inventory names it
+        named |= citing.get(_named(b["artifact"]), set())
+    excluded = set()
+    for exclusion in b.get("not_covering") or []:
+        alert = exclusion.get("alert") if isinstance(exclusion, dict) else exclusion
+        reason = exclusion.get("reason") if isinstance(exclusion, dict) else None
+        if not alert:
+            notes.append(f"{b['id']}: an exclusion names no alert, and is ignored")
+        elif not str(reason or "").strip():
+            notes.append(f"{b['id']} leaves out {alert} without a reason, and the exclusion is ignored")
+        else:
+            excluded |= groups.get(str(alert), {str(alert)})
+    legacy = "entities" not in ledger and not b.get("covers") and not b.get("about")
+    return (None if legacy else named - excluded), excluded
+
+
 def _decide(ledger):
     alerts = dedupe_alerts(ledger.get("alerts", []))
     active = [f for f in ledger.get("observations", []) if not f.get("retracted") and f.get("side") in ("Malicious", "Benign")]
@@ -128,9 +203,17 @@ def _decide(ledger):
     restated = [f for f in active if f["side"] == "Malicious" and f not in weightless and restates_alerts(f, ids, empty)]
     mal = [f for f in active if f["side"] == "Malicious" and f not in restated and f not in weightless]
     ben = [f for f in active if f["side"] == "Benign" and f not in weightless]
-    coverage = []
+    coverage, notes = [], []
+    citing, groups = alerts_citing(ledger), alert_groups(ledger)
+    reach = {b["id"]: covered_alerts(b, ledger, citing, groups, notes) for b in ben}
+
+    def explains(b, same):
+        covered, excluded = reach[b["id"]]
+        return not (same & excluded) if covered is None else bool(same & covered)
+
     for a in alerts:
-        covering = [b for b in ben if not b.get("covers") or a["id"] in b["covers"]]
+        same = groups.get(str(a["id"]), {str(a["id"])})
+        covering = [b for b in ben if explains(b, same)]
         if a["confidence"] == "High":
             covered = any(b["confidence"] == "High" for b in covering)
             rule = "High alert: needs a Benign (High) observation"
@@ -147,6 +230,11 @@ def _decide(ledger):
               "benign_observations": [f["id"] for f in ben]}
     if empty_note:
         result["no_information_note"] = empty_note
+    if any(reach[b["id"]][0] is None for b in ben):
+        notes.append("the ledger names no entities: a Benign observation that names no alert is read as covering"
+                     " every alert, as ledgers written before them were")
+    if notes:
+        result["coverage_note"] = "; ".join(notes)
     if ledger.get("duplicate_of"):
         result.update(decision="Close", verdict_id=10, verdict="Duplicate", master_case_uid=ledger["duplicate_of"],
                       reminder="Duplicate only if all four §1.5 criteria were validated: matching core entities, overlapping timeline, active assignment, evidence merged.")
@@ -240,7 +328,7 @@ def main():
     if r.get("candidate_incident_categories"):
         print("Candidate Incident Categories from the techniques the detections named: " + ", ".join(r["candidate_incident_categories"]))
     if r.get("no_information"): print("Carry no information (not counted): " + ", ".join(r["no_information"]))
-    for key in ("evidence_inventory_note", "no_information_note"):
+    for key in ("evidence_inventory_note", "no_information_note", "coverage_note"):
         if r.get(key): print("Note: " + r[key])
     for note in r.get("detection_notes", []): print("Note: " + note)
 
