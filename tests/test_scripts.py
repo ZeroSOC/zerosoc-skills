@@ -44,6 +44,23 @@ class TriageRule(unittest.TestCase):
         r = triage.decide(ledger)
         self.assertEqual(r["decision"], "Promote"); self.assertEqual(r["confidence"], "High")
 
+    def test_the_alerts_listed_as_o1_o2_are_the_alerts_and_not_more(self):
+        # #226: the ledger lists each alert as an observation (O1, O2, ...) naming it in `alert`;
+        # the rule reads the alerts once, from `alerts`, and decides as without them
+        ledger = {"alerts": [{"id": "A", "type": "Antivirus detection", "entity": "h", "confidence": "Medium"}],
+                  "observations": [{"id": "O2", "side": "Benign", "confidence": "High", "event_refs": ["EVT-1"],
+                                    "covers": ["A"], "condition": "false_positive"}]}
+        before = triage.decide(ledger)
+        ledger["observations"].insert(0, {"id": "O1", "alert": "A", "side": "Malicious", "confidence": "Medium",
+                                          "event_refs": ["A"]})
+        after = triage.decide(ledger)
+        self.assertEqual((after["decision"], after["confidence"]), (before["decision"], before["confidence"]))
+        self.assertEqual((after["restated_alerts"], after["malicious_beyond_alerts"]), ([], []))
+        # a Malicious observation naming an alert the ledger does not hold is read like any other
+        ledger["observations"].insert(1, {"id": "O3", "alert": "Z", "side": "Malicious", "confidence": "Medium",
+                                          "event_refs": ["EVT-2"]})
+        self.assertEqual(triage.decide(ledger)["malicious_beyond_alerts"], ["O3"])
+
     def test_a_malicious_observation_resting_on_the_alerts_alone_restates_them(self):
         # §1.5: "beyond the alerts" — an observation that cites alert records alone is the alert restated
         ledger = {"alerts": [{"id": "A", "type": "Antivirus detection", "entity": "h", "confidence": "Medium"}],
