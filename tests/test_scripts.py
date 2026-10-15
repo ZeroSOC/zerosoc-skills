@@ -56,6 +56,10 @@ class TriageRule(unittest.TestCase):
         after = triage.decide(ledger)
         self.assertEqual((after["decision"], after["confidence"]), (before["decision"], before["confidence"]))
         self.assertEqual((after["restated_alerts"], after["malicious_beyond_alerts"]), ([], []))
+        # a Malicious observation naming an alert the ledger does not hold is read like any other
+        ledger["observations"].insert(1, {"id": "O3", "alert": "Z", "side": "Malicious", "confidence": "Medium",
+                                          "event_refs": ["EVT-2"]})
+        self.assertEqual(triage.decide(ledger)["malicious_beyond_alerts"], ["O3"])
 
     def test_a_malicious_observation_resting_on_the_alerts_alone_restates_them(self):
         # §1.5: "beyond the alerts" — an observation that cites alert records alone is the alert restated
