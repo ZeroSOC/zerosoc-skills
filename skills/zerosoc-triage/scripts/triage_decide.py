@@ -26,6 +26,8 @@ Ledger (JSON):
   "duplicate_of": null | "CASE-0"
 }
 Alerts are the first Malicious observations at the tool's confidence, or at the level their severity maps to.
+The observations may list them too, numbered O1, O2, ... as the Note numbers them, each naming its alert in
+"alert": the rule reads an alert once, from "alerts".
 The confidence leaving triage rises on independent alerts of different types **or techniques**, which are
 the techniques the detections named. The coverage rule itself is unchanged: what the source already
 neutralized is reported with the decision and never weighed into it — a block is a response, not an
@@ -196,7 +198,9 @@ def covered_alerts(b, ledger, citing, groups, notes):
 
 def _decide(ledger):
     alerts = dedupe_alerts(ledger.get("alerts", []))
-    active = [f for f in ledger.get("observations", []) if not f.get("retracted") and f.get("side") in ("Malicious", "Benign")]
+    # an observation naming an alert in `alert` is that alert (O1, O2, ...): read once, from `alerts`
+    active = [f for f in ledger.get("observations", [])
+              if not f.get("alert") and not f.get("retracted") and f.get("side") in ("Malicious", "Benign")]
     ids = alert_ids(ledger)
     empty, empty_note = no_information.refs(ledger)
     weightless = [f for f in active if no_information.carries_nothing(f, empty)]
