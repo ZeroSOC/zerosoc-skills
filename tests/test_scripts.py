@@ -166,10 +166,32 @@ class CoverageReadOffTheEvidence(unittest.TestCase):
         self.assertEqual(unreasoned["decision"], "Close", "an exclusion without a reason is not one")
         self.assertIn("B1", unreasoned["coverage_note"])
 
+    def test_an_exclusion_reaches_every_id_of_the_alert(self):
+        ledger = _lab_case({"id": "B1", "confidence": "High", "about": [SHA],
+                            "not_covering": [{"alert": "HO", "reason": "the alert rests on the process tree"}]})
+        ledger["alerts"][1]["merged_ids"] = ["HO-2"]
+        ledger["entities"][0]["alert_ids"] = ["AV", "HO-2"]  # the evidence cites the merged id
+        r = triage.decide(ledger)
+        self.assertEqual({c["alert"]: c["covered"] for c in r["coverage"]}, {"AV": True, "HO": False})
+
+    def test_the_artifact_names_what_the_observation_rests_on(self):
+        r = triage.decide(_lab_case({"id": "B1", "confidence": "High", "artifact": f"hash:{SHA}"}))
+        self.assertEqual(r["decision"], "Close")
+
+    def test_a_name_the_inventory_does_not_hold_is_reported(self):
+        r = triage.decide(_lab_case({"id": "B1", "confidence": "High", "about": ["eicar.com"]}))
+        self.assertEqual(r["decision"], "Promote")
+        self.assertIn("'eicar.com' names no entity", r["coverage_note"])
+
     def test_a_ledger_that_names_no_entities_is_read_as_before_and_says_so(self):
         r = triage.decide(_lab_case({"id": "B1", "confidence": "High"}, entities=False))
         self.assertEqual(r["decision"], "Close", "no covers still covers every alert there")
-        self.assertIn("entities", r["coverage_note"])
+        self.assertIn("names no entities", r["coverage_note"])
+        r = triage.decide(_lab_case({"id": "B1", "confidence": "High",
+                                     "not_covering": [{"alert": "HO", "reason": "not the file"}]}, entities=False))
+        self.assertEqual(r["decision"], "Promote", "an exclusion with a reason holds there too")
+        r = triage.decide(_lab_case({"id": "B1", "confidence": "High", "covers": ["AV", "HO"]}, entities=False))
+        self.assertNotIn("coverage_note", r, "nothing was read the old way")
 
 
 class ResolutionRule(unittest.TestCase):
