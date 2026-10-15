@@ -216,7 +216,7 @@ def resolve(ledger, now=None):
     inventory = inventory_note(ledger.get("evidence_inventory")) if inventory_note else None
     if inventory: r["evidence_inventory_note"] = inventory
     record = ledger.get("detection_metadata")
-    if decision_notes: r["detection_notes"] = decision_notes(record, ledger)
+    if decision_notes: r["detection_notes"] = decision_notes(record)
     if record:
         r["neutralized_entities"] = neutralized(record)
     if ledger.get("duplicate_of"):

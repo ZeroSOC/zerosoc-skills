@@ -5,7 +5,7 @@ last_updated: 2026-09-24
 license: Apache-2.0
 status: draft
 ---
-<!-- generated from zerosoc-framework@ffd559a6339d : 04-Playbooks/99-Shared/sub_enrichment_asset.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@d0b0cab1adc6 : 04-Playbooks/99-Shared/sub_enrichment_asset.md — do not edit; regenerate with tools/build_references.py -->
 
 # Asset Entity Enrichment
 

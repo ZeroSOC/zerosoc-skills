@@ -4,7 +4,7 @@ description: What Microsoft Defender XDR's records mean in ZeroSOC Framework ter
 license: Apache-2.0
 metadata:
   version: "0.4.1"
-  framework: "zerosoc-framework@ffd559a (2026-10-13)"
+  framework: "zerosoc-framework@d0b0cab (2026-10-15)"
   status: draft
   author: ZeroSOC
 ---
@@ -24,7 +24,7 @@ and every script that needs it reads it from there rather than from a copy:
 | Block | What it settles |
 |---|---|
 | `source` | which technology this is, which API these paths are read from, and when the profile was last true of it |
-| `fields` | where each required input of Detection & Analysis §1.1 lives on an incident, an alert and an evidence item |
+| `fields` | where each input of Detection & Analysis §1.1 lives on an incident, an alert and an evidence item |
 | `vocabularies` | the source's own words in the framework's and OCSF's terms: severity, status, its classification as the framework's verdict, the determinations each verdict admits, the OCSF analytic type each detection source is, and what each remediation state says it did |
 | `alert_types` | detector id and title rules to the framework's alert types and telemetry domains |
 | `case_map` | every path of a record: where it lands on the Case, or why nothing reads it |
@@ -124,7 +124,7 @@ The recipes are in the profile's `queries` block. What they do not say:
 - **Paging an incident re-reads it.** Reading an incident a page of alerts at a time suits a reader with a small budget per answer, and costs one complete expansion of the incident per page; on a live incident two pages can disagree with each other. A reader that wants the record takes it whole, in one call.
 - **A merge moves an incident.** A merged incident carries `redirectIncidentId` and its evidence, its comments and its updates live on the master. Follow the chain first; write where the analyst will read.
 - **The same entity is named two ways.** The source lists one process more than once when alerts describe it differently — no image file, another path, a different verdict. They are one process where the device, the process id and the creation time agree, and counting them twice inflates every count a Note reports.
-- **A field that exists is not a field that is filled.** On a lower tier the column is there and empty. Treat an empty required input as the visibility gap it is: §1.1's inputs are read from the profile's field paths, and one the source did not supply is recorded with the check it prevented.
+- **A field that exists is not a field that is filled.** On a lower tier the column is there and empty: an empty input is one the source did not supply.
 - **The evidence of an alert is not telemetry.** It is the entities the detection cited. A process the detection did not flag is not in the evidence, and looking for it there and observation nothing is not evidence of absence.
 
 ## 8. Where this knowledge comes from

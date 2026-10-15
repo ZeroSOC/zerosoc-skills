@@ -547,13 +547,11 @@ class DecisionReadsWhatTheDetectionAsserts(unittest.TestCase):
         self.assertIn("not an explanation", note)
         self.assertIn("how it arrived", note)
 
-    def test_an_assertion_absent_without_a_recorded_gap_is_reported(self):
+    def test_an_absent_assertion_asks_for_no_gap(self):
         led = self.ledger()
         led["detection_metadata"]["alerts"][0]["absent"] = ["techniques", "threat name"]
-        led["detection_metadata"]["visibility_gaps"] = [{"data_source": "alert metadata: techniques"}]
         r = triage.decide(led)
-        self.assertIn("threat name", " ".join(r["detection_notes"]))
-        self.assertNotIn("alert metadata: techniques", " ".join(r["detection_notes"]))
+        self.assertNotIn("visibility gap", " ".join(r["detection_notes"]))
 
     def test_the_techniques_of_the_alerts_raise_the_confidence_the_rule_raises(self):
         # §1.5: independent alerts of different types or techniques raise the confidence one level
@@ -687,27 +685,14 @@ class DetectionMetadata(unittest.TestCase):
         self.assertEqual(bare["absent"], ["description", "detection source", "recommended actions", "techniques", "threat name"])
         self.assertEqual(bare["candidate_incident_categories"], [])
 
-    def test_what_an_alert_does_not_supply_is_a_visibility_gap_naming_that_alert(self):
-        built = metadata.build([self.ALERT, {"id": "A2", "title": "t"}], self.spec, index=self.index)
-        gaps = {g["data_source"]: g["alerts"] for g in built["visibility_gaps"]}
-        self.assertEqual(sorted(gaps), ["alert metadata: description", "alert metadata: detection source",
-                                        "alert metadata: recommended actions", "alert metadata: techniques",
-                                        "alert metadata: threat name"])
-        self.assertEqual(gaps["alert metadata: techniques"], ["A2"],
-                         "the assertions of one alert do not make up for another's: the gap names the alert that lacks it")
-        empty = metadata.build([{"id": "A2", "title": "t"}], self.spec, index=self.index)
-        self.assertEqual(sorted(g["data_source"] for g in empty["visibility_gaps"]),
-                         ["alert metadata: description", "alert metadata: detection source",
-                          "alert metadata: recommended actions", "alert metadata: techniques",
-                          "alert metadata: threat name"])
-        self.assertTrue(all(g["check_prevented"] for g in empty["visibility_gaps"]))
-
-    def test_the_remediation_state_is_a_gap_only_once_the_evidence_has_been_read(self):
+    def test_what_an_alert_does_not_supply_is_listed_with_it_and_is_no_gap(self):
+        # Detection & Analysis §1.1: an absent input is a gap only where a check needed it, which the
+        # executor knows and the script does not
         rows = [{"type": "file", "name": "x.exe", "alert_ids": ["A1"]}]
-        read = metadata.build([self.ALERT], self.spec, rows, index=self.index)
-        self.assertEqual([g["data_source"] for g in read["visibility_gaps"]], ["alert metadata: remediation state"])
-        unread = metadata.build([self.ALERT], self.spec, index=self.index)
-        self.assertEqual(unread["visibility_gaps"], [], "not passing the evidence is not an observation about the deployment")
+        built = metadata.build([self.ALERT, {"id": "A2", "title": "t"}], self.spec, rows, index=self.index)
+        self.assertEqual([a["absent"] for a in built["alerts"]],
+                         [[], ["description", "detection source", "recommended actions", "techniques", "threat name"]])
+        self.assertNotIn("visibility_gaps", built)
 
     def test_the_case_candidate_categories_come_from_the_techniques(self):
         built = metadata.build([self.ALERT], self.spec, index=self.index)
@@ -1166,16 +1151,16 @@ class RunCheck(unittest.TestCase):
         self.assertIn("skip  triage: what the detection asserts is on the ledger", out)
         self.assertNotIn("FAIL  triage: what the detection asserts is on the ledger", out)
 
-    def test_an_assertion_absent_without_a_recorded_gap_fails_the_run(self):
+    def test_an_absent_assertion_is_noted_and_fails_nothing(self):
         base = self.run_dir()
         with open(os.path.join(base, "ledger.triage.json"), encoding="utf-8") as f:
             ledger = json.load(f)
         ledger["detection_metadata"]["alerts"][0]["absent"] = ["recommended actions"]
         with open(os.path.join(base, "ledger.triage.json"), "w", encoding="utf-8") as f:
             json.dump(ledger, f)
-        code, out = self.check(base)
-        self.assertEqual(code, 1)
-        self.assertIn("FAIL  triage: an assertion the source did not supply is a recorded gap", out)
+        _, out = self.check(base)
+        self.assertIn("note  triage: assertions the source did not supply — recommended actions", out)
+        self.assertFalse([line for line in out.splitlines() if line.startswith("FAIL") and "did not supply" in line])
 
     def test_an_invalid_ledger_is_a_failed_check(self):
         base = self.run_dir()

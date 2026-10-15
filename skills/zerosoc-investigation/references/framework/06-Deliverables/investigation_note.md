@@ -1,11 +1,11 @@
 ---
 title: Investigation Note Template
 type: template
-last_updated: 2026-09-30
+last_updated: 2026-10-15
 license: Apache-2.0
 status: draft
 ---
-<!-- generated from zerosoc-framework@ffd559a6339d : 06-Deliverables/investigation_note.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@d0b0cab1adc6 : 06-Deliverables/investigation_note.md — do not edit; regenerate with tools/build_references.py -->
 
 # Investigation Note
 
@@ -61,7 +61,7 @@ It has the **same element structure as the [Triage Note](triage_note.md)**, with
 
 ### Visibility Gaps
 
-*Every required data source unavailable during investigation, and every required input of [§1.1](../03-Processes/02-detection_and_analysis.md#11-reception-aggregation-and-assignment) the source did not supply, each paired with the check it prevented; write "None." when no gap occurred.*
+*Every required data source unavailable during investigation, each paired with the check it prevented; write "None." when no gap occurred.*
 
 ### Provenance
 

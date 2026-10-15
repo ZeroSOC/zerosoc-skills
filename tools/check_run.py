@@ -302,14 +302,8 @@ def check_detection_metadata(report, run, ledger, label, note_name, profile_path
                      "; ".join(wrong[:4]) if wrong else f"all {len(fresh['alerts'])} as recomputed")
     elif alerts:
         report.skip(f"{label}: the assertions are the ones the alerts carry", "no source profile given")
-    recorded = {str(g.get("data_source", "")).strip().lower() for g in ledger.get("visibility_gaps", [])
-                if isinstance(g, dict)}
     absent = sorted({a for alert in record.get("alerts", []) for a in alert.get("absent", [])})
-    unrecorded = [a for a in absent if f"alert metadata: {a}" not in recorded]
-    report.check(not unrecorded, f"{label}: an assertion the source did not supply is a recorded gap",
-                 "each absence in visibility_gaps with the check it prevented",
-                 f"{len(unrecorded)} absent and not recorded: " + ", ".join(unrecorded) if unrecorded
-                 else ("nothing absent" if not absent else f"all {len(absent)} recorded"))
+    report.note(f"{label}: assertions the source did not supply", ", ".join(absent) or "none")
     # §1.5: what a source recommends is indicative. This once failed a run that left one
     # unanswered, then reported what became of each; on a source that publishes its procedure per
     # alert both are a checklist. How many it published is worth knowing — it sizes what the
