@@ -256,11 +256,6 @@ def _asserted(note, alerts, observations, recorded_gaps):
     if among and not read and not blind:
         failures.append(f"{len(among)} Alert Observation(s) and a detection_metadata that read no alert: each renders "
                         "what its detection asserted")
-    for alert in record.get("alerts") or []:
-        for absent in _listed(alert.get("absent")):
-            if f"alert metadata: {absent}".lower() not in recorded_gaps:
-                failures.append(f"alert {alert.get('id')}: the source did not supply the {absent}, and no "
-                                "Visibility Gap says so with the check it prevented")
     # What a source recommends is nothing this checks. They are part of what the detection
     # asserts, the executor reads them with the rest of the Case, and what it runs is an Observation
     # like any other — named in that Observation's `analytic` and checked as an Observation. Nothing here

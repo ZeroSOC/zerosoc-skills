@@ -299,7 +299,7 @@ class TheNoteCheck(unittest.TestCase):
         self.assertEqual(self.failures(note), [], "an unnamed technique is still what the detection asserted")
         note = ledger_note()
         note["detection_metadata"]["alerts"][0]["absent"] = ["threat name"]
-        self.assertTrue(any("threat name" in f and "Visibility Gap" in f for f in self.failures(note)))
+        self.assertEqual(self.failures(note), [], "an input the source did not supply is no gap by itself")
 
     def test_a_source_the_deployment_cannot_read_is_a_gap_and_not_a_broken_note(self):
         """A deployment that declares no source profile reads nothing of §1.1: there are no field
@@ -352,9 +352,6 @@ class TheNoteCheck(unittest.TestCase):
         note = ledger_note()
         note["observations"][0]["event_refs"] = 12345
         self.assertEqual(self.failures(note), [], "an event identifier may be a number")
-        one_per_letter = ledger_note()
-        one_per_letter["detection_metadata"]["alerts"][0]["absent"] = "threat name"
-        self.assertEqual(len([f for f in self.failures(one_per_letter) if "did not supply" in f]), 1)
 
     def test_an_investigation_ledger_holds_its_alerts_among_its_observations(self):
         note = ledger_note(kind="investigation", timeline=[{"id": "1"}])

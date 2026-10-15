@@ -5,7 +5,7 @@
   alert_metadata.py alerts.json --profile <source_profile.json> [--evidence evidence.json] [--json]
 
 Detection & Analysis §1.1: an Alert carries more than its entities and its type, and six of the things
-it carries are required inputs of triage, read before enrichment and recorded on the Case — the
+it carries are read before enrichment and recorded on the Case — the
 technique identifiers, the threat name and family, the detection source and detector, the remediation
 state of each entity, the source's description of the detection, and its recommended actions. This
 script extracts them, ledger-ready, and names what the source did not supply.
@@ -29,9 +29,9 @@ state it does not list is recorded as reported and treated as **not** neutralize
 nobody declared is not evidence that anything was stopped.
 
 Output (`--json`, or the same content printed): one object per alert under "alerts", the Case's
-techniques and candidate Incident Categories, the per-entity remediation the evidence reports, and
-"visibility_gaps" for every assertion an alert did not carry, naming the alerts that lack it. Record it in ledger.json: the
-decision scripts read the alerts' assertions from there, and the Note renders them.
+techniques and candidate Incident Categories, and the per-entity remediation the evidence reports. Each
+alert lists under "absent" what it does not carry. Record it in ledger.json: the decision scripts read the
+alerts' assertions from there, and the Note renders them.
 
 A remediation the source performed is **not** an explanation of the Alert (§1.5). It is recorded, it
 carries no side and no confidence, and the questions the block does not answer — how the entity
@@ -50,15 +50,6 @@ except ImportError:  # the shared scripts are copied next to each other by tools
 FIELDS = {"techniques": "techniques", "threat_name": "threat name", "threat_family": "threat family",
           "detection_source": "detection source", "detector_id": "detector id", "description": "description",
           "recommended_actions": "recommended actions"}
-# What triage loses when the source supplies none of it (§1.1), as the check each gap prevented.
-PREVENTS = {
-    "techniques": "the categories the framework's technique tables would have proposed, and the confidence its technique rule would have raised; the playbook and its section are chosen from the alert type and are unaffected",
-    "threat name": "the threat or family name the Malicious hypothesis and the family-specific enrichment start from",
-    "detection source": "how the Alert is weighed: a signature match and a model score are not the same evidence",
-    "description": "what the detection fires on, which the False Positive conditions are judged against",
-    "recommended actions": "the source's own procedure for this detection, indicative: the executor runs what bears on the Case",
-    "remediation state": "whether the source already blocked, quarantined or removed each entity",
-}
 OTHER = {"type_id": 99, "type": "Other"}
 
 
@@ -194,30 +185,6 @@ def remediation(rows, profile):
     return out
 
 
-def gaps(built, evidence_read=False):
-    """Every assertion an Alert of the Case did not carry, as a gap with the check it prevented.
-
-    One gap per assertion, naming the alerts that lack it: an assertion missing on one alert of twenty
-    is a gap for that alert's triage, and the Case's other alerts do not make it up. The remediation
-    state is a gap only once the evidence has been read — an executor that did not pass the evidence has
-    not established that the source reports none, and a gap is an observation about the deployment, not about
-    how the script was called.
-    """
-    missing = {}
-    for alert in built["alerts"]:
-        for name in alert["absent"]:
-            missing.setdefault(name, []).append(alert["id"])
-    out = []
-    for name in sorted(missing):
-        out.append({"data_source": f"alert metadata: {name}",
-                    "check_prevented": PREVENTS.get(name, f"the {name} the source did not supply"),
-                    "alerts": missing[name]})
-    if built["alerts"] and evidence_read and not built["remediation"]:
-        out.append({"data_source": "alert metadata: remediation state",
-                    "check_prevented": PREVENTS["remediation state"],
-                    "alerts": [a["id"] for a in built["alerts"]]})
-    return out
-
 
 def build(alerts, profile, evidence=None, index=None):
     """The Case's assertions, ledger-ready: per alert, then what they add up to for the Case."""
@@ -233,7 +200,6 @@ def build(alerts, profile, evidence=None, index=None):
     built["candidate_incident_categories"] = sorted({c for a in built["alerts"] for c in a["candidate_incident_categories"]})
     built["recommended_actions"] = actions_of(built)
     built["neutralized_entities"] = neutralized(built)
-    built["visibility_gaps"] = gaps(built, evidence_read=evidence is not None)
     return built
 
 
@@ -245,25 +211,16 @@ def techniques_of(record):
     return out
 
 
-def decision_notes(record, ledger=None):
+def decision_notes(record):
     """What a decision script says about the assertions: the lines a reader of the run must see.
 
-    A Case decided without them is decided on less than the source supplied (§1.1), a recommendation
-    left unread holds the decision (§1.5), and a remediated entity is recorded without ever explaining
-    anything. Absences already recorded as visibility gaps are not repeated here.
+    A Case decided without them is decided on less than the source supplied (§1.1), and a remediated
+    entity is recorded without ever explaining anything (§1.5).
     """
     if not record:
         return ["what the detection asserts was not extracted: run scripts/alert_metadata.py on the Case's "
-                "alerts before deciding — its techniques, threat name, detection source, remediation state, "
-                "description and recommended actions are required inputs of triage"]
+                "alerts before deciding"]
     out = []
-    recorded = {str(g.get("data_source", "")).lower() for g in
-                list(record.get("visibility_gaps") or []) + list((ledger or {}).get("visibility_gaps") or [])}
-    missing = sorted({a for alert in record.get("alerts", []) for a in alert.get("absent", [])
-                      if f"alert metadata: {a}" not in recorded})
-    if missing:
-        out.append("the source supplied no " + ", ".join(missing) +
-                   ": record each as a visibility gap with the check it prevented, and never infer one from the alert title")
     neutralized = [r for r in record.get("remediation", []) if r.get("neutralized")]
     if neutralized:
         out.append("the source already neutralized " + ", ".join(str(r.get("entity")) for r in neutralized) +
@@ -292,7 +249,7 @@ def main():
     built = build(json.load(open(a.alerts, encoding="utf-8")), profile, evidence, index)
     if a.json:
         print(json.dumps(built, indent=2, ensure_ascii=False))
-        return 0  # the gaps are in the output; a caller reading JSON is not failed by them
+        return 0
     for alert in built["alerts"]:
         print(f"{alert['id']}")
         print("  techniques: " + (", ".join(t["rendered"] for t in alert["techniques"]) or "none asserted"))
@@ -315,9 +272,7 @@ def main():
         unknown = sorted({t for a in built["alerts"] for t in a["techniques_not_in_the_catalog"]})
         if unknown:
             print("techniques the framework's tables do not hold; record them and name them in the Note: " + ", ".join(unknown))
-    for gap in built["visibility_gaps"]:
-        print(f"VISIBILITY GAP: {gap['data_source']} — {gap['check_prevented']}")
-    return 3 if built["visibility_gaps"] else 0
+    return 0
 
 
 if __name__ == "__main__":

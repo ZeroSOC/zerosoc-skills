@@ -4,7 +4,7 @@ description: Triage a security alert under the ZeroSOC Framework (Phase 2.a). Se
 license: Apache-2.0
 metadata:
   version: "0.4.1"
-  framework: "zerosoc-framework@ffd559a (2026-10-13)"
+  framework: "zerosoc-framework@d0b0cab (2026-10-15)"
   status: draft
   author: ZeroSOC
 ---
@@ -98,9 +98,7 @@ Read per alert: the playbook section the script prints.
    - Aim the checks of step 6 where the **remediation state** leaves them: at the entities the source left
      **active** first, and at what a block does not answer — how the entity arrived, what ran before it
      was stopped, whether the same thing is elsewhere. The state is recorded, never weighed (§1.5).
-   An assertion the source does not supply is a **visibility gap**: the script names it with the check it
-   prevented, and it goes in the ledger's `visibility_gaps` and in the Note. Never infer one from the
-   alert title.
+   What an alert does not carry, the script lists under its `absent`.
 
 4. **Select the playbook and check visibility.** Identify the telemetry domain (Endpoint, Identity,
    Network, Cloud, Email, Data, Application, OT/ICS) and the alert type — the alert types the techniques of

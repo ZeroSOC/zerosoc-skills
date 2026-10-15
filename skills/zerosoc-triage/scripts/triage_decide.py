@@ -293,7 +293,7 @@ def decide(ledger):
         r["evidence_inventory_note"] = inventory
     record = ledger.get("detection_metadata")
     if decision_notes:
-        r["detection_notes"] = decision_notes(record, ledger)
+        r["detection_notes"] = decision_notes(record)
     if record:
         r["neutralized_entities"] = neutralized(record)
         if record.get("candidate_incident_categories"):
