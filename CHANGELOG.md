@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Ingress check 3 decides on what the file was run to do.** The pin follows the framework to
+  `bc34d08` (ZeroSOC/zerosoc-framework#105): a downloaded tool run from the folder it landed in is no
+  longer `Malicious (High)` by itself; its command, arguments and children decide.
 - **An observation states only what it cites.** A triage observation in two lab Cases took the
   wording of a recommended action ("evaluate staging and execution timeline") as a finding: it said a
   downloaded tool was staged and run, citing evidence that showed neither, or that it "supports what
