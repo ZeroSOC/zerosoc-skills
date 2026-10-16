@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **An observation states only what it cites.** A triage observation in two lab Cases took the
+  wording of a recommended action ("evaluate staging and execution timeline") as a finding: it said a
+  downloaded tool was staged and run, citing evidence that showed neither, or that it "supports what
+  the detection asserted". It blocked a False Positive close, and investigation kept it as merely
+  unconfirmed. `rules/checks.md` now says what a recommendation takes for granted is a question, every
+  claim is in what the observation cites, a reading that the evidence supports the detection's claim
+  restates the alert, and a browser's download handling is not a remediation. `rules/verify.md` says
+  an observation holds only as far as what it cites shows it, and a query never takes for granted what
+  it tests.
 - **The endpoint playbook reads what a legitimate tool was asked to do.** The pin follows the
   framework to `1c41e99` (ZeroSOC/zerosoc-framework#103, #104): *Malware / loader execution* check 7
   reads a signed tool's command and arguments, a threat-intelligence indicator naming a legitimate,

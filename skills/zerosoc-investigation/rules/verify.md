@@ -20,6 +20,12 @@ executor puts that language in its place; read as it is, it means the language o
 - Start from the conflict: the observations that disagree are what the first queries must discriminate.
 - An observation that does not hold, or does not apply to this Case, is retracted with its reason.
   Retract on evidence, not on doubt; an observation that merely cannot be confirmed still holds.
+- An observation holds only as far as what it cites shows it. Read the items it cites: a claim they
+  do not carry (a file run, a staging, a containment) does not hold, and that is evidence, not doubt.
+  Neither does a reading that only says the evidence supports what the detection asserted: that is
+  the detection's claim again, and the alert already counts for it.
+- A query asks; it never takes for granted what it is meant to test, such as that a file ran or was
+  staged.
 - Every query is discriminating and states both readings, so a negative result is evidence too (a
   clean hash is a Benign observation, not silence). A query whose negative result says nothing is not
   worth asking.
