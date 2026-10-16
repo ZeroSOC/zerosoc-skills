@@ -5,7 +5,7 @@ status: draft
 last_updated: 2026-10-13
 license: Apache-2.0
 ---
-<!-- generated from zerosoc-framework@1c41e99e77b4 : 02-Taxonomy/case_schema.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@bc34d08f6827 : 02-Taxonomy/case_schema.md — do not edit; regenerate with tools/build_references.py -->
 
 # Case Schema
 

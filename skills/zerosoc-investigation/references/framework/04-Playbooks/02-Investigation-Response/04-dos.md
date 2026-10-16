@@ -16,7 +16,7 @@ required_data_sources:
   - Upstream ISP / scrubbing-provider telemetry
 status: draft
 ---
-<!-- generated from zerosoc-framework@1c41e99e77b4 : 04-Playbooks/02-Investigation-Response/04-dos.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@bc34d08f6827 : 04-Playbooks/02-Investigation-Response/04-dos.md — do not edit; regenerate with tools/build_references.py -->
 
 # 04-Denial of Service Investigation & Response
 

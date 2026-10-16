@@ -10,7 +10,7 @@ required_data_sources:
   - Directory audit logs
 status: draft
 ---
-<!-- generated from zerosoc-framework@1c41e99e77b4 : 04-Playbooks/01-Triage/identity.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@bc34d08f6827 : 04-Playbooks/01-Triage/identity.md — do not edit; regenerate with tools/build_references.py -->
 
 # Identity Triage Playbook
 
