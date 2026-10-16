@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **The endpoint playbook reads what a legitimate tool was asked to do.** The pin follows the
+  framework to `1c41e99` (ZeroSOC/zerosoc-framework#103, #104): *Malware / loader execution* check 7
+  reads a signed tool's command and arguments, a threat-intelligence indicator naming a legitimate,
+  signed tool is a False Positive condition when the tool was not run or ran only clearly benign
+  commands, remote-execution check 5 reads read-only status and health checks as Benign (Medium), and
+  discovery is Malicious (Medium) in the three endpoint checks that read it.
 - **The executor chooses each alert's type; no source profile maps one.** The alert-type map of the
   source profile decided the type from the detector id or the title, and an alert it did not know kept
   its title as its type: no playbook section, no False Positive or Benign conditions to name, no
