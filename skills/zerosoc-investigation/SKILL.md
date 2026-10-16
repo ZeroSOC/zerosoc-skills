@@ -79,7 +79,8 @@ per Case: the playbook the script prints.
    triage bring their own assertions, and the remediation state changes while a Case is open. Re-run
    `python3 scripts/alert_metadata.py alerts.json --bindings zerosoc.capabilities.json --evidence evidence.json --json`
    on the Case as it now is, keeping the dispositions already recorded on the recommended actions. Give
-   each alert appended since triage its type as triage does (its step 4) and add them with
+   each alert triage did not type (appended since, or all of them on a Case that entered here) its
+   type as triage does (its step 4) and add them with
    `python3 scripts/alert_types.py alerts.json --json`, whose entries are ready-made Malicious observations.
 3. **Choose the Incident Category and select the playbook.** Triage's candidates are where you start, and
    the category is decided by the adversary's **objective and impact** (§2.2), read in

@@ -17,7 +17,7 @@ executor puts that language in its place; read as it is, it means the language o
 - A claim of the detection (its description, its threat name, its recommended actions) is not
   evidence of an objective: what the source says a file or an address is used for is tested by the
   queries.
-- Give each alert appended since triage the alert type of the taxonomy that describes what its
-  detection fires on, named exactly as the taxonomy writes it, or no type with the reason, as triage
-  does.
+- Give each alert triage did not type (one appended since, or every alert of a Case that entered
+  here) the alert type of the taxonomy that describes what its detection fires on, named exactly as
+  the taxonomy writes it, or no type with the reason, as triage does.
 - Name the category by its identifier as the taxonomy writes it, and write the reason in $language.
