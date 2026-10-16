@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Malware check 2 applies only to a file that ran.** The pin follows the framework to the merge of
+  ZeroSOC/zerosoc-framework#108: *Payload location* is `Malicious (Medium)` only for an unknown or
+  unsigned binary that ran from a temporary or shared folder, and context when the file was not run.
 - **An execution type needs the file running.** `rules/types.md`: type an execution only when the
   evidence shows the file running; otherwise, by what put the file there. An executor typed a signed
   tool that was downloaded and never run as *Malware / loader execution*, and that section's location

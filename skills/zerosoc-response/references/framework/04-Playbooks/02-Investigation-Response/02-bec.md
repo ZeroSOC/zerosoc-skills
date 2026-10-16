@@ -16,7 +16,7 @@ required_data_sources:
   - CASB / access-policy logs
 status: draft
 ---
-<!-- generated from zerosoc-framework@bc34d08f6827 : 04-Playbooks/02-Investigation-Response/02-bec.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@e5f16f8a4697 : 04-Playbooks/02-Investigation-Response/02-bec.md — do not edit; regenerate with tools/build_references.py -->
 
 # 02-Business Email Compromise (BEC) Investigation & Response
 
