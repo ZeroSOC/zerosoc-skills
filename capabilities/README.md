@@ -79,12 +79,9 @@ and it lives with the tool skill of its technology — the Defender XDR one is
 profile is looked for beside the binding first, where a deployment's own copy wins, and then beside the
 installed skills, so installing the tool skill next to the method skills is all a deployment does.
 
-Its `alert_types` block is what makes "the same alert type on the same entity counts once"
-deterministic: ordered rules from the source's detector id and alert title to a framework alert type and
-its telemetry domain. `scripts/alert_types.py` applies it when the ledger is built and reports the alerts
-no rule matches. Every `alert_type` in a profile must exist in the framework's `02-Taxonomy/alert_types.md`
-(the tests check it). Detector ids are added as they are observed: they make a rule exact where a title is
-ambiguous or localized.
+A profile does not type the source's alerts. The executor chooses each alert's framework alert type from
+the taxonomy, by what the detection fires on, and `scripts/alert_types.py` holds the choice to the
+framework's names and counts the same type on the same entity once.
 
 Its `case_map` block is executable: a test walks sample documents of the source — every key one the source sends, every value invented — and fails on any key
 that is neither mapped to a Case field nor ignored with a reason, so a field the vendor adds tomorrow is
@@ -113,16 +110,8 @@ writes a **local override** beside its binding and names it under `source_profil
 It is declared by [source_profile_override.schema.json](source_profile_override.schema.json) and holds
 **only what differs**, so everything else keeps following the shipped profile across pin bumps: objects
 are laid over the shipped ones key by key (`null` removes a key), an entry of `case_map` replaces the
-shipped entry of the same `path`, the rules of `alert_types` are tried **before** the shipped ones, which
-stay as they are, and any other list is replaced whole. It may not restate the `source` block, and a block
-a profile does not have is refused rather than recorded and ignored. A title the shipped rules do not know
-is therefore one small rule, and the shipped rule of the same alert type keeps following the releases:
-
-```json
-"profile": { "alert_types": { "rules": [
-  { "alert_type": "Malware / loader execution", "domain": "Endpoint",
-    "title_patterns": ["^a title only this tenant raises$"] } ] } }
-```
+shipped entry of the same `path`, and any other list is replaced whole. It may not restate the `source` block, and a block
+a profile does not have is refused rather than recorded and ignored.
 
 The profile that results is held to the same schema and the same coherence as a shipped one. Check it
 before using it, from a checkout of this repository at the release the deployment runs (the schemas and

@@ -83,9 +83,9 @@ Read per alert: the playbook section the script prints.
    it reads them under the field names the deployment's map declares and records what the source did not
    supply. Put the printed object in the ledger as `detection_metadata` — every later script reads it
    from there and the Note renders it — then:
-   - Take the **techniques** to step 4: they are the first input to the candidate Incident Categories and
-     to the playbook section (`scripts/select_playbook.py --technique T1003` resolves one alone, a
-     sub-technique falling back to its parent). One the framework's tables do not hold widens nothing,
+   - Take the **techniques** to step 4: they are one input to the alert type and to the candidate
+     Incident Categories (`scripts/select_playbook.py --technique T1003` says what the framework's tables
+     make of one, a sub-technique falling back to its parent). One the tables do not hold widens nothing,
      and is recorded on the Case and named in the Note rather than dropped or renamed.
    - Take the **threat name and family** to step 6: they direct the enrichment and seed the hypotheses.
    - **The recommended actions are context** (§1.5): read them as a set — the same instruction is
@@ -100,26 +100,32 @@ Read per alert: the playbook section the script prints.
      was stopped, whether the same thing is elsewhere. The state is recorded, never weighed (§1.5).
    What an alert does not carry, the script lists under its `absent`.
 
-4. **Select the playbook and check visibility.** Identify the telemetry domain (Endpoint, Identity,
-   Network, Cloud, Email, Data, Application, OT/ICS) and the alert type — the alert types the techniques of
-   step 3 point at are the first candidates — then run:
+4. **Choose each alert's type, and the playbook sections.** Read the
+   [Alert Type taxonomy](references/framework/02-Taxonomy/alert_types.md) and give every alert the type that
+   describes **what its detection fires on**: its description, its evidence, its techniques and what
+   detected it. The title is the source's name for the detection and decides nothing; the type's
+   *Distinct from* clause separates it from its neighbours. The type's domain is the one the taxonomy files
+   it under, so the alerts of one Case may open the playbooks of several domains. Write the type on the
+   alert as `alert_type`. An alert no type describes — a source's correlation, attribution or containment
+   record states a conclusion rather than a behaviour — carries `no_type_reason` instead, and its checks come from
+   the domain's Alert Catalog and §1.2–§1.5 directly. Then, for each type you chose, run:
    `python3 scripts/select_playbook.py --domain Endpoint --alert-type "Malware / loader execution" --bindings zerosoc.capabilities.json`.
    It prints the playbook version, the required data sources with their availability, the **visibility
-   gaps** to record, and only the per-alert section you need. Record the selection in the ledger
-   (`playbook`, `playbook_version`, `domain`): the Note's Provenance repeats it, and a Case whose
-   playbook is not recorded cannot be reproduced. When no playbook exists for the domain at
-   this framework pin, use the domain's alert catalog in
-   [alert_types.md](references/framework/02-Taxonomy/alert_types.md) and apply §1.2–§1.5 directly.
+   gaps** to record, the section's candidate Incident Categories and only the per-alert section you need.
+   Record the selection in the ledger (`playbook`, `playbook_version`, `domain`; for a Case whose alerts
+   span domains, the domain of most of them, and the others' playbooks in the Note's Provenance): a Case
+   whose playbook is not recorded cannot be reproduced. The candidate Incident Categories are yours to
+   propose, in the order the Case points at them: start from the sections' own, and add those the
+   techniques of step 3 point at. The rules you are held to while you choose are
+   [rules/types.md](rules/types.md).
    The rules you are held to while you run the checks are [rules/checks.md](rules/checks.md), given to any
    executor as they stand (`$language` in them is the language the deployment writes in).
 5. **Start the ledger.** Create `ledger.json` (format in `scripts/triage_decide.py`) with the
-   `evidence_inventory` object of step 2 and the `detection_metadata` of step 3. When the deployment names a source profile (the binding's
-   `source_profiles`), build the alerts with `python3 scripts/alert_types.py alerts.json --bindings zerosoc.capabilities.json --json`:
-   it gives each alert its framework alert type (detector id first, then title) and collapses the same
-   type on the same entity to the strongest alert, so the rule below is applied the same way every time;
-   an alert it reports as unmapped keeps its title as type. The type is for this counting and for grouping
-   with the same behaviour under another vendor's name — the playbook was chosen in step 4, from the domain
-   you identified and the techniques of step 3, and an unmapped alert does not change that choice. `python3 scripts/source_profile.py --bindings zerosoc.capabilities.json --json`
+   `evidence_inventory` object of step 2 and the `detection_metadata` of step 3. Build the alerts with
+   `python3 scripts/alert_types.py alerts.json --json`, each alert carrying the `alert_type` or the
+   `no_type_reason` of step 4: it refuses a type the taxonomy does not hold, and collapses the same type on
+   the same entity to the strongest alert, so the rule below counts it once; an alert no type describes
+   keeps its title as its type. `python3 scripts/source_profile.py --bindings zerosoc.capabilities.json --json`
    prints the ledger's `source_profile` object and the source's entry for the Case's `provenance.products`:
    a **local override** of the shipped profile is recorded there and named in the Note's Provenance. Each independent
    alert is the first Malicious observation at the tool's confidence, or at the level its severity maps to

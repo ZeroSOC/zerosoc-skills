@@ -326,191 +326,92 @@ class LedgerDedup(unittest.TestCase):
         self.assertEqual(r["malicious_observations"], ["a1", "a3"])
 
 
-class AlertTypeMapping(unittest.TestCase):
+class AlertTypeChoice(unittest.TestCase):
+    """The executor chooses each alert's type; the script holds the choice to the framework's names
+    and counts the same type on the same entity once."""
+
     def setUp(self):
-        self.map = alert_types.load_map(XDR_PROFILE)
+        self.known = alert_types.known_types(os.path.join(ROOT, "framework"))
 
-    def test_titles_map_to_framework_alert_types(self):
-        for title, expected in [
-            ("Ransomware behavior detected in the file system", "Ransomware mass-encryption"),
-            ("Possible credential dumping (LSASS)", "Credential dumping"),
-            ("Sensitive credential memory read", "Credential dumping"),
-            ("Suspicious inbox forwarding rule", "Inbox forwarding / redirect or hide rule"),
-            ("'Wacatac' malware was prevented", "Malware / loader execution"),
-            ("Suspicious PowerShell command line", "Suspicious script / interpreter execution"),
-            ("Email reported by user as malware or phish", "User-reported phishing"),
-            ("Impossible travel activity", "Impossible-travel / anomalous sign-in"),
-            # rule order: the specific before the general
-            ("Malicious file detected", "Malware / loader execution"),
-            ("Malware detected in a zip archive file delivered by email", "Malicious attachment / URL delivered"),
-            ("Email messages containing malicious file removed after delivery", "Malicious attachment / URL delivered"),
-            ("Attempt to tamper with shadow copies", "Mass file destruction / disk wipe"),
-            ("Suspicious connection to a malicious IP address blocked by network protection", "C2 beaconing / known-bad destination"),
-            ("Data exfiltration over PowerShell", "Outbound data spike"),
-            ("'Locky' ransomware was prevented", "Malware / loader execution"),
-            ("Suspicious service registration", "Persistence mechanism created"),
-            ("Event log was cleared", "Security-tool / AMSI tampering"),
-            ("Creation of forwarding/redirect rule", "Inbox forwarding / redirect or hide rule"),
-            # Office 365 alert-policy alerts, read from the audit log where they never reach the alert stream
-            ("Email reported by user as malware or phish", "User-reported phishing"),
-            ("Elevation of Exchange admin privilege", "Privileged role / group grant"),
-            ("ZeroSOC - Entra role assigned", "Privileged role / group grant"),
-            ("ZeroSOC - Mailbox FullAccess granted", "Privileged role / group grant"),
-            ("ZeroSOC - Consent to application", "OAuth app consent / token-session theft"),
-            ("ZeroSOC - Mailbox audit bypass", "Logging / guardrail disabled"),
-            ("ZeroSOC - Audit log settings changed", "Logging / guardrail disabled"),
-            ("ZeroSOC - Organization audit settings", "Logging / guardrail disabled"),
-            ("Suspicious credential dump from NTDS.dit", "Credential dumping"),
-        ]:
-            with self.subTest(title=title):
-                m = alert_types.classify({"id": "x", "title": title}, self.map)
-                self.assertEqual(m["type"], expected); self.assertFalse(m["unmapped"])
+    def test_the_taxonomy_is_read_whole(self):
+        self.assertGreater(len(self.known), 40)
+        self.assertEqual(self.known["Credential dumping"], "Endpoint")
+        self.assertEqual(self.known["Inbox forwarding / redirect or hide rule"], "Email")
 
-    def test_the_titles_the_recordings_raised_map_to_the_types_decided_for_them(self):
-        """The real titles of #8, each to the type its own techniques point at."""
-        for title, expected in [
-            ("Impacket toolkit", "Remote execution / lateral movement"),
-            ("Compromised account conducting hands-on-keyboard attack", "Remote execution / lateral movement"),
-            # the same toolkit, but this one reports commands being run, not the tool being present
-            ("Ongoing hands-on-keyboard attack via Impacket toolkit", "Suspicious script / interpreter execution"),
-            ("Indication of local security authority secrets theft", "Credential dumping"),
-            ("Process memory dump", "Credential dumping"),
-            ("Suspicious Task Scheduler activity", "Persistence mechanism created"),
-            ("Masqueraded task or service", "Persistence mechanism created"),
-            ("Suspicious service launched", "Persistence mechanism created"),
-            ("Meterpreter post-exploitation tool", "Malware / loader execution"),
-            ("PowerSploit post-exploitation tool", "Malware / loader execution"),
-        ]:
-            with self.subTest(title=title):
-                m = alert_types.classify({"id": "x", "title": title}, self.map)
-                self.assertEqual(m["type"], expected); self.assertFalse(m["unmapped"])
+    def test_a_chosen_type_carries_the_domain_the_taxonomy_gives_it(self):
+        m = alert_types.typed({"id": "x", "title": "plink.exe", "alert_type": "ingress tool transfer to host",
+                               "entity": "ws-04"}, self.known)
+        self.assertEqual((m["type"], m["alert_type"], m["domain"], m["unmapped"]),
+                         ("Ingress tool transfer to host", "Ingress tool transfer to host", "Endpoint", False),
+                         "the framework's own spelling, whatever the case the executor wrote it in")
+        self.assertEqual(m["source_title"], "plink.exe")
 
-    def test_a_correlation_or_containment_record_is_left_unmapped_on_purpose(self):
-        """A source's own conclusion about a Case is not a behaviour, and no alert type is true of
-        it. It keeps its title, exactly as an unrecognized alert does, and says why."""
-        for title in ("Potential human-operated malicious activity",
-                      "Ransomware-linked threat actor detected",
-                      "Compromised device (attack disruption)"):
-            with self.subTest(title=title):
-                m = alert_types.classify({"id": "x", "title": title}, self.map)
-                self.assertTrue(m["unmapped"])
-                self.assertEqual(m["type"], title, "it keeps its own title as its type")
-                self.assertIsNone(m["domain"], "no type, so no domain")
-                self.assertTrue(m["unmapped_reason"].strip(), "the decision says why")
-                self.assertEqual(m["matched_on"], "title")
+    def test_a_type_the_framework_does_not_hold_is_refused(self):
+        with self.assertRaisesRegex(ValueError, "not an alert type of the framework"):
+            alert_types.typed({"id": "x", "title": "t", "alert_type": "Lateral movement"}, self.known)
 
-    def test_a_decided_non_mapping_is_told_apart_from_one_nobody_has_looked_at(self):
-        decided = alert_types.classify({"id": "x", "title": "Potential human-operated malicious activity"}, self.map)
-        never_seen = alert_types.classify({"id": "y", "title": "A title this source has never raised"}, self.map)
-        self.assertTrue(decided["unmapped"] and never_seen["unmapped"], "both keep their title")
-        self.assertIn("unmapped_reason", decided)
-        self.assertNotIn("unmapped_reason", never_seen, "nothing decided it, so there is no reason to give")
-        self.assertIsNone(never_seen["matched_on"])
+    def test_an_alert_no_type_describes_keeps_its_title_and_says_why(self):
+        m = alert_types.typed({"id": "x", "title": "  Potential human-operated   malicious activity ",
+                               "no_type_reason": "a correlation verdict, not a behaviour"}, self.known)
+        self.assertEqual((m["type"], m["domain"], m["unmapped"]),
+                         ("Potential human-operated malicious activity", None, True))
+        self.assertEqual(m["unmapped_reason"], "a correlation verdict, not a behaviour")
 
-    def test_a_shared_detector_id_is_matched_by_title_so_it_cannot_retype_its_other_alerts(self):
-        """Two detectors in the recordings carry more than one title, and a detector id wins over
-        any title match — so binding them would decide the other title too."""
-        shared = {"c70789ad-b645-4b13-8b6d-265433babfe6", "d60f5b90-ecd8-4d77-8186-a801597ec762"}
-        bound = {d for rule in self.map["rules"] for d in rule.get("detector_ids", [])}
-        self.assertEqual(shared & bound, set(), "a detector that means two things is matched by title")
-        # the alert that would have been dragged along keeps the type its own title earns
-        prevented = alert_types.classify(
-            {"id": "x", "title": "'RemoteExec' malware was prevented",
-             "detectorId": "d60f5b90-ecd8-4d77-8186-a801597ec762"}, self.map)
-        self.assertEqual(prevented["type"], "Malware / loader execution")
-
-    def test_a_title_that_names_no_behaviour_stays_unmapped(self):
-        for title in ("Ransomware-linked emerging threat activity group detected", "Suspicious bootloader modification",
-                      "Unusual impersonated activity (by user)", "Mass delete"):
-            with self.subTest(title=title):
-                self.assertTrue(alert_types.classify({"id": "x", "title": title}, self.map)["unmapped"])
-
-    def test_detector_id_wins_over_the_title(self):
-        custom = {"rules": [{"alert_type": "Credential dumping", "domain": "Endpoint", "detector_ids": ["det-1"], "title_patterns": []},
-                            {"alert_type": "Malware / loader execution", "domain": "Endpoint", "detector_ids": [], "title_patterns": ["malware"]}]}
-        m = alert_types.classify({"id": "x", "title": "Malware found", "detector_id": "det-1"}, custom)
-        self.assertEqual(m["type"], "Credential dumping"); self.assertEqual(m["matched_on"], "detector_id")
-
-    def test_unmapped_alert_keeps_its_title_as_type_and_is_flagged(self):
-        m = alert_types.classify({"id": "x", "title": "  Something   New  "}, self.map)
-        self.assertEqual(m["type"], "Something New"); self.assertTrue(m["unmapped"]); self.assertIsNone(m["domain"])
+    def test_an_alert_with_neither_a_type_nor_a_reason_is_refused(self):
+        with self.assertRaisesRegex(ValueError, "neither an alert_type nor a no_type_reason"):
+            alert_types.typed({"id": "x", "title": "t"}, self.known)
 
     def test_same_type_same_entity_collapses_to_the_strongest(self):
-        alerts = [{"id": "A1", "title": "Sensitive credential memory read", "entity": "ws-04", "severity": "Medium"},
-                  {"id": "A2", "title": "Possible credential dumping (LSASS)", "entity": "WS-04", "severity": "High"},
-                  {"id": "A3", "title": "Possible credential dumping (LSASS)", "entity": "ws-09", "severity": "High"}]
-        out = alert_types.build_alerts(alerts, self.map)
+        alerts = [{"id": "A1", "title": "Sensitive credential memory read", "entity": "ws-04", "severity": "Medium",
+                   "alert_type": "Credential dumping"},
+                  {"id": "A2", "title": "Possible credential dumping (LSASS)", "entity": "WS-04", "severity": "High",
+                   "alert_type": "Credential dumping"},
+                  {"id": "A3", "title": "Possible credential dumping (LSASS)", "entity": "ws-09", "severity": "High",
+                   "alert_type": "Credential dumping"}]
+        out = alert_types.build_alerts(alerts, self.known)
         self.assertEqual([(a["id"], a["entity"], a["confidence"], a["merged_ids"]) for a in out],
                          [("A2", "WS-04", "High", ["A1", "A2"]), ("A3", "ws-09", "High", ["A3"])])
         # the triage rule sees the same thing it would after its own dedup
         self.assertEqual(len(triage.dedupe_alerts(out)), 2)
 
-    def test_the_map_declares_the_source_field_names_not_the_script(self):
-        rules = [{"alert_type": "Credential dumping", "domain": "Endpoint", "detector_ids": ["det-9"], "title_patterns": []}]
-        record = {"id": "x", "title": "y", "sourceDetector": "det-9"}
-        self.assertTrue(alert_types.classify(record, {"rules": rules})["unmapped"])
-        self.assertEqual(alert_types.classify(record, {"fields": {"detector_id": "sourceDetector"}, "rules": rules})["type"], "Credential dumping")
-        self.assertIn("detector_id", self.map["fields"])
-
     def test_levels_are_case_insensitive_and_a_missing_entity_is_empty(self):
-        m = alert_types.classify({"id": "x", "title": "t", "confidence": "high", "entity": None}, self.map)
+        m = alert_types.typed({"id": "x", "title": "t", "confidence": "high", "entity": None,
+                               "no_type_reason": "r"}, self.known)
         self.assertEqual((m["confidence"], m["entity"]), ("High", ""))
-        self.assertEqual(alert_types.classify({"id": "x", "title": "t", "severity": "critical"}, self.map)["confidence"], "High")
+        self.assertEqual(alert_types.typed({"id": "x", "title": "t", "severity": "critical", "no_type_reason": "r"},
+                                           self.known)["confidence"], "High")
 
     def test_the_output_seeds_the_resolution_ledger_and_counts_once_there_too(self):
-        alerts = [{"id": "A1", "title": "Sensitive credential memory read", "entity": "ws-04", "severity": "Medium"},
-                  {"id": "A2", "title": "Possible credential dumping (LSASS)", "entity": "ws-04", "severity": "Medium"}]
-        raw = [alert_types.classify(a, self.map) for a in alerts]  # not yet collapsed
+        alerts = [{"id": "A1", "title": "Sensitive credential memory read", "entity": "ws-04", "severity": "Medium",
+                   "alert_type": "Credential dumping"},
+                  {"id": "A2", "title": "Possible credential dumping (LSASS)", "entity": "ws-04", "severity": "Medium",
+                   "alert_type": "Credential dumping"}]
+        raw = [alert_types.typed(a, self.known) for a in alerts]  # not yet collapsed
         self.assertEqual(inv.resolve({"observations": raw})["malicious_score"], 2)
-        self.assertEqual(inv.resolve({"observations": alert_types.build_alerts(alerts, self.map)})["malicious_score"], 2)
-
-    def test_the_binding_names_its_map(self):
-        import subprocess, sys, tempfile, json as j
-        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
-            j.dump([{"id": "A", "title": "Suspicious inbox forwarding rule", "entity": "u"}], f)
-        out = subprocess.run([sys.executable, os.path.join(ROOT, "tools/shared/alert_types.py"), f.name, "--bindings", DFB_PROFILE, "--json"],
-                             capture_output=True, text=True, check=True).stdout
-        os.unlink(f.name)
-        self.assertEqual(j.loads(out)[0]["type"], "Inbox forwarding / redirect or hide rule")
+        self.assertEqual(inv.resolve({"observations": alert_types.build_alerts(alerts, self.known)})["malicious_score"], 2)
 
     def _ran(self, alerts):
         import subprocess, sys, tempfile, json as j
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
             j.dump(alerts, f)
-        ran = subprocess.run([sys.executable, os.path.join(ROOT, "tools/shared/alert_types.py"),
-                              f.name, "--profile", XDR_PROFILE], capture_output=True, text=True)
+        ran = subprocess.run([sys.executable, os.path.join(ROOT, "tools/shared/alert_types.py"), f.name,
+                              "--root", os.path.join(ROOT, "framework"), "--json"], capture_output=True, text=True)
         os.unlink(f.name)
         return ran
 
-    def test_only_a_gap_nobody_decided_asks_the_maintainer_for_a_rule(self):
-        """Exit 3 is "this profile is missing a rule". A gap the profile decided is not missing
-        anything, so it neither asks for a rule nor fails the run."""
-        decided = self._ran([{"id": "B1", "title": "Potential human-operated malicious activity", "entity": "h"}])
-        self.assertEqual(decided.returncode, 0, decided.stderr)
-        self.assertIn("left unmapped on purpose", decided.stdout)
-        self.assertNotIn("add a rule", decided.stdout)
+    def test_the_script_prints_the_ledger_alerts_and_refuses_an_invented_type(self):
+        import json as j
+        ran = self._ran([{"id": "A", "title": "Suspicious inbox forwarding rule", "entity": "u",
+                          "alert_type": "Inbox forwarding / redirect or hide rule"}])
+        self.assertEqual(ran.returncode, 0, ran.stderr)
+        self.assertEqual(j.loads(ran.stdout)[0]["domain"], "Email")
+        refused = self._ran([{"id": "B", "title": "t", "entity": "u", "alert_type": "Something new"}])
+        self.assertEqual(refused.returncode, 2)
+        self.assertIn("not an alert type of the framework", refused.stderr)
 
-        unknown = self._ran([{"id": "C1", "title": "A title this source has never raised", "entity": "h"}])
-        self.assertEqual(unknown.returncode, 3)
-        self.assertIn("add a rule", unknown.stdout)
-
-        both = self._ran([{"id": "B1", "title": "Potential human-operated malicious activity", "entity": "h"},
-                          {"id": "C1", "title": "A title this source has never raised", "entity": "h"}])
-        self.assertEqual(both.returncode, 3, "one undecided gap is enough to ask")
-
-    def test_every_mapped_alert_type_exists_in_the_framework_taxonomy(self):
-        with open(os.path.join(ROOT, "framework/02-Taxonomy/alert_types.md"), encoding="utf-8") as f:
-            text = f.read()
-        known = alert_types.framework_alert_types(text)
-        self.assertGreater(len(known), 40)
-        for rule in self.map["rules"]:
-            if rule.get("unmapped"):
-                self.assertTrue(rule.get("reason", "").strip(),
-                                "a rule that maps to no alert type says why it does not")
-                self.assertNotIn("alert_type", rule, "a non-mapping names no type")
-                continue
-            self.assertIn(rule["alert_type"], known, rule["alert_type"])
-            self.assertEqual(rule["domain"], known[rule["alert_type"]])
+    def test_a_source_profile_types_no_alert(self):
+        with open(XDR_PROFILE, encoding="utf-8") as f:
+            self.assertNotIn("alert_types", json.load(f), "the executor chooses the type, not a map")
 
 
 class DecisionReadsWhatTheDetectionAsserts(unittest.TestCase):
@@ -1098,7 +999,7 @@ class RunCheck(unittest.TestCase):
                                 "alert_type": "Credential dumping", "entity": "ws-01"}]}
         ledger.update(overrides)
         alerts = [{"id": "A1", "title": "Possible credential dumping (LSASS)", "entity": "ws-01",
-                   "mitreTechniques": ["T1003"], "threatDisplayName": "HackTool:Win32/Mimikatz",
+                   "alert_type": "Credential dumping", "mitreTechniques": ["T1003"], "threatDisplayName": "HackTool:Win32/Mimikatz",
                    "threatFamilyName": "Mimikatz", "detectionSource": "antivirus",
                    "description": "A process read credential material from LSASS.",
                    "recommendedActions": "Run a full scan"}]
@@ -1290,26 +1191,37 @@ class Procedures(unittest.TestCase):
         with open(os.path.join(ROOT, "skills", skill, "SKILL.md"), encoding="utf-8") as f:
             return f.read()
 
-    def test_both_skills_extract_the_evidence_inventory_before_the_ledger(self):
-        for skill in ("zerosoc-triage", "zerosoc-investigation"):
-            text = self.read(skill)
-            self.assertIn("scripts/evidence_inventory.py", text, skill)
-            self.assertLess(text.index("evidence_inventory.py"), text.index("Start the ledger"), skill)
+    def test_triage_extracts_the_evidence_inventory_and_the_chain_before_the_ledger(self):
+        text = self.read("zerosoc-triage")
+        self.assertIn("scripts/evidence_inventory.py", text)
+        self.assertIn("scripts/process_chain.py", text)
+        self.assertLess(text.index("evidence_inventory.py"), text.index("process_chain.py"))
+        self.assertLess(text.index("process_chain.py"), text.index("Start the ledger"))
 
-    def test_both_skills_build_the_process_chain_after_the_inventory(self):
-        for skill in ("zerosoc-triage", "zerosoc-investigation"):
-            text = self.read(skill)
-            self.assertIn("scripts/process_chain.py", text, skill)
-            self.assertLess(text.index("evidence_inventory.py"), text.index("process_chain.py"), skill)
-            self.assertLess(text.index("process_chain.py"), text.index("Start the ledger"), skill)
+    def test_investigation_reads_what_triage_did_before_the_inventory_and_the_category(self):
+        # what triage did is the first thing an investigation needs: the conflict it starts from, the
+        # alert types and the candidate categories, before the evidence is extracted again
+        text = self.read("zerosoc-investigation")
+        procedure = text[text.index("## Procedure"):]
+        ledger = procedure.index("1. **Start the ledger from the Triage Note")
+        inventory = procedure.index("2. **Extract the evidence inventory**")
+        category = procedure.index("3. **Choose the Incident Category")
+        self.assertLess(ledger, inventory)
+        self.assertLess(inventory, procedure.index("process_chain.py"))
+        self.assertLess(procedure.index("process_chain.py"), category)
+        self.assertLess(category, procedure.index("4. **Verify or retract**"))
 
-    def test_both_procedures_record_the_selected_playbook_in_the_ledger(self):
-        for skill, key in (("zerosoc-triage", "domain"), ("zerosoc-investigation", "incident_category")):
-            text = self.read(skill)
-            self.assertIn("`playbook`", text, skill)
-            self.assertIn(f"`{key}`", text, skill)
-            self.assertLess(text.index("`playbook`"), text.index("Start the ledger") if "Start the ledger" in text
-                            else len(text), skill)
+    def test_both_procedures_choose_and_record_the_selected_playbook(self):
+        triage = self.read("zerosoc-triage")
+        self.assertIn("`playbook`", triage)
+        self.assertIn("`domain`", triage)
+        self.assertLess(triage.index("**Choose each alert's type"), triage.index("Start the ledger"))
+        self.assertLess(triage.index("`playbook`"), triage.index("Start the ledger"))
+        investigation = self.read("zerosoc-investigation")
+        step = investigation[investigation.index("3. **Choose the Incident Category"):]
+        self.assertIn("`playbook`", step)
+        self.assertIn("`incident_category`", step)
+        self.assertIn("re-run step 3", investigation, "a pivot chooses again")
 
     def test_the_retrospective_sweep_runs_through_the_case_store(self):
         text = self.read("zerosoc-investigation")
@@ -1318,15 +1230,15 @@ class Procedures(unittest.TestCase):
 
     def test_the_timebox_runs_from_when_the_case_is_taken_not_from_when_the_ledger_is_started(self):
         # Guardrails §5 gives an executor assigned a Case in Investigation ten or twenty minutes: the clock
-        # starts at the assignment, so the procedure names `started_at` at its first step, before the
-        # playbook selection and the extraction, and the ledger step carries that time rather than setting one
+        # starts at the assignment, so the procedure names `started_at` at its first step, before reading
+        # the Triage Note, the extraction and the playbook selection, and the ledger carries that time
         text = self.read("zerosoc-investigation")
         procedure = text[text.index("## Procedure"):]
         first = procedure.index("`started_at`")
+        self.assertLess(first, procedure.index("Read what triage did"))
         self.assertLess(first, procedure.index("2. **Extract the evidence inventory**"))
-        self.assertLess(first, procedure.index("Start the ledger"))
-        ledger_step = procedure[procedure.index("Start the ledger"):procedure.index("4. **Verify or retract**")]
-        self.assertIn("as noted at step 1", ledger_step)
+        step = procedure[procedure.index("1. **Start the ledger"):procedure.index("2. **Extract")]
+        self.assertIn("`started_at` as noted here (never the time this file is created)", step)
 
 
 class AutonomyMatrix(unittest.TestCase):

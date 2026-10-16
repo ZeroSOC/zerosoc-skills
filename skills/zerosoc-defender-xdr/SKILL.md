@@ -26,7 +26,6 @@ and every script that needs it reads it from there rather than from a copy:
 | `source` | which technology this is, which API these paths are read from, and when the profile was last true of it |
 | `fields` | where each input of Detection & Analysis §1.1 lives on an incident, an alert and an evidence item |
 | `vocabularies` | the source's own words in the framework's and OCSF's terms: severity, status, its classification as the framework's verdict, the determinations each verdict admits, the OCSF analytic type each detection source is, and what each remediation state says it did |
-| `alert_types` | detector id and title rules to the framework's alert types and telemetry domains |
 | `case_map` | every path of a record: where it lands on the Case, or why nothing reads it |
 | `extension` | the object this source keeps on the Case for what it states and the framework has no field for |
 | `capability_coverage` | which capability classes and required data sources it answers, and where it stops |
@@ -37,7 +36,6 @@ method skills take it from there:
 
 ```bash
 # run from the method skill that needs them, which resolves the profile through the binding:
-python3 alert_types.py alerts.json --bindings zerosoc.capabilities.json --json
 python3 alert_metadata.py alerts.json --bindings zerosoc.capabilities.json --evidence evidence.json --json
 ```
 
