@@ -84,7 +84,7 @@ per Case: the playbook the script prints.
 3. **Choose the Incident Category and select the playbook.** Triage's candidates are where you start, and
    the category is decided by the adversary's **objective and impact** (§2.2), read in
    [incident_categories.md](references/framework/02-Taxonomy/incident_categories.md) against what the
-   Note and the inventory show. Then run
+   Note and the inventory show, held to [rules/category.md](rules/category.md). Then run
    `python3 scripts/select_playbook.py --category IC-01 --section Investigation --bindings zerosoc.capabilities.json`.
    It prints the version, the required data sources, the visibility gaps to record, and the Investigation
    section (hypotheses, validation queries with their outcome tags, re-classification pivots). Record the

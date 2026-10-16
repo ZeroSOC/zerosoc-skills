@@ -116,7 +116,8 @@ Read per alert: the playbook section the script prints.
    span domains, the domain of most of them, and the others' playbooks in the Note's Provenance): a Case
    whose playbook is not recorded cannot be reproduced. The candidate Incident Categories are yours to
    propose, in the order the Case points at them: start from the sections' own, and add those the
-   techniques of step 3 point at.
+   techniques of step 3 point at. The rules you are held to while you choose are
+   [rules/types.md](rules/types.md).
    The rules you are held to while you run the checks are [rules/checks.md](rules/checks.md), given to any
    executor as they stand (`$language` in them is the language the deployment writes in).
 5. **Start the ledger.** Create `ledger.json` (format in `scripts/triage_decide.py`) with the
