@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+- **The executor chooses each alert's type; no source profile maps one.** The alert-type map of the
+  source profile decided the type from the detector id or the title, and an alert it did not know kept
+  its title as its type: no playbook section, no False Positive or Benign conditions to name, no
+  candidate Incident Category. Two ledger alerts in three on the lab tenants went that way (#38),
+  among them a custom file-indicator alert named after the file, whose triage ran on the source's
+  recommended actions alone. Adding rules only moves the edge. Triage step 4 now has the executor read
+  the Alert Type taxonomy and give every alert the type that describes what its detection fires on
+  (description, evidence, techniques, detection source; the title decides nothing), or say why no type
+  describes it; the type's domain is the taxonomy's, so a Case may open the playbooks of several domains,
+  and the candidate Incident Categories are the executor's to propose, starting from the sections' own
+  (#23). `alert_types.py` no longer reads a profile: it takes the chosen `alert_type` or
+  `no_type_reason` on each alert, refuses a type the taxonomy does not hold, and still collapses the same
+  type on the same entity. The `alert_types` block is gone from the Defender XDR profile, the profile
+  schema and the override schema, and `check_run.py` checks the executor's choices instead of the map's
+  coverage.
+- **Investigation reads what triage did first.** Its procedure now starts the ledger from the Triage
+  Note (the conflict that promoted the Case, the alert types, the candidate categories), then extracts
+  the evidence inventory, then chooses the Incident Category by the adversary's objective and impact,
+  with triage's candidates as the starting point, and only then opens the playbook. A re-classification
+  pivot chooses again at the same step.
 - **A result that carried no information weighs nothing on either side.** Detection & Analysis §2.4
   says a result that yields no information carries neither side, and that a scoped negative is a real
   observation. The ledger's `no_information_refs` held both kinds, so the Benign side had to read them

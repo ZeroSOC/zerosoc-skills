@@ -40,21 +40,24 @@ per Case: the playbook the script prints.
 - The investigation **timebox** (10 minutes at High or Critical severity, 20 otherwise, reference values)
   and the Case **token budget**; both are organization settings. `scripts/resolve.py` measures the
   timebox from the ledger's timestamps: it runs from `started_at`, the moment the Case was assigned to
-  you in Investigation (Guardrails §5), which is noted before step 1, not when the ledger file is
-  created, so the playbook selection and the extraction count against it.
+  you in Investigation (Guardrails §5), which is noted at step 1, not when the ledger file is
+  created, so reading the Triage Note, the extraction and the playbook selection count against it.
 
 ## Procedure
 
-1. **Select the playbook and check visibility.** First note the UTC time you take the Case: it is the
-   ledger's `started_at`, and the timebox runs from it. Then use the candidate `incident_category` from
-   the contract:
-   `python3 scripts/select_playbook.py --category IC-01 --section Investigation --bindings zerosoc.capabilities.json`.
-   It prints the version, the required data sources, the visibility gaps to record, and the Investigation
-   section (hypotheses, validation queries with their outcome tags, re-classification pivots). Record the
-   selection in the ledger (`playbook`, `playbook_version`, `incident_category`), and again after a
-   re-classification pivot: the Note's Provenance repeats it. If no
-   playbook exists for the category at this framework pin, apply §2 directly with the category definition
-   in [incident_categories.md](references/framework/02-Taxonomy/incident_categories.md).
+1. **Start the ledger from the Triage Note.** First note the UTC time you take the Case: it is the
+   ledger's `started_at`, and the timebox runs from it. Read what triage did before anything else: the
+   conflict that promoted the Case (the Malicious observations beyond the alerts and the Benign
+   observations they were weighed against), the alert type it gave each alert, and the candidate Incident
+   Categories it proposed. Create `ledger.json` (format in `scripts/resolve.py`) with every tagged
+   Observation of the Note, its side, confidence, source artifact and event reference, the Case
+   `severity`, `started_at` as noted here (never the time this file is created) and `at` on every
+   observation as it is added: the timebox is computed from these, not declared. Alert observations carry
+   their `alert_type` and `entity`, so the same type on the same entity counts once in the score. Carry
+   the ledger's `source_profile` object across and refresh it with
+   `python3 scripts/source_profile.py --bindings zerosoc.capabilities.json --json`: a local override of the
+   shipped profile in force now is recorded on the ledger and in the Case's `provenance.products`, and
+   named in the Note's Provenance.
 2. **Extract the evidence inventory** for the Case as it is now: alerts are appended after triage, so the
    triage inventory is a starting point, not the answer. List every entity the source attaches to the
    Case's alerts as `evidence.json` and run
@@ -72,21 +75,23 @@ per Case: the playbook the script prints.
    lineage the evidence does not show. Command lines, their decodings and the remediation state of each process
    are observations in their own right, not decoration, and so is the number of layers a command was encoded
    in: decoding stops at five rounds, and a command still encoded there is recorded as such.
-3. **Start the ledger** `ledger.json` (format in `scripts/resolve.py`) from the Triage Note: every
-   tagged Observation with its side, confidence, source artifact and event reference. Carry the Case's
-   `detection_metadata` across and **refresh it at this gate**: alerts appended since triage bring their
-   own assertions, and the remediation state changes while a Case is open. Re-run
+   Carry the Case's `detection_metadata` across and **refresh it at this gate**: alerts appended since
+   triage bring their own assertions, and the remediation state changes while a Case is open. Re-run
    `python3 scripts/alert_metadata.py alerts.json --bindings zerosoc.capabilities.json --evidence evidence.json --json`
-   on the Case as it now is, keeping the dispositions already recorded on the recommended actions. Carry
-   the ledger's `source_profile` object across too, and refresh it with
-   `python3 scripts/source_profile.py --bindings zerosoc.capabilities.json --json`: a local override of the
-   shipped profile in force now is recorded on the ledger and in the Case's `provenance.products`, and
-   named in the Note's Provenance. Record `started_at` (UTC) as noted at step 1, never the time this
-   file is created, the Case `severity`, the `evidence_inventory` object of step 2, and `at` on every
-   observation as it is added: the timebox is computed from these, not declared. Alert observations carry their
-   `alert_type` and `entity`, so the same type on the same entity counts once in the score; alerts
-   appended since triage are added with `python3 scripts/alert_types.py alerts.json --bindings zerosoc.capabilities.json --json`,
-   whose entries are ready-made Malicious observations. Refine the two
+   on the Case as it now is, keeping the dispositions already recorded on the recommended actions. Give
+   each alert appended since triage its type as triage does (its step 4) and add them with
+   `python3 scripts/alert_types.py alerts.json --json`, whose entries are ready-made Malicious observations.
+3. **Choose the Incident Category and select the playbook.** Triage's candidates are where you start, and
+   the category is decided by the adversary's **objective and impact** (§2.2), read in
+   [incident_categories.md](references/framework/02-Taxonomy/incident_categories.md) against what the
+   Note and the inventory show. Then run
+   `python3 scripts/select_playbook.py --category IC-01 --section Investigation --bindings zerosoc.capabilities.json`.
+   It prints the version, the required data sources, the visibility gaps to record, and the Investigation
+   section (hypotheses, validation queries with their outcome tags, re-classification pivots). Record the
+   selection in the ledger (`playbook`, `playbook_version`, `incident_category`), and again after a
+   re-classification pivot: the Note's Provenance repeats it. If no
+   playbook exists for the category at this framework pin, apply §2 directly with the category definition.
+   Refine the two
    hypotheses to the Case (§2.1), starting the Malicious one from the **threat or family the detection
    named**: a named family has documented behaviour, persistence and follow-on activity, so the queries
    ask whether *those* are present rather than whether the activity is malicious in general. The name is a
@@ -125,7 +130,7 @@ per Case: the playbook the script prints.
    budget is exhausted (`budget_exhausted`), it closes as **Insufficient Data** (7) with a monitoring watch (`watch_until`; re-open on recurrence of the
    entities) and emit a visibility or tuning ticket. Never stop for doubt; never "escalate".
 9. **Re-classify on evidence drift** (§2.2.5). If the objective differs from or exceeds the candidate
-   category, change `incident_category`, re-run step 1 for the new playbook, carry every observation
+   category, change `incident_category`, re-run step 3 for the new playbook, carry every observation
    forward, and record the pivot and its reason in the Note. The classification stays provisional until
    promotion.
 10. **Assign correctly.** The moment a Crown Jewel asset or a privileged identity enters the scope, the

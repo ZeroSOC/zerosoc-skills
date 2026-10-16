@@ -33,12 +33,10 @@ import re
 import sys
 
 # what an override may hold: every block of a profile but the one that says which source it is
-BLOCKS = ("fields", "vocabularies", "alert_types", "case_map", "extension", "capability_coverage", "queries")
+BLOCKS = ("fields", "vocabularies", "case_map", "extension", "capability_coverage", "queries")
 # a list of a profile whose entries have an identity: an override's entry replaces the shipped entry
-# of the same identity. The rules are tried in order and have none: the deployment's are tried first
-# and the shipped ones are left as they are. Any other list is replaced whole.
+# of the same identity. Any other list is replaced whole.
 KEYED = {("case_map",): "path"}
-FIRST = {("alert_types", "rules"): "alert_type"}
 
 
 def _named_by(bindings_path):
@@ -136,8 +134,6 @@ def _laid_over(shipped, local, where=()):
         replaced = {entry[identity]: entry for entry in local}
         kept = [replaced.pop(entry[identity], entry) for entry in shipped]
         return _said(kept + list(replaced.values()))
-    if where in FIRST and isinstance(shipped, list) and isinstance(local, list):
-        return _said(local) + shipped
     return _said(local)
 
 
@@ -145,20 +141,10 @@ def _paths(local, where=()):
     """What an override sets, as the paths a reader of the record can find in the profile."""
     if isinstance(local, dict):
         return [p for key, value in local.items() for p in _paths(value, where + (key,))]
-    named = KEYED.get(where) or FIRST.get(where)
+    named = KEYED.get(where)
     if named and isinstance(local, list):
-        return [f"{'.'.join(where)}[{_names(entry, named)}]" for entry in local]
+        return [f"{'.'.join(where)}[{entry.get(named) if isinstance(entry, dict) else entry}]" for entry in local]
     return [".".join(where)]
-
-
-def _names(entry, identity):
-    """What to call one entry of a keyed list. An alert-type rule that declares a deliberate
-    non-mapping carries no ``alert_type``, and is named by the reason it gives instead."""
-    if not isinstance(entry, dict):
-        return entry
-    if identity in entry:
-        return entry[identity]
-    return "unmapped: " + str(entry.get("reason", "")) if entry.get("unmapped") else entry.get(identity)
 
 
 def overridden(profile, override_path):
@@ -206,23 +192,12 @@ def overridden(profile, override_path):
 
 
 def load(path, override=None):
-    """The profile at ``path`` — with the local override laid over it, where the deployment names
-    one — and its title patterns compiled: a bad pattern fails here rather than at the first alert
-    that meets it."""
+    """The profile at ``path``, with the local override laid over it where the deployment names one."""
     with open(path, encoding="utf-8") as handle:
         profile = json.load(handle)
     if override:
         profile = overridden(profile, override)
-    for rule in (profile.get("alert_types") or {}).get("rules", []):
-        for pattern in rule.get("title_patterns", []):
-            re.compile(pattern)
     return profile
-
-
-def alert_rules(profile):
-    """The view the alert-type assignment reads: the rules, and the source's own field names."""
-    block = profile.get("alert_types") or {}
-    return {"fields": block.get("fields") or {}, "rules": block.get("rules") or []}
 
 
 def telemetry_rows(profile):

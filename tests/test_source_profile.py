@@ -145,10 +145,6 @@ class Coherence(unittest.TestCase):
         self.profile["fields"]["evidence"]["upn"] = "userAccount.userPrincipalNam"
         self.assertIn("userAccount.userPrincipalNam", self.problems())
 
-    def test_the_alert_type_fields_are_paths_of_the_record_too(self) -> None:
-        self.profile["alert_types"]["fields"]["detector_id"] = "detectorIdX"
-        self.assertIn("detectorIdX", self.problems())
-
     def test_a_path_is_mapped_once(self) -> None:
         self.profile["case_map"].append({"path": "id", "ignored": "a second entry that contradicts the first"})
         self.assertIn("'id' is in the case_map 2 times", self.problems())
@@ -156,14 +152,6 @@ class Coherence(unittest.TestCase):
     def test_a_path_is_mapped_or_ignored_never_both(self) -> None:
         self.profile["case_map"][0]["ignored"] = "and yet it is mapped, so which is it"
         self.assertIn("both mapped and ignored", self.problems())
-
-    def test_a_rule_that_can_match_nothing_or_everything_is_said(self) -> None:
-        rules = self.profile["alert_types"]["rules"]
-        rules[0]["detector_ids"], rules[0]["title_patterns"] = [], []
-        rules[1]["title_patterns"] = [""]
-        found = self.problems()
-        self.assertIn("matches nothing", found)
-        self.assertIn("matches every title", found)
 
     def case_schema(self) -> dict[str, Any]:
         return json.loads((ROOT / "skills" / "zerosoc-defender-xdr" / "references" / "framework"

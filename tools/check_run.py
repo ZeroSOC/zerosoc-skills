@@ -6,7 +6,7 @@
 A run is a directory holding what the executor produced, one file per artifact:
 
   evidence.json            the Case's evidence rows, as given to evidence_inventory.py
-  alerts.json              the source alerts, as given to alert_types.py
+  alerts.json              the source alerts with the types the executor chose, as given to alert_types.py
   ledger.triage.json       the triage ledger at the decision, with "domain", the Note's
                            "recorded_verdict" and the "detection_metadata" of alert_metadata.py
   ledger.investigation.json  the investigation ledger at the resolution   (optional)
@@ -203,27 +203,30 @@ def check_source_profile(report, run, ledger, label, profile_path, note_name):
                  "named" if version in note or stated["file"] in note else "the Note names neither")
 
 
-def check_alert_map(report, run, profile_path):
-    """The source's alerts against its source profile: what it covers, and what it collapses."""
+def check_alert_map(report, run):
+    """The alert types the executor chose: each one the framework's, and the same type on one entity
+    collapsed."""
     alerts = read(run, "alerts.json")
     if alerts is None:
-        report.skip("alert types: mapped from the source profile", "no alerts.json in the run")
+        report.skip("alert types: chosen from the framework's taxonomy", "no alerts.json in the run")
         return None
-    if not profile_path or not os.path.exists(profile_path):
-        report.skip("alert types: mapped from the source profile", "no source profile given")
+    catalog = alert_types.framework_alert_types(read_reference("02-Taxonomy/alert_types.md"))
+    try:
+        built = alert_types.build_alerts(alerts, catalog)
+    except ValueError as refused:
+        report.check(False, "alert types: chosen from the framework's taxonomy",
+                     "every alert typed from the taxonomy, or a reason no type fits", str(refused))
         return None
-    amap = source_profile.alert_rules(effective_profile(run, profile_path))
-    built = alert_types.build_alerts(alerts, amap)
-    unmapped = sorted({str(a.get("source_title") or a.get("id")) for a in built if a.get("unmapped")})
-    if unmapped:
-        report.note("alert types: source titles the profile does not cover",
-                    f"{len(unmapped)} to report on the ticket, with the detector id of each: " + "; ".join(unmapped))
+    untyped = [a for a in built if a.get("unmapped")]
+    if untyped:
+        report.note("alert types: alerts no type describes",
+                    "; ".join(f"{a['source_title']}: {a['unmapped_reason']}" for a in untyped))
     else:
-        report.ok("alert types: every source title maps to a framework type")
+        report.ok("alert types: every alert typed from the framework's taxonomy")
     collapsed = len(alerts) - len(built)
     report.ok("alert types: same type on one entity collapsed",
               f"{len(alerts)} source alerts → {len(built)} observations ({collapsed} collapsed)")
-    return {str(a.get("source_title") or "").lower() for a in built}
+    return {str(a.get("source_title") or "").lower() for a in untyped}
 
 
 def check_alert_ledger(report, ledger, label, source_titles=None):
@@ -442,7 +445,7 @@ def _run(run, profile):
 
     print("# triage")
     check_inventory(report, run, triage, "triage")
-    titles = check_alert_map(report, run, profile)
+    titles = check_alert_map(report, run)
     check_alert_ledger(report, triage, "triage", titles)
     check_source_profile(report, run, triage, "triage", profile, "triage_note.md")
     check_detection_metadata(report, run, triage, "triage", "triage_note.md", profile)

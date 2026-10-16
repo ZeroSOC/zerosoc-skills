@@ -1,51 +1,34 @@
 #!/usr/bin/env python3
-"""Map source alerts to the framework's alert types and build the ledger's alerts. Standard library only.
+"""Build the ledger's alerts from the alert types the executor chose. Standard library only.
 
-  alert_types.py alerts.json --profile <source_profile.json> [--json]
+  alert_types.py alerts.json [--json]
 
-Detection & Analysis §1.1: the same alert type on the same entity counts once. That is only
-deterministic when the alert type is: this script assigns it from the source profile (detector id first,
-then title pattern) and collapses same type + same entity to the strongest alert, listing what it merged.
+Detection & Analysis §1.1: the same alert type on the same entity counts once. The executor chooses
+each alert's type from the Alert Catalogs of the triage playbooks (select_playbook.py --catalogs), by
+what the detection fires on: its description, its evidence, its techniques and what detected it. The
+title is the source's name for the detection and decides nothing. This script checks each choice
+against the framework's alert types and collapses the same type on the same entity to the strongest
+alert, listing what it merged.
 
-That counting, and an alert type that groups with the same behaviour under another vendor's name, are
-what the type is for. Choosing a playbook is not: the executor identifies the telemetry domain, and
-the techniques the detection asserts point at the candidate alert types (select_playbook.py
---technique), both before this runs. An alert left unmapped changes neither.
+alerts.json: a list of {"id", "title", "entity", "alert_type"?, "no_type_reason"?, "severity"?,
+"confidence"?, "technique"?, "detector_id"?}. "alert_type" is a row of the framework's alert types;
+an alert no row fits carries "no_type_reason" in its place, keeps its title as its type, and is
+flagged "unmapped" with that reason: the taxonomy is not bent to cover what it does not describe (a
+source's correlation, attribution or containment record states a conclusion, not a behaviour). An
+alert type the framework does not hold, or an alert with neither field, is refused: exit 2.
 
-  alert_types.py alerts.json --bindings zerosoc.capabilities.json   (reads the binding's "source_profiles")
-
-alerts.json: a list of {"id", "title", "detector_id"?, "entity", "severity"?, "confidence"?, "technique"?}.
-The rules are the `alert_types` block of the technology's **source profile** (one versioned home for
-what its records mean, validated against capabilities/source_profile.schema.json):
-{"alert_types": {"fields": {"detector_id": "<the source's own field name>", ...},
-                 "rules": [{"alert_type": "<framework alert type>", "domain": "<telemetry domain>",
-                            "detector_ids": ["..."], "title_patterns": ["<regex, case-insensitive>"]},
-                           {"unmapped": true, "reason": "<why no framework type is right>",
-                            "title_patterns": ["..."]}]}}
-"fields" lets the source's records be passed unrenamed; the script itself knows no source. An alert no
-rule matches keeps its normalized title as its type and is flagged "unmapped": it still deduplicates,
-and the flag tells the maintainer of the profile what to add. Some alerts should stay that way — a
-source's correlation, attribution and containment records state a conclusion rather than a behaviour,
-and no behaviour type is true of them. A rule declaring "unmapped" says so, with the reason, and the
-alert is flagged exactly as before: the taxonomy is not bent to cover what it does not describe, and
-the maintainer's list of what to add stops carrying what was already decided. Output: the "alerts"
-array of ledger.json
-(format in triage_decide.py). Each entry also carries "alert_type" and "side": "Malicious", so the same
-entries seed the observations of resolve.py, where one type on one entity again counts once.
+Output: the "alerts" array of ledger.json (format in triage_decide.py). Each entry also carries
+"alert_type" and "side": "Malicious", so the same entries seed the observations of resolve.py, where
+one type on one entity again counts once.
 """
 import argparse, json, os, re, sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import source_profile
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.normpath(os.path.join(HERE, "..", "references", "framework"))
+TAXONOMY = os.path.join("02-Taxonomy", "alert_types.md")
 
 W = {"Low": 1, "Medium": 2, "High": 3}
 SEV2CONF = {"Informational": "Low", "Low": "Low", "Medium": "Medium", "High": "High", "Critical": "High"}
-
-
-def load_map(path, override=None):
-    """The alert-type rules of the technology at ``path``: its source profile's own block, with the
-    deployment's local override laid over it where it names one."""
-    return source_profile.alert_rules(source_profile.load(path, override))
 
 
 def framework_alert_types(markdown):
@@ -62,61 +45,51 @@ def framework_alert_types(markdown):
     return out
 
 
-def _field(alert, amap, name):
-    """The canonical field, or the source's own name for it as the profile declares under "fields"."""
-    value = alert.get(name)
-    alias = (amap.get("fields") or {}).get(name)
-    return value if value not in (None, "") or not alias else alert.get(alias)
+def known_types(root=ROOT):
+    with open(os.path.join(root, TAXONOMY), encoding="utf-8") as handle:
+        return framework_alert_types(handle.read())
 
 
-def _confidence(alert, amap):
-    stated = str(_field(alert, amap, "confidence") or "").capitalize()
+def _confidence(alert):
+    stated = str(alert.get("confidence") or "").capitalize()
     if stated in W:
         return stated
-    return SEV2CONF.get(str(_field(alert, amap, "severity") or "Medium").capitalize(), "Medium")
+    return SEV2CONF.get(str(alert.get("severity") or "Medium").capitalize(), "Medium")
 
 
-def classify(alert, amap):
-    """The alert with its framework type: {"type", "domain", "unmapped", "matched_on", ...}.
+def typed(alert, known):
+    """The alert as the ledger carries it: {"type", "domain", "unmapped", ...}.
 
-    A rule that declares ``unmapped`` leaves the alert its own title, exactly as no rule at all would,
-    and carries the reason on ``unmapped_reason``. The difference is ``matched_on``: a gap somebody
-    decided says which rule decided it, and one nobody has looked at yet says nothing.
+    The type is the executor's choice, held to the framework's names: its domain is the one the
+    taxonomy gives the type. An alert no type fits keeps its own title, with the reason.
     """
-    detector = _field(alert, amap, "detector_id")
-    title = re.sub(r"\s+", " ", str(_field(alert, amap, "title") or "")).strip()
-    hit, matched_on = None, None
-    for rule in amap.get("rules", []):
-        if detector and detector in rule.get("detector_ids", []):
-            hit, matched_on = rule, "detector_id"
-            break
-    if hit is None:
-        for rule in amap.get("rules", []):
-            if any(re.search(p, title, re.IGNORECASE) for p in rule.get("title_patterns", [])):
-                hit, matched_on = rule, "title"
-                break
-    decided = bool(hit and hit.get("unmapped"))
-    mapped = hit is not None and not decided
-    alert_type = hit["alert_type"] if mapped else title
-    out = {"id": _field(alert, amap, "id"), "type": alert_type, "alert_type": alert_type, "side": "Malicious",
-           "domain": hit["domain"] if mapped else None, "entity": str(_field(alert, amap, "entity") or ""),
-           "confidence": _confidence(alert, amap), "source_title": title, "unmapped": not mapped,
-           "matched_on": matched_on}
-    if decided:
-        out["unmapped_reason"] = hit["reason"]
-    for key in ("severity", "technique"):
-        if _field(alert, amap, key):
-            out[key] = _field(alert, amap, key)
-    if detector:
-        out["detector_id"] = detector
+    title = re.sub(r"\s+", " ", str(alert.get("title") or "")).strip()
+    chosen = str(alert.get("alert_type") or "").strip()
+    reason = str(alert.get("no_type_reason") or "").strip()
+    if chosen:
+        domain = next((d for t, d in known.items() if t.casefold() == chosen.casefold()), None)
+        if domain is None:
+            raise ValueError(f"alert {alert.get('id')}: '{chosen}' is not an alert type of the framework;"
+                             " choose a row of an Alert Catalog, or give no_type_reason")
+        chosen = next(t for t in known if t.casefold() == chosen.casefold())
+    elif not reason:
+        raise ValueError(f"alert {alert.get('id')}: neither an alert_type nor a no_type_reason")
+    out = {"id": alert.get("id"), "type": chosen or title, "alert_type": chosen or title, "side": "Malicious",
+           "domain": domain if chosen else None, "entity": str(alert.get("entity") or ""),
+           "confidence": _confidence(alert), "source_title": title, "unmapped": not chosen}
+    if not chosen:
+        out["unmapped_reason"] = reason
+    for key in ("severity", "technique", "detector_id"):
+        if alert.get(key):
+            out[key] = alert[key]
     return out
 
 
-def build_alerts(alerts, amap):
-    """Classified alerts, same type on the same entity collapsed to the strongest, in first-seen order."""
+def build_alerts(alerts, known):
+    """Typed alerts, same type on the same entity collapsed to the strongest, in first-seen order."""
     best, order = {}, []
     for alert in alerts:
-        c = classify(alert, amap)
+        c = typed(alert, known)
         key = (c["type"].strip().lower(), str(c["entity"]).strip().lower())
         if key not in best:
             best[key] = dict(c, merged_ids=[c["id"]])
@@ -134,25 +107,21 @@ def build_alerts(alerts, amap):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("alerts")
-    source_profile.add_arguments(ap)
+    ap.add_argument("--root", default=ROOT)
     ap.add_argument("--json", action="store_true")
     a = ap.parse_args()
-    profile = source_profile.from_arguments(ap, a)
-    out = build_alerts(json.load(open(a.alerts, encoding="utf-8")), source_profile.alert_rules(profile))
+    try:
+        out = build_alerts(json.load(open(a.alerts, encoding="utf-8")), known_types(a.root))
+    except ValueError as refused:
+        print(refused, file=sys.stderr)
+        sys.exit(2)
     if a.json:
         print(json.dumps(out, indent=2, ensure_ascii=False))
         return
     for x in out:
-        if x.get("unmapped_reason"):        # a gap the profile decided: there is nothing to add
-            flag = f"  left unmapped on purpose: {x['unmapped_reason']}"
-        elif x["unmapped"]:
-            flag = "  UNMAPPED: add a rule to the source profile's alert_types"
-        else:
-            flag = ""
+        flag = f"  no alert type fits: {x['unmapped_reason']}" if x["unmapped"] else ""
         merged = f"  (counts once for {', '.join(x['merged_ids'])})" if len(x["merged_ids"]) > 1 else ""
         print(f"{x['id']}\t{x['type']}\t{x['entity']}\t{x['confidence']}{merged}{flag}")
-    if any(x["unmapped"] and not x.get("unmapped_reason") for x in out):
-        sys.exit(3)
 
 
 if __name__ == "__main__":

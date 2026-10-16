@@ -179,27 +179,6 @@ def coherent(profile: dict[str, Any], where: str) -> list[str]:
                 problems.append(
                     f"{where}: fields.{group}.{name} reads {path!r}, which the case_map does not name"
                 )
-    for name, path in (profile["alert_types"].get("fields") or {}).items():
-        if f"alerts[].{path}" not in paths:
-            problems.append(
-                f"{where}: alert_types.fields.{name} reads {path!r}, which the case_map does not name")
-    for rule in profile["alert_types"]["rules"]:
-        # a rule either names the framework type its alerts carry, or says they are deliberately
-        # left unmapped; both forms match the same way, so both are reported by what they are
-        named = (f"alert type {rule['alert_type']!r}" if "alert_type" in rule
-                 else f"the non-mapping {rule.get('reason', '')!r}")
-        if not rule.get("detector_ids") and not rule.get("title_patterns"):
-            problems.append(f"{where}: {named} has no detector id and no "
-                            "title pattern, so it matches nothing")
-        for pattern in rule.get("title_patterns", []):
-            if not pattern.strip():
-                problems.append(f"{where}: {named} has an empty title "
-                                "pattern, which matches every title")
-                continue
-            try:
-                re.compile(pattern)
-            except re.error as exc:
-                problems.append(f"{where}: {named} has a bad pattern {pattern!r}: {exc}")
     for name, held in profile["extension"]["properties"].items():
         if held["from"] not in paths:
             problems.append(f"{where}: extension.{name} reads {held['from']!r}, which the case_map does not name")
