@@ -13,6 +13,8 @@ executor puts that language in its place; read as it is, it means the language o
 - A detection that matches an indicator fires on the indicator being seen: type the act that put it
   where it was seen (a file written, a connection made, a process started), as the evidence shows it.
   What the indicator's author says the indicator is used for is a claim the checks test.
+- Type an execution only when the evidence shows the file running; otherwise, by what put the file
+  there.
 - Name the type exactly as the taxonomy writes it. Where two types fit, the *Distinct from* clause
   decides between them.
 - A detection no type describes gets none, with the reason: a source's correlation, attribution or
