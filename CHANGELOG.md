@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **An execution type needs the file running.** `rules/types.md`: type an execution only when the
+  evidence shows the file running; otherwise, by what put the file there. An executor typed a signed
+  tool that was downloaded and never run as *Malware / loader execution*, and that section's location
+  check promoted the Case.
 - **Ingress check 3 decides on what the file was run to do.** The pin follows the framework to
   `bc34d08` (ZeroSOC/zerosoc-framework#105): a downloaded tool run from the folder it landed in is no
   longer `Malicious (High)` by itself; its command, arguments and children decide.
