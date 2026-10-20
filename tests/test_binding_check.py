@@ -109,6 +109,60 @@ class ReferenceBinding(unittest.TestCase):
             self.assertIn("'Anti-virus'", out.getvalue())
 
 
+class ProvidersPerClass(unittest.TestCase):
+    """A class may bind several providers, each saying which observables it takes (#71)."""
+
+    TWO = {"reputation.multi_engine": [
+        {"tool": "mcp:ip-rep/check", "accepts": ["ip"], "egress": "third-party"},
+        {"tool": "mcp:multi/lookup", "accepts": ["ip", "domain", "hash"], "egress": "third-party"}]}
+
+    def _binding(self, capabilities):
+        b = copy.deepcopy(BINDING)
+        b["capabilities"].update(capabilities)
+        return b
+
+    def test_one_object_per_class_is_still_a_binding(self):
+        self.assertEqual(check.schema_problems(BINDING), [])
+
+    def test_a_list_of_providers_is_a_binding(self):
+        self.assertEqual(check.schema_problems(self._binding(self.TWO)), [])
+
+    def test_a_listed_provider_says_what_it_accepts(self):
+        b = self._binding({"reputation.multi_engine": [{"tool": "mcp:ip-rep/check", "egress": "third-party"}]})
+        self.assertTrue(any("accepts" in p for p in check.schema_problems(b)), check.schema_problems(b))
+
+    def test_only_known_observable_kinds_and_egress(self):
+        for bad in ({"tool": "mcp:x/y", "accepts": ["email"]}, {"tool": "mcp:x/y", "accepts": ["ip"], "egress": "public"}):
+            self.assertTrue(check.schema_problems(self._binding({"reputation.multi_engine": [bad]})), bad)
+
+    def test_an_empty_list_binds_nothing_and_is_refused(self):
+        self.assertTrue(check.schema_problems(self._binding({"reputation.multi_engine": []})))
+
+    def test_the_reference_check_reads_the_first_provider_and_leaves_the_rest_alone(self):
+        b = copy.deepcopy(BINDING)
+        b["capabilities"]["telemetry.endpoint"] = [{"tool": "mcp:x/evidence", "accepts": ["ip"]},
+                                                    {"tool": "mcp:other/edr", "accepts": ["hash"]}]
+        self.assertEqual(check.differences(b, MANIFEST), [])
+        b["capabilities"]["telemetry.endpoint"][0]["tool"] = "mcp:other/edr"
+        self.assertEqual(check.differences(b, MANIFEST),
+                         ["capability telemetry.endpoint: the manifest binds mcp:x/evidence, the binding mcp:other/edr"])
+
+    def test_the_command_refuses_a_binding_the_schema_refuses(self):
+        with tempfile.TemporaryDirectory() as d:
+            m, bad = os.path.join(d, "m.json"), os.path.join(d, "bad.json")
+            for path, data in ((m, MANIFEST), (bad, self._binding({"reputation.multi_engine": [{"tool": "mcp:x/y"}]}))):
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump(data, f)
+            with redirect_stdout(io.StringIO()) as out:
+                self.assertEqual(check.main([bad, "--manifest", m]), 1)
+            self.assertIn("accepts", out.getvalue())
+
+    def test_the_bindings_the_skills_ship_fit_the_schema(self):
+        for name in ("zerosoc.capabilities.example.json", "zerosoc.capabilities.defender-for-business.json"):
+            with open(os.path.join(ROOT, "capabilities", name), encoding="utf-8") as f:
+                self.assertEqual(check.schema_problems(json.load(f)), [], name)
+
+
 class ShippedReferenceBinding(unittest.TestCase):
     """The Defender for Business example declares what it was derived from, so CI can check it."""
 

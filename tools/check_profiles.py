@@ -138,12 +138,27 @@ def _one_of(value: Any, branches: list[dict[str, Any]], root: dict[str, Any], wh
     fitting = [sub for sub, problems in failures if not problems]
     if len(fitting) == 1:
         return []
-    forms = " or ".join(sub.get("title", f"form {n + 1}") for n, sub in enumerate(branches))
+    forms = " or ".join(_resolved(sub, root).get("title", f"form {n + 1}") for n, sub in enumerate(branches))
     if not fitting:
-        closest, problems = min(failures, key=lambda pair: len(pair[1]))
-        named = closest.get("title", "one of the forms")
+        # a form the value is not even the type of was never close: a list is read as the list form
+        closest, problems = min(
+            failures, key=lambda pair: (not _kind_fits(value, _resolved(pair[0], root)), len(pair[1]))
+        )
+        named = _resolved(closest, root).get("title", "one of the forms")
         return [f"{where}: fits none of {forms}; read as {named}: " + "; ".join(problems)]
     return [f"{where}: fits more than one of {forms}, so which was meant is ambiguous"]
+
+
+def _resolved(schema: dict[str, Any], root: dict[str, Any]) -> dict[str, Any]:
+    """The schema a branch stands for: the definition it references, or itself."""
+    ref = schema.get("$ref", "")
+    return root.get("$defs", {}).get(ref.split("/")[-1], schema) if ref.startswith("#/$defs/") else schema
+
+
+def _kind_fits(value: Any, schema: dict[str, Any]) -> bool:
+    declared = schema.get("type")
+    kinds = [declared] if isinstance(declared, str) else list(declared or [])
+    return not kinds or any(_type_ok(value, k) for k in kinds)
 
 
 def coherent(profile: dict[str, Any], where: str) -> list[str]:

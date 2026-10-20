@@ -25,6 +25,11 @@ class the manifest does not know (a knowledge base, a reputation service) is the
 left alone; a data source the manifest does not know is an error, because the binding then answers for a
 source nobody declared. Notes are prose and are not compared.
 
+A class may bind an ordered list of providers, each saying which observables it accepts. The manifest's
+option is compared with the first of them; the others are the deployment's own and are left alone. Before
+any of this the binding is held to its schema (capabilities/zerosoc.capabilities.schema.json), so a listed
+provider that does not say what it accepts is refused here, not discovered by a host.
+
 Standard library only. Exit 1 on any difference, 2 when the manifest cannot be read.
 
 Usage:
@@ -33,10 +38,37 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import sys
 import urllib.request
+from pathlib import Path
 from typing import Any
+
+ROOT = Path(__file__).resolve().parent.parent
+SCHEMA = ROOT / "capabilities" / "zerosoc.capabilities.schema.json"
+
+
+def _validator() -> Any:
+    """The standard-library schema check the profiles are held to, from its own file."""
+    spec = importlib.util.spec_from_file_location("check_profiles", Path(__file__).with_name("check_profiles.py"))
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.validate
+
+
+def schema_problems(binding: dict[str, Any]) -> list[str]:
+    """Every way the binding does not fit its schema, each naming where."""
+    schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
+    return _validator()(binding, schema, schema, "binding")
+
+
+def first_tool(bound: Any) -> str | None:
+    """The tool a class is bound to, or the first provider's when it binds several."""
+    if isinstance(bound, list):
+        bound = bound[0] if bound else None
+    return (bound or {}).get("tool")
 
 
 def _holds(requirement: str, provides: set[str]) -> bool:
@@ -86,7 +118,7 @@ def differences(binding: dict[str, Any], manifest: dict[str, Any]) -> list[str]:
     out += [f"reference.provides names {r}, which holds on every deployment and is not listed"
             for r in sorted(r for r in provides if r.startswith("always:"))]
     classes, sources = expected(manifest, provides)
-    bound = {k: (v or {}).get("tool") for k, v in (binding.get("capabilities") or {}).items()}
+    bound = {k: first_tool(v) for k, v in (binding.get("capabilities") or {}).items()}
     for klass, tool in sorted(classes.items()):
         have = bound.get(klass)
         if tool != have:
@@ -120,6 +152,11 @@ def main(argv: list[str] | None = None) -> int:
     a = ap.parse_args(argv)
     with open(a.binding, encoding="utf-8") as f:
         binding = json.load(f)
+    unfit = schema_problems(binding)
+    if unfit:
+        for line in unfit:
+            print(f"{a.binding}: {line}")
+        return 1
     try:
         manifest = load_manifest(binding, a.manifest)
     except (OSError, ValueError) as exc:

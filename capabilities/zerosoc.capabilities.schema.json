@@ -36,21 +36,21 @@
     },
     "capabilities": {
       "type": "object",
-      "description": "capability class -> tool binding",
+      "description": "capability class -> the provider that serves it, or an ordered list of providers. Several providers of one class each answer for the observables they accept, and each answer is its own observation, naming its source.",
       "additionalProperties": {
-        "type": "object",
-        "required": [
-          "tool"
-        ],
-        "properties": {
-          "tool": {
-            "type": "string",
-            "description": "What the host invokes: an MCP server/tool, a CLI, an endpoint."
+        "oneOf": [
+          {
+            "$ref": "#/$defs/provider"
           },
-          "notes": {
-            "type": "string"
+          {
+            "title": "providers",
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/$defs/listed_provider"
+            }
           }
-        }
+        ]
       }
     },
     "data_sources": {
@@ -80,6 +80,82 @@
       "additionalProperties": {
         "type": "string"
       }
+    }
+  },
+  "$defs": {
+    "provider": {
+      "title": "provider",
+      "type": "object",
+      "required": [
+        "tool"
+      ],
+      "properties": {
+        "tool": {
+          "type": "string",
+          "description": "What the host invokes: an MCP server/tool, a CLI, an endpoint."
+        },
+        "notes": {
+          "type": "string"
+        },
+        "accepts": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "enum": [
+              "ip",
+              "domain",
+              "url",
+              "hash"
+            ]
+          },
+          "description": "The observable kinds this provider is asked about. Absent on a single provider: every kind the class takes."
+        },
+        "egress": {
+          "enum": [
+            "tenant",
+            "third-party"
+          ],
+          "description": "tenant: the organisation's own system of record, asked about anything. third-party: anything else, asked only about external indicators, as bare values (the framework's egress rule). A host treats a provider that says neither as third-party."
+        }
+      }
+    },
+    "listed_provider": {
+      "title": "listed provider",
+      "type": "object",
+      "required": [
+        "tool",
+        "accepts"
+      ],
+      "properties": {
+        "tool": {
+          "type": "string",
+          "description": "What the host invokes: an MCP server/tool, a CLI, an endpoint."
+        },
+        "notes": {
+          "type": "string"
+        },
+        "accepts": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "enum": [
+              "ip",
+              "domain",
+              "url",
+              "hash"
+            ]
+          },
+          "description": "The observable kinds this provider is asked about. Absent on a single provider: every kind the class takes."
+        },
+        "egress": {
+          "enum": [
+            "tenant",
+            "third-party"
+          ],
+          "description": "tenant: the organisation's own system of record, asked about anything. third-party: anything else, asked only about external indicators, as bare values (the framework's egress rule). A host treats a provider that says neither as third-party."
+        }
+      },
+      "description": "One of several providers of a class: it says which observables it takes."
     }
   }
 }
