@@ -1,7 +1,10 @@
 {
   "deployment": "example — one XDR tenant with an MCP server for the XDR platform",
   "capabilities": {
-    "reputation.multi_engine": {"tool": "mcp:threat-intel/lookup_indicator", "notes": "hashes, IPs, domains only (egress rule)"},
+    "reputation.multi_engine": [
+      {"tool": "mcp:ip-reputation/check_ip", "accepts": ["ip"], "egress": "third-party", "notes": "an address reputation service: deep on IPs"},
+      {"tool": "mcp:threat-intel/lookup_indicator", "accepts": ["ip", "domain", "hash"], "egress": "third-party", "notes": "hashes, IPs, domains only (egress rule)"}
+    ],
     "domain.registration": {"tool": "mcp:threat-intel/whois"},
     "asset.cmdb": {"tool": "mcp:xdr/get_device"},
     "identity.directory": {"tool": "mcp:directory/get_user"},

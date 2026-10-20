@@ -138,7 +138,11 @@ Read per alert: the playbook section the script prints.
    carry back their **Produces** outputs by name) and its numbered **Checks**. Query threat intelligence,
    the asset inventory, the directory, the SOC Knowledge Base, prior Cases, the 30-day history, lateral
    scope and the campaign check. **Egress rule**: only hashes and already-public IPs and domains leave the
-   environment; never files, full URLs or message bodies; detonation only in an isolated sandbox.
+   environment; never files, full URLs or message bodies; detonation only in an isolated sandbox. A
+   provider the binding marks `tenant` is the organization's own system and may be asked about internal
+   observables too. **Several providers of one class**: ask each about the observables it `accepts`; each
+   answer is its own observation, naming its source, and one source's confidence score is that source's
+   reading, never a count of engines flagging the indicator.
 7. **Tag every result** as the playbook prescribes: `Malicious` or `Benign` at Low, Medium or High
    (Definitions §7: High establishes the side alone, Medium is a strong signal needing a second, Low is
    consistent but common in normal operation). A result that bears on neither side is context, untagged.

@@ -111,7 +111,8 @@ per Case: the playbook the script prints.
    every query run, listed or added, with its outcome and tag, and list each result that carried no
    information under the ledger's `no_information_refs` and each query that covered the question and found
    nothing under `scoped_negative_refs`, as in triage: `resolve.py` gives the first no weight on either side.
-   Egress rule as in triage: indicators only.
+   Egress rule as in triage: indicators only; several providers of one class as in triage, one
+   observation per source.
 6. **What the source already did is not coverage.** An entity the source blocked, quarantined or removed
    carries no side and no confidence at this gate either: it is an action the Case records, and the
    questions it leaves open — how the entity arrived, what ran before it was stopped, whether the same
