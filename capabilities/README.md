@@ -24,9 +24,16 @@ the check, and update the binding until it passes.
 
 The binding file has two maps:
 
-- `capabilities`: capability class → `{ "tool": "...", "notes": "..." }`. The `tool` is whatever the host
-  understands: an MCP server and tool name, a CLI, a query endpoint. The skill's Provenance section lists
-  the classes it invoked, never the tool names.
+- `capabilities`: capability class → `{ "tool": "...", "notes": "..." }`, or an ordered list of them when
+  several providers serve one class. The `tool` is whatever the host understands: an MCP server and tool
+  name, a CLI, a query endpoint. The skill's Provenance section lists the classes it invoked, never the
+  tool names. Two optional fields say how a provider may be asked:
+  - `accepts`: the observable kinds it is asked about (`ip`, `domain`, `url`, `hash`). Required for every
+    provider of a list, so a deployment with one source deep on addresses and one broad across kinds asks
+    each about what it knows. Each answer is its own observation, naming its source.
+  - `egress`: `tenant` for the organization's own system of record, asked about anything, or
+    `third-party`, asked only about external indicators as bare values (the framework's egress rule). A
+    host treats a provider that says neither as `third-party`.
 - `data_sources`: the `required_data_sources` names used by the playbooks' frontmatter → `true` when the
   source is available to the executor, `false` otherwise. `scripts/select_playbook.py` compares a
   playbook's requirements with this map and emits the **visibility gaps** that the Notes must record,

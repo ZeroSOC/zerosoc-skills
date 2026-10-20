@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Several providers of one capability class.** A class may bind an ordered list of providers, each
+  saying which observables it `accepts` (`ip`, `domain`, `url`, `hash`) and whether it is the
+  organization's own system or a third party (`egress`), so a deployment can pair a source deep on
+  addresses with one broad across kinds. Each answer is its own observation, naming its source, and one
+  source's confidence score is never read as a count of engines. `tools/check_binding.py` now holds a
+  binding to its schema first (#71).
 - **Malware check 2 applies only to a file that ran.** The pin follows the framework to the merge of
   ZeroSOC/zerosoc-framework#108: *Payload location* is `Malicious (Medium)` only for an unknown or
   unsigned binary that ran from a temporary or shared folder, and context when the file was not run.

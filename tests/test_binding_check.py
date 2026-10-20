@@ -157,6 +157,14 @@ class ProvidersPerClass(unittest.TestCase):
                 self.assertEqual(check.main([bad, "--manifest", m]), 1)
             self.assertIn("accepts", out.getvalue())
 
+    def test_the_example_shows_two_providers_of_one_class(self):
+        """A starting point that shows the shape: one source for addresses, one across kinds."""
+        with open(os.path.join(ROOT, "capabilities", "zerosoc.capabilities.example.json"), encoding="utf-8") as f:
+            providers = json.load(f)["capabilities"]["reputation.multi_engine"]
+        self.assertIsInstance(providers, list)
+        self.assertEqual([p["accepts"] for p in providers], [["ip"], ["ip", "domain", "hash"]])
+        self.assertTrue(all(p["egress"] == "third-party" for p in providers))
+
     def test_the_bindings_the_skills_ship_fit_the_schema(self):
         for name in ("zerosoc.capabilities.example.json", "zerosoc.capabilities.defender-for-business.json"):
             with open(os.path.join(ROOT, "capabilities", name), encoding="utf-8") as f:
