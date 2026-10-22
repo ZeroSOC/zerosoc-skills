@@ -4,7 +4,7 @@
   note_elements.py --kind triage|investigation [--note note.json] [--json]
 
 The framework says which elements a Note renders and in what order, and what makes one
-non-conformant (Detection & Analysis §1.6 and §2.5). That is **structure and conformance**, and it
+non-conformant (Detection & Analysis §1.6 and §2.6). That is **structure and conformance**, and it
 belongs with the method rather than with whatever assembled the Note last.
 
 What this script does **not** do is write the Note. The Summary, the Rationale, each Observation's
@@ -38,7 +38,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 FRAMEWORK = os.path.normpath(os.path.join(HERE, "..", "references", "framework"))
 METHOD = os.path.join("03-Processes", "02-detection_and_analysis.md")
 
-SECTIONS = {"triage": "1.6 Triage Note", "investigation": "2.5 Investigation Note"}
+SECTIONS = {"triage": "1.6 Triage Note", "investigation": "2.6 Investigation Note"}
 """Where the framework states the elements of each Note kind. The order and the words are read
 from there — the skills execute the framework's method and never restate it."""
 

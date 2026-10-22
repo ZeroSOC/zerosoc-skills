@@ -454,7 +454,7 @@
     },
     {
       "path": "displayName",
-      "ignored": "the source's title for the incident; the Case's account is its Notes, and a title nobody wrote is not one"
+      "case": "message"
     },
     {
       "path": "severity",

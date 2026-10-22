@@ -4,7 +4,7 @@ description: Investigate a promoted Case under the ZeroSOC Framework (Phase 2.b)
 license: Apache-2.0
 metadata:
   version: "0.4.1"
-  framework: "zerosoc-framework@e5f16f8 (2026-10-16)"
+  framework: "zerosoc-framework@a932294 (2026-10-22)"
   status: draft
   author: ZeroSOC
 ---
@@ -122,11 +122,16 @@ per Case: the playbook the script prints.
 7. **Mark coverage.** When the Benign explanation accounts for a Medium or High Malicious observation, set
    `covered: true` on it; uncovered Low Malicious observations never block a Benign verdict, they lower its
    confidence and are listed as residual observations.
-8. **Resolve**: set `resolved_at` (UTC) in the ledger, with `alerts` (each alert's id and own confidence), and run
+8. **Resolve**, after reading the Case again (§1.1.6, §2.2.4): an alert that joined it since you read it is
+   investigated here and never sent back to triage. Type it and add it as in step 2, extend the queries to
+   what it adds, and judge whether it changes the verdict: a repeat of an alert type or technique the Case
+   already holds adds little, a new technique shows the attacker progressing along the attack path, and a
+   new targeted entity may be lateral movement. Then set `resolved_at` (UTC) in the ledger, with `alerts` (each alert's id and own confidence), and run
    `python3 scripts/resolve.py ledger.json`. Malicious is proven at a score of 3 or more when an alert is at High
    confidence or an observation stands beyond the alerts (one that only restates an alert counts as it);
    Benign at 3 or more *and* every Medium or High Malicious observation retracted or covered; the verdict and
-   confidence follow the §2.4 table (confidence is the strongest carrying observation, never an average). If neither side is proven, run the remaining discriminating
+   confidence follow the §2.4 table (confidence is the strongest carrying observation, never an average; on
+   a proven Malicious side it is the starting value step 11 re-assesses). If neither side is proven, run the remaining discriminating
    queries. The script measures the timebox from `started_at` to `resolved_at` (the current time when absent)
    against the severity-scaled reference value, which `timebox_minutes` may tighten, never extend; when it has expired, or the
    budget is exhausted (`budget_exhausted`), it closes as **Insufficient Data** (7) with a monitoring watch (`watch_until`; re-open on recurrence of the
@@ -134,10 +139,19 @@ per Case: the playbook the script prints.
 9. **Re-classify on evidence drift** (§2.2.5). If the objective differs from or exceeds the candidate
    category, change `incident_category`, re-run step 3 for the new playbook, carry every observation
    forward, and record the pivot and its reason in the Note. The classification stays provisional until
-   promotion.
+   the Incident is confirmed (step 11).
 10. **Assign correctly.** The moment a Crown Jewel asset or a privileged identity enters the scope, the
    assignee becomes a human (`handover_reason`); keep running queries and proposing, the human decides.
-11. **On Malicious proven** (§3.1): set `verdict_id = 2`; assign the definitive Incident Category and the
+11. **On Malicious proven, confirm the Incident** (§2.5), before writing the Note. **Re-assess** the severity,
+    the confidence and the Incident Category from your understanding of the Incident (§1.4): record a value
+    that changes, with its reason, in the Note's Rationale, and treat a change of category as a
+    re-classification (step 9). **Estimate** `impact_id` from what is known. **Plan the initial response
+    actions** from three inputs: the actions the source recommends, carried by the alerts; the actions the
+    category's playbook describes; and your own judgment of the Case. Prioritize them, drop the unnecessary
+    or redundant ones (disabling a local, non-domain account on a host already isolated is redundant), and
+    add the ones the Incident, its context, its severity and the impact estimate call for; each planned
+    action is a ticket the Case raises, of its kind (`containment`, `eradication`, `recovery`). Then set
+    `verdict_id = 2`; record the definitive Incident Category and the
     observed techniques as `ID (Name)`; extend the **Case Timeline** triage compiled with the course of the
     attack (interleaved with the detection and the response actions that ran, each entry timestamped in UTC
     with its event reference; the `timeline` of `process_chain.py --json` gives the process entries with their
@@ -149,12 +163,12 @@ per Case: the playbook the script prints.
     orders them, **derives T0** — the earliest Malicious `first_seen`; context may come before it — flags the one
     entry that carries it, and fails a T0 no entry carries or a Malicious entry earlier than the T0 the Case states. The Case's `start_time` opens at the earliest Alert and moves earlier
     whenever a Malicious Observation cites an earlier event; on a confirmed Incident it is **T0**, the
-    earliest confirmed malicious event. Confirm or assess `impact_id`, and whether the
+    earliest confirmed malicious event. Then, per §3.1, confirm the impact you estimated, and whether the
     Incident is **significant** under NIS2 Article 23(3) and **cross-border**; run the **retrospective
     entity sweep** through the `cases.store` capability class (Cases closed as False Positive or Benign
     in the last 90 days sharing the Incident's entities; never through `telemetry.*`, whose retention is
     shorter than the window; an unbound `cases.store` is a visibility gap; every match is flagged for QA
-    review, never dismissed); pass the scope to response. At Low
+    review, never dismissed); pass the scope and the planned actions to response. At Low
     confidence the Incident is still declared; every containment action then requires approval.
 12. **On Benign proven**: `verdict_id` 1 (False Positive, plus a `tuning` ticket to Phase 1) or 5 (Benign,
     plus an `exception` ticket — the Knowledge Base entry you propose and a person confirms — unless the
@@ -167,7 +181,7 @@ per Case: the playbook the script prints.
 13. **Write the Investigation Note.** It renders the Case at this gate and holds no state of its own,
     on the **same element structure as the Triage Note** — it extends and updates that Note rather than
     mirroring it. The canonical list is
-    [Detection & Analysis §2.5](references/framework/03-Processes/02-detection_and_analysis.md), in this
+    [Detection & Analysis §2.6](references/framework/03-Processes/02-detection_and_analysis.md), in this
     order: **Summary** (as the Triage Note, at this gate); **Classification** (confirmed or last
     candidate category, severity, confidence, impact, significance and cross-border on a confirmed
     Incident, and the decision: the `verdict_id` the resolution produced, with the master Case id on a
@@ -187,7 +201,7 @@ per Case: the playbook the script prints.
     Observation is that Observation's `analytic`, and the identifiers are cited with each Observation.
     `python3 scripts/note_elements.py --kind investigation --note note.json` prints the elements in
     order and checks the Note — the ledger, with one field per element beside it — against those rules, reporting
-    what §2.5 requires as **failures**, which is the only thing it reports: the Note may not be written while one
+    what §2.6 requires as **failures**, which is the only thing it reports: the Note may not be written while one
     stands. It renders the structure and runs the
     checks; the content and the prose are yours ([rules/note-prose.md](rules/note-prose.md)). The rules
     binding the two judgment steps are [rules/verify.md](rules/verify.md) (the hypotheses and the choice
@@ -198,8 +212,7 @@ per Case: the playbook the script prints.
     [Playbook Architecture §5](references/framework/04-Playbooks/playbook_architecture.md): the triage
     contract fields refined, plus `verdict_id`, `incident_category`, `reclassification_pivots` when the
     category changed, `impact_id`, `significant`, `cross_border`, `is_suspected_breach`,
-    `handover_reason` when a handover occurred, the recommended containment, eradication and recovery
-    actions from the playbook, and `notes` carrying the Investigation Note. `start_time` is already on
+    `handover_reason` when a handover occurred, the planned response actions (step 11), and `notes` carrying the Investigation Note. `start_time` is already on
     the Case and carries T0. Then invoke the `zerosoc-response` skill. Stakeholder notification (§3.2) is the SOC
     Manager's responsibility and starts after confirmation.
 

@@ -21,7 +21,7 @@ required_data_sources:
   - EDR
 status: draft
 ---
-<!-- generated from zerosoc-framework@e5f16f8a4697 : 04-Playbooks/02-Investigation-Response/11-data_breach_exfiltration.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@a93229436a62 : 04-Playbooks/02-Investigation-Response/11-data_breach_exfiltration.md — do not edit; regenerate with tools/build_references.py -->
 
 # 11-Data Breach / Exfiltration Investigation & Response
 

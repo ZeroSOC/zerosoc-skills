@@ -233,7 +233,7 @@ def resolve(ledger, now=None):
     elif malicious_proven:
         conf = max(W[f["confidence"]] for f in mal)
         r.update(outcome="Malicious proven", verdict_id=2, verdict="True Positive", confidence_id=conf, confidence=LEVELS[conf - 1],
-                 next="promote to Incident (§3.1): definitive category, start_time carrying T0, retrospective entity sweep, Investigation → Response contract" + ("; at Low confidence every containment action requires approval" if conf == 1 else ""))
+                 next="confirm the Incident (§2.5): re-assess severity, confidence and category, estimate the impact, plan the initial response actions; then the definitive category, start_time carrying T0, the retrospective entity sweep (§3.1) and the Investigation → Response contract" + ("; at Low confidence every containment action requires approval" if conf == 1 else ""))
     else:
         if box["expired"] or ledger.get("budget_exhausted"):
             r.update(outcome="Neither proven at timebox/budget expiry", verdict_id=7, verdict="Insufficient Data", confidence_id=None,

@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- **Incident confirmation, and alerts that join after promotion.** The pin follows the framework to the
+  merge of ZeroSOC/zerosoc-framework#109. Investigation step 11 is §2.5 *Incident Confirmation*: on a
+  proven Malicious side the executor re-assesses severity, confidence and Incident Category, recording
+  a changed value with its reason in the Rationale; estimates the impact; and plans the initial
+  response actions from the source's recommendations, the category's playbook and its own judgment,
+  dropping redundant ones. Each planned action is a ticket of its kind, and the Investigation → Response
+  contract carries them in place of the playbook's list. Step 8 reads the Case again before resolving:
+  an alert that joined since is investigated there, not sent back to triage, and a new technique or a
+  newly targeted entity weighs more than a repeat. The Investigation Note is §2.6, which
+  `note_elements.py` now reads. `resolve.py` names the confirmation as the next step (#73).
+- **The Case takes the incident's title from the source.** The Defender XDR profile maps `displayName`
+  to the Case's `message`, its title (framework DD-26), where it was ignored before (#73).
 - **Several providers of one capability class.** A class may bind an ordered list of providers, each
   saying which observables it `accepts` (`ip`, `domain`, `url`, `hash`) and whether it is the
   organization's own system or a third party (`egress`), so a deployment can pair a source deep on
