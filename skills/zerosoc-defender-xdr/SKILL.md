@@ -4,7 +4,7 @@ description: What Microsoft Defender XDR's records mean in ZeroSOC Framework ter
 license: Apache-2.0
 metadata:
   version: "0.4.1"
-  framework: "zerosoc-framework@e5f16f8 (2026-10-16)"
+  framework: "zerosoc-framework@a932294 (2026-10-22)"
   status: draft
   author: ZeroSOC
 ---

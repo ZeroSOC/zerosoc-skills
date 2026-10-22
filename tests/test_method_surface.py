@@ -407,7 +407,7 @@ class AFrameworkChangeIsASkillsReleaseAndNothingElse(unittest.TestCase):
         def rewrite(text):
             head, rest = text.split("### 1.6 Triage Note", 1)
             rest = rest.replace("8.  **Provenance** —", "8.  **Provenance and Custody** —", 1)
-            rest = rest.replace("\n**Two former elements", "9.  **Lessons** — what this Case teaches the next one.\n\n**Two former elements", 1)
+            rest = rest.replace("\nNotes must be specific", "9.  **Lessons** — what this Case teaches the next one.\n\nNotes must be specific", 1)
             return head + "### 1.6 Triage Note" + rest
         root = self.served(rewrite)
         names = [e["element"] for e in note_elements.elements("triage", root)]
