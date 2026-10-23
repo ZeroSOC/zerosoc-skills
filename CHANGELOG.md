@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **Techniques at two levels, recorded (#80).** A ledger observation carries `attacks`, the
+  techniques it shows as identifiers, and the investigation ledger's own `attacks` holds the
+  Incident's, recorded at confirmation. Both tagging rules (`rules/checks.md`, `rules/tag.md`) ask a
+  Malicious observation for the most specific techniques it shows, and none when it shows none.
+  `resolve.py` lists, on Malicious proven, the techniques the standing Malicious observations show and
+  names any recorded technique none of them shows; a retraction takes its techniques with it. The
+  response skill adds the techniques an expanded scope reveals. `alert_metadata.py` calls the union of
+  the alerts' techniques what it is: the alerts', provisional until the Incident's are assessed.
 - **One Case-wide process chain, citable, with its decoded scripts once; a lean JSON graph (#76).**
   `process_chain.py` prints one tree per device, every process once. A legend labels the alerts that
   cite a process (A1, …, each with its full id once) and each process names its alerts by label, so

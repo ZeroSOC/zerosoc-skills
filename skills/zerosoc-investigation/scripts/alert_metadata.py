@@ -28,8 +28,10 @@ A detection source the profile does not list is OCSF analytic type Other (99), n
 state it does not list is recorded as reported and treated as **not** neutralized, because a state
 nobody declared is not evidence that anything was stopped.
 
-Output (`--json`, or the same content printed): one object per alert under "alerts", the Case's
-techniques and candidate Incident Categories, and the per-entity remediation the evidence reports. Each
+Output (`--json`, or the same content printed): one object per alert under "alerts", the techniques
+the alerts assert together with the candidate Incident Categories they point at, and the per-entity
+remediation the evidence reports. The alerts' techniques are provisional and stay the alerts': the
+Incident's own are assessed at confirmation, from the observations that stand. Each
 alert lists under "absent" what it does not carry. Record it in ledger.json: the decision scripts read the
 alerts' assertions from there, and the Note renders them.
 
@@ -187,7 +189,7 @@ def remediation(rows, profile):
 
 
 def build(alerts, profile, evidence=None, index=None):
-    """The Case's assertions, ledger-ready: per alert, then what they add up to for the Case."""
+    """The alerts' assertions, ledger-ready: per alert, then what they add up to across the Case's alerts."""
     built = {"alerts": [assertions(a, profile, index) for a in alerts],
              "remediation": remediation(evidence, profile)}
     seen, techniques = set(), []

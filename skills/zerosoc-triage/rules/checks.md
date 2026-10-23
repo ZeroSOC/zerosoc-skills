@@ -28,6 +28,9 @@ executor puts that language in its place; read as it is, it means the language o
   the checks, never a finding.
 - Tag each result Malicious or Benign at Low, Medium or High as the playbook prescribes; a result
   that bears on neither side is context: it carries no side and no confidence.
+- A Malicious observation names in `attacks` the techniques it shows, the most specific the evidence
+  supports (the sub-technique where there is one). One that shows no technique, such as a
+  threat-intelligence match, names none, and so do Benign observations and context.
 - Every observation cites the alert ids or the event references that ground it, and every claim in it is
   in what it cites: write what the cited items show, nothing they do not. An observation that cannot
   be grounded is not written.

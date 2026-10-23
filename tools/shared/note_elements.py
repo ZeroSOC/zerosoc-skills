@@ -22,7 +22,7 @@ nothing is copied into a second shape, plus one field per element the framework 
 {"kind": "triage",
  "classification": {...}, "summary": "...", "rationale": "...", "provenance": {...},
  "observations": [{"id": "1", "desc": "...", "side": "Malicious"|"Benign"|null,
-               "confidence": "Low|Medium|High", "event_refs": ["<event id or link>"]}],
+               "confidence": "Low|Medium|High", "event_refs": ["<event id or link>"], "attacks": ["T1003.001"]}],
  "alerts": [...], "detection_metadata": {...}, "visibility_gaps": [{"data_source", "check_prevented"}],
  "timeline": [...], "reclassification_pivots": [...]}
 
@@ -30,7 +30,9 @@ An element's field is the framework's own name for it, lower-cased and joined wi
 "Visibility Gaps" is `visibility_gaps` — so an element the framework adds or renames is required under
 its new name with no change here. Two are shorter by habit: "Case Timeline" is `timeline` and
 "Re-classification Pivots" is `reclassification_pivots`. An observation with side null is context. An observation
-written as {"n", "observation", "tag": {"side", "confidence_id"}} is read too.
+written as {"n", "observation", "tag": {"side", "confidence_id"}} is read too. A Malicious observation's "attacks"
+are the techniques it shows, and an investigation ledger's own "attacks" the Incident's: the Notes render them
+`ID (Name)`, and no check reads them, since notation never fails a Note.
 """
 import argparse, json, os, re, sys
 

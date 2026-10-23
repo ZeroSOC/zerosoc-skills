@@ -10,6 +10,9 @@ executor puts that language in its place; read as it is, it means the language o
 - Tag by the outcomes the playbook states for that query — `→ Malicious (High) if <result>;
   Benign (Low) if <result>` — each with its confidence. Decide by judgment only when a result fits
   neither stated outcome; then it is usually context.
+- A Malicious observation names in `attacks` the techniques it shows, the most specific the evidence
+  supports (the sub-technique where there is one). One that shows no technique, such as a
+  threat-intelligence match, names none, and so do Benign observations and context.
 - A query that was not run, or whose answer says the source could not answer, produces **no**
   observation: it is a visibility gap, never a Benign observation.
 - Evidence that **explains** what the alerts fired on is a Benign observation, not context. The Benign
