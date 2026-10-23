@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- **One Case-wide process chain, citable, with its decoded scripts once; a lean JSON graph (#76).**
+  `process_chain.py` prints one tree per device, every process once. A legend labels the alerts that
+  cite a process (A1, …, each with its full id once) and each process names its alerts by label, so
+  what is said of a process can cite them. Every decoded command is printed in full, once, under
+  `scripts:` (D1, …), and the command line points to it in place of the encoded payload. The
+  per-alert view is gone: it repeated every shared subtree, and left out the descendants of an
+  alert's processes. **The JSON changes shape:** `processes` (each once, keyed `device|pid|created` as
+  the evidence rows are, with `parent_process` by key), `gaps`, `scripts` (OCSF-shaped, typed by the
+  interpreter: an encoded-command switch makes it PowerShell), `devices` with their roots, `alerts`
+  (the legend) and a timeline with keys instead of command lines. `--from-graph graph.json` prints the
+  text of a stored graph. On a real 21-process incident: text 15 KB → 13 KB with every script whole,
+  JSON 528 KB → 77 KB.
 - **Framework pin to `e422bde`, and the skills follow it.** It brings ZeroSOC/zerosoc-framework#111,
   #112 and #115.
   - *Techniques at two levels (#111).* The Triage → Investigation contract no longer carries the

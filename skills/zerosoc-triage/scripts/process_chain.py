@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
 """Reconstruct the process lineage of a Case from its evidence rows. Standard library only.
 
-  process_chain.py evidence.json [--telemetry telemetry.json [--bindings zerosoc.capabilities.json]] [--case]
+  process_chain.py evidence.json [--telemetry telemetry.json [--bindings zerosoc.capabilities.json]]
                    [--alerts alerts.json] [--width N] [--json]
+  process_chain.py --from-graph graph.json [--width N]
 
-One chain per alert, the way a console shows an alert story: the processes the alert cites, each under its
-ancestors, which are marked as context when they come from the Case's other alerts. `--case` prints the
-Case-wide chain instead, every alert joined into one tree per device: the view an investigation scores on.
+One chain for the whole Case, one tree per device, every process once under its ancestors. The text is what an
+executor reads: a legend labels the alerts that cite a process (A1, A2, …, each with its full id once), each
+process names its alerts by label, so what is said about a process can cite them, and every decoded command is
+printed in full, once, under "scripts:" (D1, D2, …), the command line pointing to it in place of its encoded
+payload. The JSON (`--json`) is what a program reads: each process once, keyed as the evidence rows are
+(`device|pid|created`), with its parent by key; the lineage gaps; each decoded command once as a script the
+processes point to; a timeline oldest first. `--from-graph` prints the text of a graph written earlier, so the
+text can be shown again from what was kept.
 
 Without telemetry the chain is evidence-only: it holds the processes the source attached to the Case's alerts,
 never the processes around them, and a parent outside the evidence is printed as a lineage gap, never guessed.
@@ -19,7 +25,7 @@ created before the telemetry window, a device not onboarded) stay gaps. Telemetr
 through the bound endpoint class, never the whole tenant.
 
 evidence.json: the rows given to evidence_inventory.py (a list, or its --json output with "entities").
-alerts.json (optional): {"<alert id>": {"title": ..., "severity": ...}}, to title the per-alert sections.
+alerts.json (optional): {"<alert id>": {"title": ..., "severity": ...}}, to title the alerts in the legend.
 telemetry.json (optional): process-creation rows for the Case's devices and window, as
 {"device", "pid", "created", "name", "command_line", "parent_pid", "parent_created"} and, when the source
 reports them on the same row, "parent_name", "parent_command_line", "parent_parent_pid",
@@ -295,58 +301,75 @@ def _key(n):
     return n["_t"][0] if n["_t"] else float("inf")
 
 
-def _tree(node, seen, section=None):
-    out = {k: node[k] for k in ("pid", "created", "in_evidence", "source", "alert_ids")}
-    if section is not None and node["in_evidence"]:
-        out["cited_by_this_alert"] = id(node) in section["own"]
-    out["name"] = node["names"][0] if node["names"] else None
-    if len(node["names"]) > 1:
-        out["names"] = node["names"]
-    out["command_lines"] = node["command_lines"]
-    if node["attrs"]:
-        out["attributes"] = node["attrs"]
-    if node["in_evidence"]:
-        out.update(verdicts=node["verdicts"], rows=node["rows"])
-    elif node["source"] != "telemetry":
-        out["gap"] = node["gap"]
-    seen.add(id(node))
-    out["children"] = [_tree(c, seen, section) for c in sorted(node["children"], key=_key)
-                       if id(c) not in seen and (section is None or id(c) in section["nodes"])]
+def _uid(node):
+    """A process's key, the one the evidence rows join on: device, PID and creation time."""
+    return f"{node['device']}|{node['pid']}|{node['created'] or ''}"
+
+
+def _ms(node):
+    return node["_t"][0] // 1000 if node.get("_t") else None
+
+
+def _walk(chain):
+    """Every node once, devices in order and each tree depth first, children oldest first."""
+    seen, out = set(), []
+
+    def visit(node):
+        if id(node) in seen:
+            return
+        seen.add(id(node))
+        out.append(node)
+        for child in sorted(node["children"], key=_key):
+            visit(child)
+
+    for d in chain["devices"]:
+        for root in sorted(d["roots"], key=_key):
+            visit(root)
     return out
 
 
-def per_alert(chain):
-    """One section per alert citing a process: its processes, closed upwards over their ancestors."""
-    sections = {}
+SCRIPT_TYPES = (("powershell", 2, "PowerShell"), ("pwsh", 2, "PowerShell"), ("cmd", 1, "Windows Command Prompt"),
+                ("python", 3, "Python"), ("bash", 6, "Unix Shell"), ("sh", 6, "Unix Shell"))
+"""OCSF script type_id by the interpreter's image name; anything else is Unknown (0)."""
+
+
+POWERSHELL_ENCODED = re.compile(r"(?i)(?:^|\s)[-/]e(?:c|nc|ncodedcommand)?\s")
+"""PowerShell's encoded-command switch: what was decoded is a PowerShell script, whichever process's command
+line carries it (cmd.exe running `powershell -enc …` included)."""
+
+
+def _script_type(name, cmd_line=None):
+    if cmd_line and POWERSHELL_ENCODED.search(str(cmd_line)):
+        return 2, "PowerShell"
+    base = os.path.basename(str(name or "")).lower().removesuffix(".exe")
+    return next(((tid, cap) for key, tid, cap in SCRIPT_TYPES if base == key), (0, "Unknown"))
+
+
+def legend(chain, alerts=None):
+    """The alerts that cite a process, labelled A1, A2, … in the order their first process ran."""
+    first = {}
     for node in chain["nodes"]:
+        if not node["in_evidence"]:
+            continue
         for alert in node["alert_ids"]:
-            own, nodes = sections.setdefault(alert, (set(), {}))
-            own.add(id(node))
-            walk = node
-            while walk is not None and id(walk) not in nodes:
-                nodes[id(walk)] = walk
-                walk = walk.get("parent")
+            if alert not in first or _key(node) < first[alert]:
+                first[alert] = _key(node)
     out = []
-    for alert in sorted(sections, key=lambda a: min(_key(n) for n in sections[a][1].values())):
-        own, nodes = sections[alert]
-        roots = [n for n in nodes.values() if n.get("parent") is None or id(n["parent"]) not in nodes]
-        devices = {}
-        for root in sorted(roots, key=_key):
-            devices.setdefault(root["device"].lower(), {"device": root["device"], "roots": []})["roots"].append(root)
-        out.append({"alert_id": alert, "own": own, "nodes": nodes, "devices": [devices[k] for k in sorted(devices)],
-                    "processes": sum(1 for n in nodes.values() if n["in_evidence"]), "cited": len(own)})
+    for n, alert in enumerate(sorted(first, key=lambda a: (first[a], a)), 1):
+        meta = (alerts or {}).get(alert) or {}
+        title = meta.get("title") or meta.get("displayName") if isinstance(meta, dict) else None
+        out.append({"label": f"A{n}", "alert_id": alert, **({"title": title} if title else {})})
     return out
 
 
 def timeline(chain):
-    """One entry per process in the evidence, oldest first, with its alerts as event references."""
+    """One entry per process, oldest first, with its alerts as event references and its parent by key."""
     entries = []
     for n in sorted(chain["nodes"], key=_key):
         parent = n.get("parent")
-        entries.append({"time": n["created"], "device": n["device"], "pid": n["pid"], "source": n["source"],
-                        "process": n["names"][0] if n["names"] else None,
-                        "command_line": n["command_lines"][0] if n["command_lines"] else None,
-                        "parent_pid": parent["pid"] if parent else None,
+        entries.append({"time": n["created"], "uid": _uid(n), "device": n["device"], "pid": n["pid"],
+                        "source": n["source"], "process": n["names"][0] if n["names"] else None,
+                        "parent_uid": _uid(parent) if parent else None,
                         "parent": (parent["names"][0] if parent["names"] else None) if parent else None,
                         "parent_in_evidence": parent["in_evidence"] if parent else None,
                         "event_refs": n["alert_ids"]})
@@ -362,22 +385,61 @@ def summary(chain):
             "anomalies": len(chain["anomalies"])}
 
 
-def as_json(chain):
-    seen = set()
-    sections = []
-    for section in per_alert(chain):
-        shown = set()
-        sections.append({"alert_id": section["alert_id"], "processes_cited": section["cited"],
-                         "ancestors_from_the_case": section["processes"] - section["cited"],
-                         "devices": [{"device": d["device"], "tree": [_tree(r, shown, section) for r in sorted(d["roots"], key=_key)]}
-                                     for d in section["devices"]]})
-    return {"process_chain": dict(summary(chain), alerts_citing_a_process=len(sections)),
-            "alerts": sections,
-            "devices": [{"device": d["device"], "tree": [_tree(r, seen) for r in sorted(d["roots"], key=_key)]} for d in chain["devices"]],
-            "lineage_gaps": [{"device": g["device"], "pid": g["pid"], "created": g["created"], "name": g["names"][0] if g["names"] else None,
-                              "command_line": g["command_lines"][0] if g["command_lines"] else None,
-                              "reason": g["gap"], "children": [c["pid"] for c in g["children"]]} for g in chain["gaps"]],
+DECODING = ("decoded_command", "decode_rounds", "decode_capped")
+
+
+def as_json(chain, alerts=None):
+    """The chain as a graph, each process once: an OCSF-shaped process keyed as the evidence rows are, its
+    parent by key, and each decoded command once as an OCSF-shaped script the processes point to."""
+    labels = legend(chain, alerts)
+    scripts, by_content, processes, gaps = [], {}, [], []
+    for node in _walk(chain):
+        if not node["in_evidence"] and node["source"] != "telemetry":
+            gaps.append({"uid": _uid(node), "device": node["device"], "pid": node["pid"], "created": node["created"],
+                         "created_time": _ms(node), "name": node["names"][0] if node["names"] else None,
+                         "reason": node["gap"], "children": [_uid(c) for c in sorted(node["children"], key=_key)]})
+            continue
+        parent = node.get("parent")
+        out = {"uid": _uid(node), "device": node["device"], "pid": node["pid"],
+               "name": node["names"][0] if node["names"] else None, "created": node["created"],
+               "created_time": _ms(node), "cmd_line": node["command_lines"][0] if node["command_lines"] else None,
+               "parent_process": {"uid": _uid(parent), "pid": parent["pid"]} if parent else None,
+               "source": node["source"], "alert_ids": node["alert_ids"]}
+        if len(node["names"]) > 1:
+            out["names"] = node["names"]
+        if len(node["command_lines"]) > 1:
+            out["cmd_lines"] = node["command_lines"]
+        if node["in_evidence"]:
+            out.update(verdicts=node["verdicts"], rows=node["rows"])
+        attrs = {k: v for k, v in node["attrs"].items() if k not in DECODING}
+        if attrs:
+            out["attributes"] = attrs
+        decoded = node["attrs"].get("decoded_command")
+        if decoded:
+            content = str(decoded).strip()
+            script = by_content.get(content)
+            if script is None:
+                type_id, caption = _script_type(out["name"], out["cmd_line"])
+                script = {"uid": f"D{len(scripts) + 1}", "type_id": type_id, "type": caption,
+                          "script_content": content, "process_uids": []}
+                scripts.append(script)
+                by_content[content] = script
+            script["process_uids"].append(out["uid"])
+            out["script_uid"] = script["uid"]
+            if node["attrs"].get("decode_rounds"):
+                out["decode_rounds"] = node["attrs"]["decode_rounds"]
+            if node["attrs"].get("decode_capped"):
+                out["decode_capped"] = True
+        processes.append(out)
+    return {"process_chain": dict(summary(chain), alerts_citing_a_process=len(labels)),
+            "alerts": labels,
+            "devices": [{"device": d["device"], "roots": [_uid(r) for r in sorted(d["roots"], key=_key)]}
+                        for d in chain["devices"]],
+            "processes": processes, "gaps": gaps, "scripts": scripts,
             "unplaced": chain["unplaced"], "anomalies": chain["anomalies"], "timeline": timeline(chain)}
+
+
+ENCODED = re.compile(r"^[A-Za-z0-9+/=]{40,}$")
 
 
 def _short(value, limit):
@@ -386,91 +448,97 @@ def _short(value, limit):
     return text if not limit or len(text) <= limit else text[:limit - 1] + "…"
 
 
-def _detail(node, depth, out, width=WIDTH):
-    """The command line, its decoding and the remediation state: what a chain is read for.
-
-    Every printed line is cut to `width` (0: never cut). A decoding keeps its own line structure, so a
-    decoded script is read as a script; a decoding that is itself an encoded command is cut like any other."""
-    pad = "  " * (depth + 1)
-    for line in node["command_lines"][:2]:
-        out.append(f"{pad}$ {_short(line, width)}")
-    decoded = node["attrs"].get("decoded_command")
-    if decoded:
-        rounds = node["attrs"].get("decode_rounds")
-        layers = f" ({rounds} layers of encoding{', still encoded' if node['attrs'].get('decode_capped') else ''})" if rounds else ""
-        lines = [line for line in str(decoded).strip().splitlines() if line.strip()] or [""]
-        out.append(f"{pad}decoded{layers}: {_short(lines[0], width)}")
-        out += [f"{pad}         {_short(line, width)}" for line in lines[1:]]
-    state = " ".join(str(node["attrs"][k]) for k in ("remediation_status", "detection_status") if node["attrs"].get(k))
-    if state:
-        out.append(f"{pad}state: {state}")
+def _command(line, script_uid):
+    """A command line with its encoded payload replaced by the script it decodes to."""
+    if not script_uid:
+        return line
+    return " ".join(f"‹encoded: {script_uid}›" if ENCODED.match(token) else token for token in str(line).split())
 
 
-def _lines(node, depth, seen, out, section=None, width=WIDTH):
-    seen.add(id(node))
-    name = node["names"][0] if node["names"] else "(unnamed)"
-    if section is not None and node["in_evidence"] and id(node) not in section["own"]:
-        out.append(f"{'  ' * depth}{name} {node['pid']} {node['created']} (context: another alert of the Case)")
-        _detail(node, depth, out, width)
-    elif node["in_evidence"]:
-        also = f" (also {', '.join(node['names'][1:])})" if len(node["names"]) > 1 else ""
-        out.append(f"{'  ' * depth}{name}{also} {node['pid']} {node['created']} {'/'.join(node['verdicts']) or '-'} alerts={len(node['alert_ids'])}")
-        _detail(node, depth, out, width)
-    elif node["source"] == "telemetry":
-        out.append(f"{'  ' * depth}[telemetry] {name} {node['pid']} {node['created']} (not cited by any alert)")
-        _detail(node, depth, out, width)
-    else:
-        out.append(f"{'  ' * depth}[gap] {name} {node['pid']} {node['created'] or '-'}: {node['gap']}")
-    for child in sorted(node["children"], key=_key):
-        if id(child) not in seen and (section is None or id(child) in section["nodes"]):
-            _lines(child, depth + 1, seen, out, section, width)
+def render(graph, width=WIDTH):
+    """The graph as text: the legend, one tree per device with every process once, each naming its alerts
+    by label, and every decoded script in full, once. What an executor reads; the JSON is what a program reads."""
+    s = graph["process_chain"]
+    out = [f"{s['label']}: {s['processes']} processes on {s['devices']} devices "
+           f"({s['from_the_evidence']} from {s['process_rows']} evidence rows"
+           + (f", {s['from_telemetry']} from telemetry" if s["from_telemetry"] else "")
+           + f"); {s['lineage_gaps']} lineage gaps, {s['unplaced']} unplaced, {s['anomalies']} anomalies"]
+    label = {a["alert_id"]: a["label"] for a in graph["alerts"]}
+    if graph["alerts"]:
+        out.append("alerts:")
+        out += [f"  {a['label']:<4} {a['alert_id']}" + (f"  {a['title']}" if a.get("title") else "") for a in graph["alerts"]]
+    nodes = {p["uid"]: p for p in graph["processes"]}
+    gaps = {g["uid"]: g for g in graph["gaps"]}
+    children = {}
+    for p in graph["processes"]:
+        if p["parent_process"]:
+            children.setdefault(p["parent_process"]["uid"], []).append(p["uid"])
 
+    def line(uid, depth):
+        pad = "  " * depth
+        if uid in gaps:
+            g = gaps[uid]
+            out.append(f"{pad}[gap] {g['name'] or '(unnamed)'} {g['pid']} {g['created'] or '-'}: {g['reason']}")
+            kids = g["children"]
+        else:
+            p = nodes[uid]
+            name = p["name"] or "(unnamed)"
+            also = f" (also {', '.join(p['names'][1:])})" if len(p.get("names") or []) > 1 else ""
+            if p["source"] == "telemetry":
+                out.append(f"{pad}[telemetry] {name}{also} {p['pid']} {p['created']} (not cited by any alert)")
+            else:
+                cited = " ".join(label.get(a, a) for a in sorted(p["alert_ids"], key=lambda a: int(label.get(a, "A0")[1:])))
+                out.append(f"{pad}{name}{also} {p['pid']} {p['created']} {'/'.join(p.get('verdicts') or []) or '-'}  alerts: {cited}")
+            for cmd in (p.get("cmd_lines") or [p["cmd_line"]] if p["cmd_line"] else [])[:2]:
+                out.append(f"{pad}  $ {_short(_command(cmd, p.get('script_uid')), width)}")
+            if p.get("script_uid"):
+                rounds = p.get("decode_rounds")
+                layers = f" ({rounds} layers of encoding{', still encoded' if p.get('decode_capped') else ''})" if rounds else ""
+                out.append(f"{pad}  decoded: {p['script_uid']}{layers}")
+            attrs = p.get("attributes") or {}
+            state = " ".join(str(attrs[k]) for k in ("remediation_status", "detection_status") if attrs.get(k))
+            if state:
+                out.append(f"{pad}  state: {state}")
+            kids = children.get(uid, [])
+        ordered = sorted(kids, key=lambda k: (nodes.get(k) or gaps.get(k) or {}).get("created_time") or 0)
+        for kid in ordered:
+            line(kid, depth + 1)
 
-def _titles(sections, alerts):
-    for section in sections:
-        meta = (alerts or {}).get(section["alert_id"]) or {}
-        title = meta.get("title") or meta.get("displayName")
-        yield section, f"alert {section['alert_id']}" + (f": {title}" if title else "")
-
-
-def as_text(chain, alerts=None, case=False, width=WIDTH):
-    s = summary(chain)
-    head = (f"{s['label']}: {s['processes']} processes on {s['devices']} devices "
-            f"({s['from_the_evidence']} from {s['process_rows']} evidence rows"
-            + (f", {s['from_telemetry']} from telemetry" if s["from_telemetry"] else "")
-            + f"); {s['lineage_gaps']} lineage gaps, {s['unplaced']} unplaced, {s['anomalies']} anomalies")
-    out = [head if case else head + f"; {len(per_alert(chain))} of the Case's alerts cite a process"]
-    if not case:
-        for section, title in _titles(per_alert(chain), alerts):
-            out.append(f"{title} — {section['cited']} processes cited, {section['processes'] - section['cited']} ancestors from the Case")
-            seen = set()
-            for d in section["devices"]:
-                out.append(f"  {d['device']}")
-                for root in sorted(d["roots"], key=_key):
-                    _lines(root, 2, seen, out, section, width)
-        out += [f"unplaced: {u.get('name') or '(unnamed)'} {u.get('pid')} missing {', '.join(u['missing'])}" for u in chain["unplaced"]]
-        out += [f"anomaly: {a}" for a in chain["anomalies"]]
-        return "\n".join(out)
-    seen = set()
-    for d in chain["devices"]:
+    for d in graph["devices"]:
         out.append(d["device"])
-        for root in sorted(d["roots"], key=_key):
-            _lines(root, 1, seen, out, None, width)
-    out += [f"unplaced: {u.get('name') or '(unnamed)'} {u.get('pid')} missing {', '.join(u['missing'])}" for u in chain["unplaced"]]
-    out += [f"anomaly: {a}" for a in chain["anomalies"]]
+        for root in d["roots"]:
+            line(root, 1)
+    if graph["scripts"]:
+        out.append("scripts:")
+        for script in graph["scripts"]:
+            runs = ", ".join(f"{nodes[u]['name']} {nodes[u]['pid']}" for u in script["process_uids"] if u in nodes)
+            out.append(f"  {script['uid']}  {script['type']}, run by {runs}")
+            out += [f"      {text}" for text in script["script_content"].splitlines()]
+    out += [f"unplaced: {u.get('name') or '(unnamed)'} {u.get('pid')} missing {', '.join(u['missing'])}" for u in graph["unplaced"]]
+    out += [f"anomaly: {a}" for a in graph["anomalies"]]
     return "\n".join(out)
+
+
+def as_text(chain, alerts=None, width=WIDTH):
+    return render(as_json(chain, alerts), width)
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("evidence")
-    ap.add_argument("--case", action="store_true", help="the Case-wide chain instead of one per alert")
+    ap.add_argument("evidence", nargs="?")
+    ap.add_argument("--from-graph", help="print the text of a graph this script wrote with --json")
+    ap.add_argument("--case", action="store_true", help=argparse.SUPPRESS)  # the Case-wide chain is the only view
     ap.add_argument("--telemetry", help="process-creation rows for the Case's devices, to fill the gaps")
-    ap.add_argument("--alerts", help="alert id -> {title, severity}, to title the sections")
+    ap.add_argument("--alerts", help="alert id -> {title, severity}, to title the alerts")
     ap.add_argument("--width", type=int, default=WIDTH, help="where a command line is cut; 0 prints it whole")
     ap.add_argument("--json", action="store_true")
     source_profile.add_arguments(ap)
     a = ap.parse_args()
+    if a.from_graph:
+        print(render(json.load(open(a.from_graph, encoding="utf-8")), a.width))
+        sys.exit(0)
+    if not a.evidence:
+        ap.error("evidence.json is required unless --from-graph is given")
     telemetry = json.load(open(a.telemetry, encoding="utf-8")) if a.telemetry else None
     # the profile says what this source calls the telemetry's columns; a run with no telemetry reads none
     columns = columns_of(source_profile.from_arguments(ap, a)) if telemetry and (a.profile or a.bindings) else None
@@ -480,7 +548,8 @@ def main():
               "a way this script knows, so the telemetry filled nothing: pass --bindings (or --profile), and the "
               "source profile says what this source calls its columns", file=sys.stderr)
     alerts = json.load(open(a.alerts, encoding="utf-8")) if a.alerts else None
-    print(json.dumps(as_json(chain), indent=2, ensure_ascii=False) if a.json else as_text(chain, alerts, a.case, a.width))
+    graph = as_json(chain, alerts)
+    print(json.dumps(graph, indent=2, ensure_ascii=False) if a.json else render(graph, a.width))
     sys.exit(0)
 
 
