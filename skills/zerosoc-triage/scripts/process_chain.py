@@ -491,7 +491,9 @@ def as_ocsf(graph):
             s = scripts[p["script_uid"]]
             event["script"] = {k: s[k] for k in ("uid", "type_id", "type", "script_content")}
         launches.append({k: v for k, v in event.items() if v is not None})
-        for alert in p["alert_ids"]:
+        # an alert cites what its evidence holds: a process telemetry filled in carries its descendants'
+        # alerts in the graph, and none of them cites it
+        for alert in p["alert_ids"] if p["source"] == "evidence" else []:
             cited.setdefault(alert, []).append({"name": "process", "uid": p["uid"], "process": _entity(p, full=False)})
     for n, u in enumerate(graph["unplaced"], 1):
         process = {k: v for k, v in (("name", u.get("name")), ("pid", u.get("pid")), ("created_time_dt", u.get("created")))
