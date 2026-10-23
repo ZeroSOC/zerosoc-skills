@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- **Framework pin to `e422bde`, and the skills follow it.** It brings ZeroSOC/zerosoc-framework#111,
+  #112 and #115.
+  - *Techniques at two levels (#111).* The Triage → Investigation contract no longer carries the
+    Case's `attacks`; each Observation in `finding_info_list` carries its own. Investigation step 11
+    records the Incident's tactics and techniques, assessed from the Observations that stand (an
+    Alert's mapping is provisional: one no Observation shows is left out, a broad one narrowed). Its
+    Note's Classification renders them, and the Investigation → Response contract carries them as
+    `attacks`. Both Notes render the techniques on Malicious Observations.
+  - *Response starts from the plan (#109, missed in the previous release).* The response skill's
+    inputs are the planned response actions and the Incident's techniques, and step 3 starts from
+    the containment planned at confirmation, adding from the playbook as the scope expands.
+  - *Alert type on the Alert (#112) and processes and scripts (#115)* reach the references. No skill
+    text depended on them: the scripts already name `alert_type`.
 - **`vendor_attributes` is the source's severity.** The pin follows the framework to the merge of
   ZeroSOC/zerosoc-framework#113: on the Case it is the Case's severity as the source reports it, or
   the highest of its alerts' where the source reports none, kept current while the Case is open

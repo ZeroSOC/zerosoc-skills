@@ -4,7 +4,7 @@ description: Investigate a promoted Case under the ZeroSOC Framework (Phase 2.b)
 license: Apache-2.0
 metadata:
   version: "0.4.1"
-  framework: "zerosoc-framework@98f551e (2026-10-23)"
+  framework: "zerosoc-framework@e422bde (2026-10-23)"
   status: draft
   author: ZeroSOC
 ---
@@ -151,8 +151,10 @@ per Case: the playbook the script prints.
     or redundant ones (disabling a local, non-domain account on a host already isolated is redundant), and
     add the ones the Incident, its context, its severity and the impact estimate call for; each planned
     action is a ticket the Case raises, of its kind (`containment`, `eradication`, `recovery`). Then set
-    `verdict_id = 2`; record the definitive Incident Category and the
-    observed techniques as `ID (Name)`; extend the **Case Timeline** triage compiled with the course of the
+    `verdict_id = 2`; record the definitive Incident Category and the Incident's tactics and techniques
+    as `ID (Name)`, assessed from the Observations that stand: the Alerts' mappings are provisional, so
+    one no Observation shows is left out and a broad one is narrowed; a Malicious Observation carries
+    the techniques it shows; extend the **Case Timeline** triage compiled with the course of the
     attack (interleaved with the detection and the response actions that ran, each entry timestamped in UTC
     with its event reference; the `timeline` of `process_chain.py --json` gives the process entries with their
     alerts as references). The timeline says what happened and is not a field the Case stores: it is the
@@ -183,13 +185,14 @@ per Case: the playbook the script prints.
     mirroring it. The canonical list is
     [Detection & Analysis §2.6](references/framework/03-Processes/02-detection_and_analysis.md), in this
     order: **Summary** (as the Triage Note, at this gate); **Classification** (confirmed or last
-    candidate category, severity, confidence, impact, significance and cross-border on a confirmed
-    Incident, and the decision: the `verdict_id` the resolution produced, with the master Case id on a
+    candidate category, severity, confidence, impact, and on a confirmed Incident its tactics and
+    techniques, significance and cross-border, and the decision: the `verdict_id` the resolution produced, with the master Case id on a
     Duplicate); **Rationale** (the score of each side, the Observations that carry the verdict, the
     retractions and why — how the confidence was reached, not a restatement of it); **Observations** (the
     Alerts; the triage Observations, each now verified or **retracted** with the reason; and the result of
     each validation query — every one rendered with its tag, with what produced it, and with the events
-    it rests on by OCSF identifier; the Alerts also render what their detection asserted, as in the
+    it rests on by OCSF identifier; a Malicious Observation renders the techniques it shows; the Alerts
+    also render what their detection asserted, as in the
     Triage Note, with the remediation state of each entity **as it stands at this gate**, and any
     recommended action run at this gate renders as the Observation it produced);
     **Re-classification Pivots**; **Case Timeline** (whatever the verdict: the one triage compiled, extended by
@@ -212,7 +215,8 @@ per Case: the playbook the script prints.
     [Playbook Architecture §5](references/framework/04-Playbooks/playbook_architecture.md): the triage
     contract fields refined, plus `verdict_id`, `incident_category`, `reclassification_pivots` when the
     category changed, `impact_id`, `significant`, `cross_border`, `is_suspected_breach`,
-    `handover_reason` when a handover occurred, the planned response actions (step 11), and `notes` carrying the Investigation Note. `start_time` is already on
+    `handover_reason` when a handover occurred, `attacks` (the Incident's techniques), the planned
+    response actions (step 11), and `notes` carrying the Investigation Note. `start_time` is already on
     the Case and carries T0. Then invoke the `zerosoc-response` skill. Stakeholder notification (§3.2) is the SOC
     Manager's responsibility and starts after confirmation.
 

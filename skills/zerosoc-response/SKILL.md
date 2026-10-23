@@ -4,7 +4,7 @@ description: Respond to a confirmed Incident under the ZeroSOC Framework (Phase 
 license: Apache-2.0
 metadata:
   version: "0.4.1"
-  framework: "zerosoc-framework@98f551e (2026-10-23)"
+  framework: "zerosoc-framework@e422bde (2026-10-23)"
   status: draft
   author: ZeroSOC
 ---
@@ -32,8 +32,10 @@ and the autonomy matrix, §2.1) and [Guardrails §2–§3](references/framework/
 
 - The contract: confirmed `incident_category`, scope (`observables`), `finding_info_list` (the Alerts,
   the Observations and any action already taken), `start_time` (the Incident's T0), `severity_id`,
-  `confidence_id`, `impact_id`, `significant`, `cross_border`, `handover_reason`, `notes` carrying the
-  Investigation Note, the recommended actions. A tool-initiated action that fired before any executor
+  `confidence_id`, `impact_id`, `significant`, `cross_border`, `handover_reason`, `attacks` (the
+  Incident's techniques), `notes` carrying the Investigation Note, and the planned response actions:
+  the `containment`, `eradication` and `recovery` tickets the investigation raised when it confirmed
+  the Incident, in priority order. A tool-initiated action that fired before any executor
   opened the Case is already an entry — this is where the **remediation the source performed per entity**
   is carried, blocked, quarantined or removed: read them before acting, so nothing is done twice and an
   entity the source left active is not mistaken for one it treated.
@@ -60,7 +62,8 @@ and the autonomy matrix, §2.1) and [Guardrails §2–§3](references/framework/
    and record each notification (`notifications`: kind, recipient, deadline, sent time). Internal
    notification by severity: High within 30 minutes to asset owners and the security lead; Critical
    within 15 minutes to the CISO, legal, risk and executives (reference times).
-3. **Select containment actions** from the playbook. Subtract what the source has already done: an
+3. **Select containment actions**, starting from the ones planned at confirmation (Detection & Analysis
+   §2.5) and adding from the playbook as the scope expands. Subtract what the source has already done: an
    entity it blocked, quarantined or removed needs no containment repeating on it, and the action is
    recorded as taken by the source rather than claimed by this run; an entity it left **active** keeps
    every action the matrix allows. Then run:

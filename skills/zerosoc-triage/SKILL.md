@@ -4,7 +4,7 @@ description: Triage a security alert under the ZeroSOC Framework (Phase 2.a). Se
 license: Apache-2.0
 metadata:
   version: "0.4.1"
-  framework: "zerosoc-framework@98f551e (2026-10-23)"
+  framework: "zerosoc-framework@e422bde (2026-10-23)"
   status: draft
   author: ZeroSOC
 ---
@@ -184,7 +184,8 @@ Read per alert: the playbook section the script prints.
    two sentences); **Observations** (a table, alerts first, each with its tag, **what produced it** — the check is the
    Observation's `analytic` — and the events it rests on by OCSF identifier; each **Alert** also renders what its
    detection asserted: its techniques as `ID (Name)`, the threat name and family, the detection source and detector,
-   and the remediation state of each entity it names; a **recommended action you ran** renders as the Observation it
+   and the remediation state of each entity it names; a **Malicious Observation** renders the techniques it shows,
+   as `ID (Name)`; a **recommended action you ran** renders as the Observation it
    produced, naming the recommendation it came from, and one you did not run renders nowhere); **Case Timeline**
    (what happened, as far as triage establishes it: the Alerts, the actions your Observations establish, and the
    response actions that ran, the source's own remediation included. Triage compiles it and a Case closed here keeps
@@ -218,7 +219,8 @@ Read per alert: the playbook section the script prints.
     Promote: `verdict_id` stays 0 and the Case carries the **Triage → Investigation contract** of
     [Playbook Architecture §5](references/framework/04-Playbooks/playbook_architecture.md): `uid`,
     `status_id`, `severity_id`, `confidence_id`, `impact_id` when known, `start_time`, `observables`,
-    `finding_info_list`, `attacks`, `candidate_incident_categories`, `entry_path`, `master_case_uid`
+    `finding_info_list` (the Alerts and every triage Observation, each with the techniques it carries),
+    `candidate_incident_categories`, `entry_path`, `master_case_uid`
     when correlated, `visibility_gaps`, `provenance`, `desc`, and `notes` carrying the Triage Note.
     The contract states which fields must be populated at the boundary; one Case object crosses every
     phase, so nothing is copied. Then invoke the `zerosoc-investigation` skill.
