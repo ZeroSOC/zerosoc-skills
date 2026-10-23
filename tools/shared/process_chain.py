@@ -3,7 +3,7 @@
 
   process_chain.py evidence.json [--telemetry telemetry.json [--bindings zerosoc.capabilities.json]]
                    [--alerts alerts.json] [--width N] [--json]
-  process_chain.py --from-graph graph.json [--width N]
+  process_chain.py --from-graph graph.json [--width N] [--ocsf]
 
 One chain for the whole Case, one tree per device, every process once under its ancestors. The text is what an
 executor reads: a legend labels the alerts that cite a process (A1, A2, …, each with its full id once), each
@@ -11,8 +11,10 @@ process names its alerts by label, so what is said about a process can cite them
 printed in full, once, under "scripts:" (D1, D2, …), the command line pointing to it in place of its encoded
 payload. The JSON (`--json`) is what a program reads: each process once, keyed as the evidence rows are
 (`device|pid|created`), with its parent by key; the lineage gaps; each decoded command once as a script the
-processes point to; a timeline oldest first. `--from-graph` prints the text of a graph written earlier, so the
-text can be shown again from what was kept.
+processes point to; a timeline oldest first. `--ocsf` prints the chain as the Case keeps it: a context
+Observation's `desc` and `related_events`, each process an OCSF `process` with its parentage in `parent_process`
+and `ancestry`, each decoded command a `script`. `--from-graph` prints the text of a graph or an Observation
+written earlier, so the text can be shown again from what was kept.
 
 Without telemetry the chain is evidence-only: it holds the processes the source attached to the Case's alerts,
 never the processes around them, and a parent outside the evidence is printed as a lineage gap, never guessed.
@@ -439,6 +441,155 @@ def as_json(chain, alerts=None):
             "unplaced": chain["unplaced"], "anomalies": chain["anomalies"], "timeline": timeline(chain)}
 
 
+LAUNCH = {"type_uid": 100701, "type_name": "Process Activity: Launch"}
+DETECTION = {"type_uid": 200401, "type_name": "Detection Finding: Create"}
+HASHES = (("sha1", 2, "SHA-1"), ("sha256", 3, "SHA-256"))
+STATE = ("source", "verdicts", "names", "cmd_lines", "decode_rounds", "decode_capped", "upn", "mde_device_id",
+         "remediation_status", "detection_status", "elevation_token")
+"""What the chain knows of a process that no OCSF object here carries: kept in its evidence artifact's data."""
+
+
+def _entity(p, full=True):
+    """A process as another object names it: what is known of it as a parent, its name further up."""
+    out = {"uid": p["uid"], "pid": p["pid"], "name": p.get("name")}
+    if full:
+        out.update(created_time=p.get("created_time"), created_time_dt=p.get("created"))
+    return {k: v for k, v in out.items() if v is not None}
+
+
+def _ocsf_process(p, known):
+    attrs = p.get("attributes") or {}
+    out = dict(_entity(p), cmd_line=p.get("cmd_line"))
+    hashes = [{"algorithm_id": aid, "algorithm": name, "value": attrs[key]} for key, aid, name in HASHES if attrs.get(key)]
+    file = {k: v for k, v in (("path", attrs.get("path")), ("hashes", hashes)) if v}
+    user = {k: v for k, v in (("name", attrs.get("account")), ("uid", attrs.get("user_sid"))) if v}
+    ancestry, parent = [], p.get("parent_process")
+    while parent and parent["uid"] in known and len(ancestry) < 64:
+        ancestry.append(_entity(known[parent["uid"]], full=not ancestry))
+        parent = known[parent["uid"]].get("parent_process")
+    out.update(file=file or None, user=user or None, parent_process=ancestry[0] if ancestry else None,
+               ancestry=ancestry or None)
+    return {k: v for k, v in out.items() if v is not None}
+
+
+def as_ocsf(graph):
+    """The chain as a context Observation's `desc` and `related_events`, in OCSF's own objects: a Detection
+    Finding per alert, naming its processes in its evidences, and a Process Activity launch per process, with its
+    parentage in `parent_process` and `ancestry` and its decoded command as a `script`. A parent the evidence does
+    not show is only named as a parent, with what is known of it. The `desc` is the chain's summary line and its
+    anomalies."""
+    known = {g["uid"]: g for g in graph["gaps"]} | {p["uid"]: p for p in graph["processes"]}
+    scripts = {s["uid"]: s for s in graph["scripts"]}
+    launches, cited = [], {}
+    for p in graph["processes"]:
+        state = {k: v for k, v in {**p, **(p.get("attributes") or {})}.items()
+                 if k in STATE and v not in (None, "", [], False)}
+        event = dict(LAUNCH, uid=p["uid"], first_seen_time=p.get("created_time"), count=p.get("rows") or None,
+                     device={"hostname": p["device"]}, process=_ocsf_process(p, known),
+                     evidences=[{"name": "process", "uid": p["uid"], "data": state}])
+        if p.get("script_uid"):
+            s = scripts[p["script_uid"]]
+            event["script"] = {k: s[k] for k in ("uid", "type_id", "type", "script_content")}
+        launches.append({k: v for k, v in event.items() if v is not None})
+        for alert in p["alert_ids"]:
+            cited.setdefault(alert, []).append({"name": "process", "uid": p["uid"], "process": _entity(p, full=False)})
+    for n, u in enumerate(graph["unplaced"], 1):
+        process = {k: v for k, v in (("name", u.get("name")), ("pid", u.get("pid")), ("created_time_dt", u.get("created")))
+                   if v is not None}
+        event = dict(LAUNCH, uid=f"unplaced:{n}", process=process, evidences=[{"name": "process", "data": {"missing": u["missing"]}}])
+        if u.get("device"):
+            event["device"] = {"hostname": u["device"]}
+        launches.append(event)
+    alerts = [dict(DETECTION, uid=a["alert_id"], **({"title": a["title"]} if a.get("title") else {}),
+                   evidences=cited.get(a["alert_id"], [])) for a in graph["alerts"]]
+    lines = [_header(graph["process_chain"])] + [f"anomaly: {a}" for a in graph["anomalies"]]
+    return {"desc": "\n".join(lines), "related_events": alerts + launches}
+
+
+def from_ocsf(observation):
+    """The graph again from the Observation `as_ocsf` wrote, so its text can be shown from what the Case kept."""
+    lines = str(observation.get("desc") or "").splitlines()
+    label = lines[0].split(":")[0] if lines else LABEL
+    events = observation.get("related_events") or []
+    alerts, cited = [], {}
+    for e in (e for e in events if e.get("type_uid") == DETECTION["type_uid"]):
+        alerts.append({"label": f"A{len(alerts) + 1}", "alert_id": e["uid"], **({"title": e["title"]} if e.get("title") else {})})
+        for artifact in e.get("evidences") or []:
+            cited.setdefault(artifact.get("uid"), []).append(e["uid"])
+    processes, parents, scripts, unplaced = [], {}, {}, []
+    for e in (e for e in events if e.get("type_uid") == LAUNCH["type_uid"]):
+        proc = e.get("process") or {}
+        state = dict(((e.get("evidences") or [{}])[0]).get("data") or {})
+        device = (e.get("device") or {}).get("hostname")
+        if str(e["uid"]).startswith("unplaced:"):
+            unplaced.append({"name": proc.get("name"), "pid": proc.get("pid"), "created": proc.get("created_time_dt"),
+                             "device": device, "alert_ids": [], "missing": state.get("missing") or []})
+            continue
+        parent = proc.get("parent_process")
+        out = {"uid": e["uid"], "device": device, "pid": proc.get("pid"), "name": proc.get("name"),
+               "created": proc.get("created_time_dt"), "created_time": proc.get("created_time"),
+               "cmd_line": proc.get("cmd_line"),
+               "parent_process": {"uid": parent["uid"], "pid": parent.get("pid")} if parent else None,
+               "source": state.pop("source", "evidence"), "alert_ids": sorted(cited.get(e["uid"], []))}
+        for key in ("names", "cmd_lines"):
+            if key in state:
+                out[key] = state.pop(key)
+        verdicts = state.pop("verdicts", [])
+        if out["source"] == "evidence":
+            out.update(verdicts=verdicts, rows=e.get("count") or 0)
+        decoding = {k: state.pop(k) for k in ("decode_rounds", "decode_capped") if k in state}
+        file, user = proc.get("file") or {}, proc.get("user") or {}
+        attrs = {k: v for k, v in (("path", file.get("path")), ("account", user.get("name")), ("user_sid", user.get("uid"))) if v}
+        for h in file.get("hashes") or []:
+            attrs.update((key, h["value"]) for key, aid, _ in HASHES if aid == h.get("algorithm_id"))
+        attrs.update(state)
+        if attrs:
+            out["attributes"] = attrs
+        if e.get("script"):
+            s = e["script"]
+            script = scripts.setdefault(s["uid"], {"uid": s["uid"], "type_id": s.get("type_id", 0),
+                                                   "type": s.get("type") or "Unknown",
+                                                   "script_content": s.get("script_content") or "", "process_uids": []})
+            script["process_uids"].append(e["uid"])
+            out.update(script_uid=s["uid"], **decoding)
+        processes.append(out)
+        if parent:
+            parents.setdefault(parent["uid"], parent)
+    known = {p["uid"] for p in processes}
+    gaps = []
+    for uid, g in parents.items():
+        if uid in known:
+            continue
+        created = g.get("created_time_dt")
+        reason = ("outside the evidence and the telemetry" if label == LABEL_FULL else "outside the evidence") \
+            if created else "parent creation time not reported"
+        gaps.append({"uid": uid, "device": uid.split("|")[0], "pid": g.get("pid"), "created": created,
+                     "created_time": g.get("created_time"), "name": g.get("name"), "reason": reason, "children": []})
+
+    def order(item):
+        time = parse_time(item["created"]) if item.get("created") else None
+        return time[0] if time else float("inf")
+
+    nodes = {item["uid"]: item for item in processes + gaps}
+    devices = {}
+    for item in sorted(processes + gaps, key=order):
+        devices.setdefault(item["device"].lower(), {"device": item["device"], "roots": []})
+        parent = nodes.get((item.get("parent_process") or {}).get("uid"))
+        if parent is None:
+            devices[item["device"].lower()]["roots"].append(item["uid"])
+        elif "reason" in parent:
+            parent["children"].append(item["uid"])
+    anomalies = [line.removeprefix("anomaly: ") for line in lines[1:] if line.startswith("anomaly: ")]
+    from_telemetry = sum(1 for p in processes if p["source"] == "telemetry")
+    summary = {"label": label, "process_rows": sum(p.get("rows") or 0 for p in processes) + len(unplaced),
+               "processes": len(processes), "from_the_evidence": len(processes) - from_telemetry,
+               "from_telemetry": from_telemetry, "devices": len(devices), "lineage_gaps": len(gaps),
+               "unplaced": len(unplaced), "anomalies": len(anomalies), "alerts_citing_a_process": len(alerts)}
+    return {"process_chain": summary, "alerts": alerts, "devices": [devices[k] for k in sorted(devices)],
+            "processes": processes, "gaps": gaps, "scripts": list(scripts.values()), "unplaced": unplaced,
+            "anomalies": anomalies}
+
+
 ENCODED = re.compile(r"^[A-Za-z0-9+/=]{40,}$")
 
 
@@ -455,14 +606,17 @@ def _command(line, script_uid):
     return " ".join(f"‹encoded: {script_uid}›" if ENCODED.match(token) else token for token in str(line).split())
 
 
+def _header(s):
+    return (f"{s['label']}: {s['processes']} processes on {s['devices']} devices "
+            f"({s['from_the_evidence']} from {s['process_rows']} evidence rows"
+            + (f", {s['from_telemetry']} from telemetry" if s["from_telemetry"] else "")
+            + f"); {s['lineage_gaps']} lineage gaps, {s['unplaced']} unplaced, {s['anomalies']} anomalies")
+
+
 def render(graph, width=WIDTH):
     """The graph as text: the legend, one tree per device with every process once, each naming its alerts
     by label, and every decoded script in full, once. What an executor reads; the JSON is what a program reads."""
-    s = graph["process_chain"]
-    out = [f"{s['label']}: {s['processes']} processes on {s['devices']} devices "
-           f"({s['from_the_evidence']} from {s['process_rows']} evidence rows"
-           + (f", {s['from_telemetry']} from telemetry" if s["from_telemetry"] else "")
-           + f"); {s['lineage_gaps']} lineage gaps, {s['unplaced']} unplaced, {s['anomalies']} anomalies"]
+    out = [_header(graph["process_chain"])]
     label = {a["alert_id"]: a["label"] for a in graph["alerts"]}
     if graph["alerts"]:
         out.append("alerts:")
@@ -532,10 +686,13 @@ def main():
     ap.add_argument("--alerts", help="alert id -> {title, severity}, to title the alerts")
     ap.add_argument("--width", type=int, default=WIDTH, help="where a command line is cut; 0 prints it whole")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--ocsf", action="store_true", help="print the chain as a context Observation's desc and related_events")
     source_profile.add_arguments(ap)
     a = ap.parse_args()
     if a.from_graph:
-        print(render(json.load(open(a.from_graph, encoding="utf-8")), a.width))
+        graph = json.load(open(a.from_graph, encoding="utf-8"))
+        graph = from_ocsf(graph) if "related_events" in graph else graph
+        print(json.dumps(as_ocsf(graph), indent=2, ensure_ascii=False) if a.ocsf else render(graph, a.width))
         sys.exit(0)
     if not a.evidence:
         ap.error("evidence.json is required unless --from-graph is given")
@@ -549,7 +706,10 @@ def main():
               "source profile says what this source calls its columns", file=sys.stderr)
     alerts = json.load(open(a.alerts, encoding="utf-8")) if a.alerts else None
     graph = as_json(chain, alerts)
-    print(json.dumps(graph, indent=2, ensure_ascii=False) if a.json else render(graph, a.width))
+    if a.json or a.ocsf:
+        print(json.dumps(as_ocsf(graph) if a.ocsf else graph, indent=2, ensure_ascii=False))
+    else:
+        print(render(graph, a.width))
     sys.exit(0)
 
 
