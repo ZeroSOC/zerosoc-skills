@@ -28,8 +28,8 @@ Ledger (JSON):
 events it rests on and "timeline" whether the Case Timeline shows it; note_elements.py and timeline.py read
 them from this same ledger. This rule reads "event_refs" with "alerts" (the Case's alerts and each one's own
 confidence): a Malicious observation that cites one alert and nothing else counts as that alert, whatever it
-is tagged — once, at the alert's own confidence, in the score as in the proof — and Malicious is proven at 3
-only when an alert's own confidence is High or a Malicious observation stands beyond the alerts (§2.4). A ledger that names no alerts is resolved by the score alone, and says so.
+is tagged — once, never above the alert's own confidence, in the score as in the proof — and Malicious is
+proven at 3 only when an alert's own confidence is High or a Malicious observation stands beyond the alerts (§2.4). A ledger that names no alerts is resolved by the score alone, and says so.
 "no_information_refs" are the references whose result carried no information: a lookup that knows nothing
 of the indicator, a search that finds no approval, a query that was not answered. "scoped_negative_refs" are
 the references whose query covered the question and found nothing, such as no child process on a covered
@@ -209,8 +209,9 @@ def alert_index(ledger):
 
 def as_alerts(observations, ledger, empty):
     """§2.4: an observation that only restates an alert counts as that alert, in the score as in the proof:
-    the restatements of one alert are one observation, at the alert's own confidence however they are tagged,
-    and the same one as the alert's typed observation where the ledger has one (§1.1)."""
+    the restatements of one alert are one observation, weighed no higher than the alert's own confidence however
+    they are tagged, and the same one as the alert's typed observation where the ledger has one (§1.1). The
+    cap never raises a tag: a High alert read at Low stays Low."""
     owner, own = alert_index(ledger)
     bound = {f["id"]: alert_bound(f, owner, empty) for f in observations if f["side"] == "Malicious"}
     typed = {}
@@ -222,7 +223,8 @@ def as_alerts(observations, ledger, empty):
         alert = bound.get(f["id"])
         if alert not in own or f.get("alert_type"):
             out.append(f); continue
-        g = dict(f, confidence=own[alert] or f["confidence"])
+        cap = own[alert] if own[alert] in W else f["confidence"]
+        g = dict(f, confidence=min(f["confidence"], cap, key=W.__getitem__))
         if alert in typed:
             g.update(alert_type=typed[alert]["alert_type"], entity=typed[alert]["entity"])
         else:
