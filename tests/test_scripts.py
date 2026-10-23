@@ -789,36 +789,30 @@ class ProcessChain(unittest.TestCase):
         self.assertTrue(any("loop" in a for a in loop["anomalies"]))
         self.assertEqual(len(chain.as_json(loop)["timeline"]), 2)
 
-    def test_one_section_per_alert_citing_a_process(self):
-        sections = chain.per_alert(self.live)
-        self.assertEqual(len(sections), 28)  # of the incident's 32 alerts; the others cite no process
-        for section in sections:
-            self.assertTrue(section["cited"])
-            self.assertLessEqual(section["cited"], section["processes"])
-        self.assertEqual({n["pid"] for n in self.live["nodes"]},
-                         {n["pid"] for s in sections for n in s["nodes"].values() if n["in_evidence"]})
+    def test_the_legend_labels_every_alert_citing_a_process_once(self):
+        labels = chain.legend(self.live)
+        self.assertEqual(len(labels), 28)  # of the incident's 32 alerts; the others cite no process
+        self.assertEqual([a["label"] for a in labels], [f"A{n}" for n in range(1, 29)])
+        cited = {a for n in self.live["nodes"] if n["in_evidence"] for a in n["alert_ids"]}
+        self.assertEqual({a["alert_id"] for a in labels}, cited)
 
-    def test_an_alerts_section_closes_upwards_over_its_ancestors(self):
+    def test_each_process_names_its_alerts_by_label(self):
         built = chain.build([self.row(10, "2026-09-13T12:00:00Z", alerts=["A"]),
                              self.row(11, "2026-09-13T12:00:01Z", 10, "2026-09-13T12:00:00Z", alerts=["A"]),
-                             self.row(12, "2026-09-13T12:00:02Z", 11, "2026-09-13T12:00:01Z", alerts=["B"])])
-        sections = {s["alert_id"]: s for s in chain.per_alert(built)}
-        self.assertEqual(sorted(sections), ["A", "B"])
-        b = sections["B"]
-        self.assertEqual((b["cited"], b["processes"]), (1, 3), "the alert's process plus its two ancestors")
-        text = chain.as_text(built)
-        self.assertIn("alert B", text)
-        self.assertIn("(context: another alert of the Case)", text)
-        self.assertNotIn("p12.exe 12", text.split("alert A")[1].split("alert B")[0], "a child of another alert is not in this story")
-        node = chain.as_json(built)["alerts"][1]["devices"][0]["tree"][0]
-        self.assertFalse(node["cited_by_this_alert"])
-        self.assertTrue(node["children"][0]["children"][0]["cited_by_this_alert"])
+                             self.row(12, "2026-09-13T12:00:02Z", 11, "2026-09-13T12:00:01Z", alerts=["B", "A"])])
+        text = chain.as_text(built, {"A": {"title": "Suspicious PowerShell"}, "B": {"title": "Credential theft"}})
+        self.assertIn("A1   A  Suspicious PowerShell", text)
+        self.assertIn("A2   B  Credential theft", text)
+        self.assertIn("p12.exe 12 2026-09-13T12:00:02Z -  alerts: A1 A2", text)
+        self.assertNotIn("context:", text, "no per-alert view: every process is in the one tree")
+        self.assertEqual(text.count("p10.exe 10"), 1, "every process once")
 
-    def test_the_case_wide_chain_is_still_available(self):
-        text = chain.as_text(self.live, case=True)
-        self.assertNotIn("alert d", text)
-        self.assertIn("winrshost", chain.as_text(self.live, case=True) if False else "winrshost")
+    def test_the_text_is_one_tree_per_device(self):
+        text = chain.as_text(self.live)
         self.assertEqual(text.count("[gap]"), len(self.live["gaps"]))
+        for node in self.live["nodes"]:
+            name = node["names"][0] if node["names"] else "(unnamed)"
+            self.assertEqual(text.count(f"{name} {node['pid']} {node['created']}"), 1, f"{name} {node['pid']}")
 
     def test_accepts_the_inventory_output_and_renders_the_label(self):
         inventory = evidence.build([self.row(10, "2026-09-13T08:00:00Z"), self.row(10, "2026-09-13T08:00:00Z", alerts=["B"])])
@@ -925,54 +919,80 @@ class ProcessChainTelemetry(unittest.TestCase):
         self.assertEqual((parent["source"], parent["command_lines"]), ("telemetry", ["parent.exe"]))
         self.assertEqual(parent["parent"]["pid"], 4, "the row's grandparent columns add one more level")
 
-    def test_the_text_view_shows_command_lines_cut_to_length(self):
-        text = chain.as_text(self.with_, case=True)
+    def test_the_text_view_points_an_encoded_command_to_its_script(self):
+        text = chain.as_text(self.with_)
         self.assertIn("$ WinrsHost.exe -Embedding", text)
         self.assertIn("[telemetry]", text)
-        self.assertTrue(all(len(line) < 200 for line in text.splitlines()), "encoded commands are cut in the text view")
-        self.assertIn("…", text)
+        self.assertIn("-EncodedCommand ‹encoded: D1›", text)
+        self.assertNotIn("UABvAHcAZQByAFMAaABlAGwAbAAgAC0ATgBvAFAAcgBvAGYAaQBsAGUAIAAtAE4AbwBuAEkAbgB0AGUAcgBhAGMAdABpAHYAZQAg", text)
+        commands = [line for line in text.splitlines() if line.strip().startswith("$ ")]
+        self.assertTrue(all(len(line) < 200 for line in commands), "command lines are cut in the text view")
         whole = json.dumps(chain.as_json(self.with_))
-        self.assertIn("EncodedCommand UABvAHcAZQByAFMAaABlAGwAbAAgAC0ATgBvAFAAcgBvAGYAaQBsAGUAIAAtAE4AbwBuAEkAbgB0AGUAcgBhAGMAdABpAHYAZQAg", whole)
+        self.assertIn("EncodedCommand UABvAHcAZQByAFMAaABlAGwAbAAgAC0ATgBvAFAAcgBvAGYAaQBsAGUAIAAtAE4AbwBuAEkAbgB0AGUAcgBhAGMAdABpAHYAZQAg", whole,
+                      "the JSON keeps the whole command line")
 
-    def test_width_controls_where_a_command_is_cut(self):
-        whole = chain.as_text(self.with_, case=True, width=0)
-        self.assertIn("EncodedCommand UABvAHcAZQByAFMAaABlAGwAbAAgAC0ATgBvAFAAcgBvAGYAaQBsAGUAIAAtAE4AbwBuAEkAbgB0AGUAcgBhAGMAdABpAHYAZQAg", whole)
-        self.assertNotIn("…", whole)
-        narrow = chain.as_text(self.with_, case=True, width=60)
-        commands = [line.strip() for line in narrow.splitlines() if line.strip().startswith(("$ ", "decoded:"))]
+    def test_width_controls_where_a_command_is_cut_and_scripts_stay_whole(self):
+        whole = chain.as_text(self.with_, width=0)
+        self.assertFalse([line for line in whole.splitlines() if line.strip().startswith("$ ") and line.endswith("…")])
+        narrow = chain.as_text(self.with_, width=60)
+        commands = [line.strip() for line in narrow.splitlines() if line.strip().startswith("$ ")]
         self.assertTrue(commands)
         self.assertTrue(all(len(line) <= 70 for line in commands), "only the commands answer to --width")
+        self.assertEqual(narrow.split("scripts:")[1], whole.split("scripts:")[1], "a decoded script is never cut")
 
-    def test_a_decoded_command_is_read_as_a_script(self):
-        text = chain.as_text(self.with_, case=True)
-        decoded = [line for line in text.splitlines() if "decoded:" in line]
-        self.assertTrue(decoded)
-        body = text[text.index(decoded[0]):].splitlines()
-        self.assertTrue(any(line.strip().startswith("if ($PSVersionTable") for line in body[:8]),
+    def test_a_decoded_command_is_read_as_a_script_once(self):
+        text = chain.as_text(self.with_)
+        self.assertIn("decoded: D1", text)
+        scripts = text.split("scripts:")[1]
+        self.assertTrue(any(line.strip().startswith("if ($PSVersionTable") for line in scripts.splitlines()),
                         "the decoding keeps its own lines instead of being flattened")
+        graph = chain.as_json(self.with_)
+        contents = [s["script_content"] for s in graph["scripts"]]
+        self.assertEqual(len(contents), len(set(contents)), "each decoded command once")
+        self.assertTrue(all(s["type"] == "PowerShell" and s["type_id"] == 2 for s in graph["scripts"]))
 
     def test_layers_of_encoding_are_named_in_the_chain(self):
         rows = [{"type": "process", "name": "powershell.exe", "pid": 10, "created": "2026-09-13T12:00:00Z",
                  "device": "ws-01", "alert_ids": ["A"], "command_line": "powershell -enc AAAA",
                  "decoded_command": "whoami", "decode_rounds": 3, "decode_capped": True}]
-        text = chain.as_text(chain.build(rows), case=True)
-        self.assertIn("decoded (3 layers of encoding, still encoded): whoami", text)
+        text = chain.as_text(chain.build(rows))
+        self.assertIn("decoded: D1 (3 layers of encoding, still encoded)", text)
+        self.assertIn("      whoami", text.split("scripts:")[1])
         plain = [dict(rows[0], decode_rounds=None, decode_capped=None)]
-        self.assertIn("decoded: whoami", chain.as_text(chain.build(plain), case=True))
+        self.assertIn("  decoded: D1\n", chain.as_text(chain.build(plain)) + "\n")
 
     def test_the_json_keeps_the_attributes_a_note_cites(self):
-        def walk(nodes):
-            for n in nodes:
-                yield n
-                yield from walk(n["children"])
-
         document = chain.as_json(self.with_)
-        nodes = list(walk([t for a in document["alerts"] for d in a["devices"] for t in d["tree"]]))
-        alerted = [n for n in nodes if n["source"] == "evidence" and n.get("attributes")]
+        alerted = [p for p in document["processes"] if p["source"] == "evidence" and p.get("attributes")]
         self.assertTrue(alerted)
-        self.assertTrue(set().union(*(n["attributes"] for n in alerted)) >= {"sha256", "path", "account"})
-        self.assertTrue(any(n["command_lines"] for n in nodes))
-        self.assertTrue(any(e["command_line"] for e in document["timeline"]))
+        self.assertTrue(set().union(*(p["attributes"] for p in alerted)) >= {"sha256", "path", "account"})
+        self.assertTrue(any(p["cmd_line"] for p in document["processes"]))
+        self.assertTrue(all(e["uid"] for e in document["timeline"]))
+
+    def test_the_json_holds_each_process_once_keyed_as_the_evidence_rows(self):
+        document = chain.as_json(self.with_)
+        uids = [p["uid"] for p in document["processes"]]
+        self.assertEqual(len(uids), len(set(uids)), "each process once")
+        rows = {f"{r['device']}|{r['pid']}|{r['created']}" for r in self.evidence if r.get("type") == "process"}
+        cited = {p["uid"] for p in document["processes"] if p["source"] == "evidence"}
+        self.assertLessEqual(cited, rows, "an evidence process joins its row on device, PID and creation time")
+        known = set(uids) | {g["uid"] for g in document["gaps"]}
+        parents = {p["parent_process"]["uid"] for p in document["processes"] if p["parent_process"]}
+        self.assertLessEqual(parents, known, "a parent is a process or a gap of the graph")
+        self.assertNotIn("tree", json.dumps(document["devices"]), "no nested copies")
+
+    def test_the_text_renders_again_from_a_stored_graph(self):
+        stored = json.loads(json.dumps(chain.as_json(self.with_)))
+        self.assertEqual(chain.render(stored), chain.as_text(self.with_))
+
+    def test_one_script_shared_by_two_processes_is_printed_once(self):
+        rows = [{"type": "process", "name": "powershell.exe", "pid": pid, "created": created, "device": "ws-01",
+                 "alert_ids": ["A"], "command_line": "powershell -enc " + "A" * 60, "decoded_command": "Get-Process"}
+                for pid, created in ((10, "2026-09-13T12:00:00Z"), (11, "2026-09-13T12:00:05Z"))]
+        text = chain.as_text(chain.build(rows))
+        self.assertEqual(text.count("Get-Process"), 1)
+        self.assertEqual(text.count("decoded: D1"), 2)
+        self.assertIn("run by powershell.exe 10, powershell.exe 11", text)
 
 
 class RunCheck(unittest.TestCase):

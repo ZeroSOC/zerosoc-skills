@@ -64,8 +64,10 @@ Read per alert: the playbook section the script prints.
    extracted"; otherwise "31 entities extracted, unverified").
    When the inventory holds processes, run `python3 scripts/process_chain.py evidence.json --alerts alerts.json`
    for the parent/child lineage the [Artifact enrichment](references/framework/04-Playbooks/99-Shared/sub_enrichment_artifact.md)
-   produces: one chain per alert, each process under its ancestors, as an alert story is read (`--case` joins
-   the Case's alerts into one chain per device). Read the command lines, not only the names: they carry the
+   produces: one chain for the Case, one tree per device, every process once under its ancestors. Each process
+   names the alerts that cite it by label (`alerts: A1 A4`, the legend at the top gives each label's alert id),
+   so what you say of a process cites those alerts; each decoded command is printed in full, once, under
+   `scripts:` (`D1`, …), and the command line points to it. Read the command lines, not only the names: they carry the
    objective, and the layers of encoding over them are part of the observation: a command hidden behind one
    layer is read for its intent, each further layer is a deliberate choice, and decoding stops at five.
    Two deployments, told apart by the binding, not by assumption:

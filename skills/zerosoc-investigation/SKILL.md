@@ -67,8 +67,8 @@ per Case: the playbook the script prints.
    in the ledger; extract what is missing before scoring. For a hunt-opened Case the inventory is what
    the hunt collected, and N is unverified.
    When it holds processes, rebuild the lineage with `python3 scripts/process_chain.py evidence.json --alerts alerts.json`
-   (one chain per alert, each process under its ancestors; `--case` joins them into one chain per device, the
-   view to score on). Where the bound endpoint class carries process telemetry, query the Case's devices and
+   (one tree per device, every process once under its ancestors, each naming its alerts by the legend's labels
+   and pointing to its decoded command, printed in full once under `scripts:`). Where the bound endpoint class carries process telemetry, query the Case's devices and
    window for process creations and pass them with `--telemetry telemetry.json --bindings zerosoc.capabilities.json` (the source profile says what the source calls its columns): the ancestors the alerts never
    cited are reconstructed and marked as such. Where it carries alert evidence only, the chain stops at the
    first ancestor no alert cited: that is a **lineage gap**, it is recorded, and no hypothesis may rest on a
