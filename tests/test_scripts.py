@@ -1388,6 +1388,25 @@ class AlertsAloneDoNotProve(unittest.TestCase):
         r = inv.resolve({"alerts": alerts, "observations": self._obs(merged)})
         self.assertEqual(r["outcome"], "Neither proven")
 
+    def test_a_restatement_scores_as_its_alert_once(self):
+        """An observation that only restates an alert counts as that alert, in the score too (§2.4): a
+        reputation lookup that knew nothing, cited beside the alert, adds no second alert."""
+        lookup = {"id": "O3", "side": "Malicious", "confidence": "Medium", "event_refs": ["EVT-5", "x1"]}
+        r = inv.resolve({"alerts": self.ALERTS, "observations": self._obs(lookup), "no_information_refs": ["EVT-5"],
+                         "scoped_negative_refs": []})
+        self.assertEqual((r["malicious_score"], r["counted"]["Malicious"]["counted"]), (4, ["O1", "O2"]))
+
+    def test_a_restatement_tagged_high_scores_at_its_alerts_confidence(self):
+        restated = {"id": "O3", "side": "Malicious", "confidence": "High", "event_refs": ["x1"]}
+        self.assertEqual(inv.resolve({"alerts": self.ALERTS, "observations": self._obs(restated)})["malicious_score"], 4)
+
+    def test_a_restatement_of_a_typed_alert_is_that_alert(self):
+        typed = {"id": "O1", "side": "Malicious", "confidence": "Medium", "event_refs": ["x1"],
+                 "alert_type": "C2 beaconing", "entity": "vwin02"}
+        restated = {"id": "O3", "side": "Malicious", "confidence": "Medium", "event_refs": ["x1"]}
+        r = inv.resolve({"alerts": self.ALERTS[:1], "observations": [typed, restated]})
+        self.assertEqual((r["malicious_score"], r["counted"]["Malicious"]["counted"]), (2, ["O1"]))
+
     def test_an_alert_at_high_confidence_proves_it_alone(self):
         alerts = [{"id": "x1", "confidence": "High"}]
         f = [{"id": "O1", "side": "Malicious", "confidence": "High", "event_refs": ["x1"]}]
