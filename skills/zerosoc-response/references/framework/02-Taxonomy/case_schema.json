@@ -137,7 +137,8 @@
       "type": "array",
       "items": {
         "$ref": "#/$defs/ocsf_attack"
-      }
+      },
+      "description": "The Incident's tactics and techniques, assessed at incident confirmation from the Observations that stand and kept current as the response reveals more. Empty until confirmation: the techniques the Alerts assert are provisional and stay on the Alerts."
     },
     "observables": {
       "type": "array",
@@ -377,6 +378,14 @@
         },
         "product": {
           "$ref": "#/$defs/ocsf_product"
+        },
+        "process": {
+          "$ref": "#/$defs/ocsf_process",
+          "description": "The process the event shows, where it shows one."
+        },
+        "script": {
+          "$ref": "#/$defs/ocsf_script",
+          "description": "The decoded command the event's process ran, where it ran an encoded one."
         }
       },
       "description": "An event that is evidence of the Observation: what the Observation rests on, kept with the Case and cited by identifier. It may be any OCSF event — a Detection Finding where the Observation is an Alert, a Remediation Activity on an action entry, an event of the telemetry a query returned — or an event that is not in OCSF at all, which `type` names instead of `type_uid`. What is left out is what the Observation did not rest on: bulk telemetry, result sets, message bodies, file content."
@@ -415,7 +424,8 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/ocsf_attack"
-          }
+          },
+          "description": "The tactics and techniques the entry shows. An Alert carries the ones its detection asserted, and a Malicious Observation SHOULD carry the ones it shows."
         },
         "related_events": {
           "type": "array",
@@ -454,7 +464,7 @@
         "zerosoc": {
           "type": "object",
           "additionalProperties": false,
-          "description": "Framework attributes of an Observation: its side and confidence, and whether the Case Timeline renders it. An Observation that bears on no hypothesis carries neither side nor confidence, and so does every action entry.",
+          "description": "Framework attributes of an Observation: its side and confidence, whether the Case Timeline renders it, and an Alert's alert type. An Observation that bears on no hypothesis carries neither side nor confidence, and so does every action entry.",
           "dependentRequired": {
             "side": [
               "confidence_id"
@@ -489,6 +499,11 @@
             "timeline": {
               "type": "boolean",
               "description": "Set on the entries the Case Timeline renders."
+            },
+            "alert_type": {
+              "type": "string",
+              "minLength": 1,
+              "description": "On an Alert, the alert type it is triaged under: the one its source declares, or the one the executor identified. Absent where no alert type describes the Alert, and on every entry that is not an Alert."
             }
           }
         }
@@ -941,7 +956,7 @@
         },
         "relation": {
           "type": "string",
-          "description": "An ATT&CK technique identifier where the edge is an observed technique, otherwise a STIX 2.1 relationship type."
+          "description": "Where the edge is an observed technique, the most specific identifier the Observation's attacks carries for it, whose entry gives the edge its tactic; otherwise a STIX 2.1 relationship type."
         },
         "name": {
           "type": "string"
@@ -1020,6 +1035,98 @@
         "modified_time": {
           "type": "integer",
           "description": "OCSF timestamp_t: milliseconds since the Unix epoch (UTC)."
+        }
+      }
+    },
+    "ocsf_process": {
+      "type": "object",
+      "x-ocsf-object": "process",
+      "additionalProperties": true,
+      "description": "A process an Observation rests on, with its parentage in parent_process and ancestry. A parent the evidence does not show carries what is known of it.",
+      "properties": {
+        "uid": {
+          "type": "string"
+        },
+        "pid": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "cmd_line": {
+          "type": "string",
+          "description": "The command line as the process was launched, encoded or not."
+        },
+        "created_time": {
+          "type": "integer",
+          "description": "OCSF timestamp_t: milliseconds since the Unix epoch (UTC)."
+        },
+        "parent_process": {
+          "$ref": "#/$defs/ocsf_process"
+        },
+        "ancestry": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ocsf_process"
+          },
+          "description": "The extended parentage, the direct parent first."
+        }
+      }
+    },
+    "ocsf_script": {
+      "type": "object",
+      "x-ocsf-object": "script",
+      "additionalProperties": true,
+      "description": "A command decoded from its encoded form.",
+      "required": [
+        "type_id",
+        "script_content"
+      ],
+      "properties": {
+        "type_id": {
+          "type": "integer",
+          "enum": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            99
+          ],
+          "x-enum-captions": {
+            "0": "Unknown",
+            "1": "Windows Command Prompt",
+            "2": "PowerShell",
+            "3": "Python",
+            "4": "JavaScript",
+            "5": "VBScript",
+            "6": "Unix Shell",
+            "7": "VBA",
+            "99": "Other"
+          },
+          "description": "The interpreter."
+        },
+        "script_content": {
+          "type": "string",
+          "description": "The decoded content, normalized to UTF-8."
+        },
+        "hashes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "description": "Hashes of the script in its original encoding."
+        },
+        "uid": {
+          "type": "string"
+        },
+        "parent_uid": {
+          "type": "string",
+          "description": "The uid of the script that launched this one."
         }
       }
     }
