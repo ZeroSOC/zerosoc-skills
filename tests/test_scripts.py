@@ -985,6 +985,53 @@ class ProcessChainTelemetry(unittest.TestCase):
         stored = json.loads(json.dumps(chain.as_json(self.with_)))
         self.assertEqual(chain.render(stored), chain.as_text(self.with_))
 
+    def test_the_case_keeps_the_chain_in_ocsf_objects(self):
+        observation = chain.as_ocsf(chain.as_json(self.with_))
+        events = observation["related_events"]
+        launches = {e["uid"]: e for e in events if e["type_uid"] == 100701}
+        alerts = [e for e in events if e["type_uid"] == 200401]
+        self.assertEqual(len(launches), 45, "a launch per process, the ones telemetry filled in included")
+        self.assertEqual([a["uid"] for a in alerts], [a["alert_id"] for a in chain.legend(self.with_)])
+        powershell = next(e for e in launches.values() if e["process"]["pid"] == 3664)
+        self.assertEqual([p["pid"] for p in powershell["process"]["ancestry"]], [3424, 5316, 2772, 948, 816, 676],
+                         "the extended parentage, the direct parent first")
+        self.assertEqual(powershell["process"]["parent_process"]["pid"], 3424)
+        self.assertIn(powershell["uid"], {a["uid"] for alert in alerts for a in alert["evidences"]})
+        gap = self.node(self.with_, 676)
+        self.assertNotIn(f"{gap['device']}|676|{gap['created']}", launches, "a gap is only named as a parent")
+        scripts = [e["script"] for e in launches.values() if e.get("script")]
+        self.assertTrue(scripts and all(s["type_id"] == 2 and s["script_content"] for s in scripts))
+        self.assertEqual(observation["desc"].splitlines()[0], chain.as_text(self.with_).splitlines()[0])
+
+    def test_the_text_renders_again_from_the_stored_observation(self):
+        with open(os.path.join(FIXTURES, "incident14_evidence.json"), encoding="utf-8") as f:
+            live = chain.build(json.load(f))
+        odd = chain.build([{"type": "process", "name": "a.exe", "pid": 11, "created": "2026-09-13T12:00:01Z", "device": "ws-01",
+                            "parent_pid": 10, "parent_created": "2026-09-13T12:00:00Z", "alert_ids": ["A"]},
+                           {"type": "process", "name": "a.exe", "pid": 11, "created": "2026-09-13T12:00:01Z", "device": "ws-01",
+                            "parent_pid": 9, "parent_created": "2026-09-13T12:00:00Z", "alert_ids": ["A"]},
+                           {"type": "process", "name": "b.exe", "pid": 12, "device": "ws-01", "alert_ids": ["A"]}])
+        self.assertTrue(odd["anomalies"] and odd["unplaced"])
+        for built in (self.with_, self.without, live, odd):
+            stored = json.loads(json.dumps(chain.as_ocsf(chain.as_json(built))))
+            self.assertEqual(chain.render(chain.from_ocsf(stored)), chain.as_text(built))
+
+    def test_the_script_writes_and_reads_the_stored_observation(self):
+        import subprocess, sys, tempfile
+        base = tempfile.mkdtemp()
+        with open(os.path.join(base, "evidence.json"), "w", encoding="utf-8") as f:
+            json.dump(self.evidence, f)
+        script = os.path.join(ROOT, "tools", "shared", "process_chain.py")
+
+        def run(*args):
+            return subprocess.run([sys.executable, script, *args], cwd=base, capture_output=True, text=True, check=True).stdout
+
+        with open(os.path.join(base, "observation.json"), "w", encoding="utf-8") as f:
+            f.write(run("evidence.json", "--ocsf"))
+        self.assertEqual(run("--from-graph", "observation.json"), run("evidence.json"))
+        with open(os.path.join(base, "observation.json"), encoding="utf-8") as f:
+            self.assertEqual(json.loads(run("--from-graph", "observation.json", "--ocsf")), json.load(f))
+
     def test_one_script_shared_by_two_processes_is_printed_once(self):
         rows = [{"type": "process", "name": "powershell.exe", "pid": pid, "created": created, "device": "ws-01",
                  "alert_ids": ["A"], "command_line": "powershell -enc " + "A" * 60, "decoded_command": "Get-Process"}

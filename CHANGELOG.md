@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **The Case keeps its process chain (`--ocsf`).** `process_chain.py --ocsf` prints the chain as the
+  `desc` and `related_events` of an Observation with no side, in OCSF's own objects: a Process
+  Activity launch per process, with its parentage in `parent_process` and `ancestry` and its decoded
+  command as a `script`, and a Detection Finding per alert naming its processes in its evidences. A
+  lineage gap is only named as a parent, with what is known of it. `--from-graph` reads that
+  Observation as well as a graph, and prints the same text the chain printed when it was built. The
+  investigation skill records the Observation at step 2 and replaces it when joining alerts rebuild
+  the chain.
 - **Techniques at two levels, recorded (#80).** A ledger observation carries `attacks`, the
   techniques it shows as identifiers, and the investigation ledger's own `attacks` holds the
   Incident's, recorded at confirmation. Both tagging rules (`rules/checks.md`, `rules/tag.md`) ask a

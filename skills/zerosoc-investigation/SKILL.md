@@ -75,6 +75,10 @@ per Case: the playbook the script prints.
    lineage the evidence does not show. Command lines, their decodings and the remediation state of each process
    are observations in their own right, not decoration, and so is the number of layers a command was encoded
    in: decoding stops at five rounds, and a command still encoded there is recorded as such.
+   Keep the chain with the Case: the same command with `--ocsf` prints it as the `desc` and `related_events`
+   of an Observation with no side (each process an OCSF `process` with its `parent_process` and `ancestry`,
+   each decoded command a `script`, each alert naming its processes). Record it once, and replace it when
+   alerts that joined rebuild the chain; `--from-graph observation.json` prints its text again.
    Carry the Case's `detection_metadata` across and **refresh it at this gate**: alerts appended since
    triage bring their own assertions, and the remediation state changes while a Case is open. Re-run
    `python3 scripts/alert_metadata.py alerts.json --bindings zerosoc.capabilities.json --evidence evidence.json --json`
