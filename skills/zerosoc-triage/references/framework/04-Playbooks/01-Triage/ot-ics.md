@@ -10,7 +10,7 @@ required_data_sources:
   - Engineering-workstation / HMI endpoint telemetry
 status: draft
 ---
-<!-- generated from zerosoc-framework@a93229436a62 : 04-Playbooks/01-Triage/ot-ics.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@98f551ea02fe : 04-Playbooks/01-Triage/ot-ics.md — do not edit; regenerate with tools/build_references.py -->
 
 # OT/ICS Triage Playbook
 
