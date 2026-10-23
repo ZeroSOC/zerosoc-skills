@@ -18,7 +18,7 @@ required_data_sources:
   - EDR
 status: draft
 ---
-<!-- generated from zerosoc-framework@a93229436a62 : 04-Playbooks/02-Investigation-Response/01-phishing.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@98f551ea02fe : 04-Playbooks/02-Investigation-Response/01-phishing.md — do not edit; regenerate with tools/build_references.py -->
 
 # 01-Phishing / Social Engineering Investigation & Response
 

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **`vendor_attributes` is the source's severity.** The pin follows the framework to the merge of
+  ZeroSOC/zerosoc-framework#113: on the Case it is the Case's severity as the source reports it, or
+  the highest of its alerts' where the source reports none, kept current while the Case is open
+  and never a value the executor wrote back. It was set only when triage overrode the severity.
+  The Case's title and DD-26 now say "the source's own title for the Case": "Incident" keeps the
+  framework's sense, a confirmed Case.
 - **Incident confirmation, and alerts that join after promotion.** The pin follows the framework to the
   merge of ZeroSOC/zerosoc-framework#109. Investigation step 11 is §2.5 *Incident Confirmation*: on a
   proven Malicious side the executor re-assesses severity, confidence and Incident Category, recording

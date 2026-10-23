@@ -5,7 +5,7 @@ last_updated: 2026-09-19
 license: Apache-2.0
 status: draft
 ---
-<!-- generated from zerosoc-framework@a93229436a62 : 04-Playbooks/99-Shared/sub_enrichment_identity.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@98f551ea02fe : 04-Playbooks/99-Shared/sub_enrichment_identity.md — do not edit; regenerate with tools/build_references.py -->
 
 # Identity Entity Enrichment
 
