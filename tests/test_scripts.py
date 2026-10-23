@@ -1512,6 +1512,47 @@ class ResolutionReportsWhatItCounted(unittest.TestCase):
         self.assertEqual(r["malicious_score"], 3)
 
 
+class IncidentTechniques(unittest.TestCase):
+    """Techniques at two levels (DD-27): each observation carries the ones it shows, and the Incident's,
+    recorded at confirmation, trace to the observations that stand."""
+
+    def ledger(self, recorded=None, **extra):
+        observations = [
+            {"id": "O1", "side": "Malicious", "confidence": "High", "event_refs": ["A1"], "attacks": ["T1003.001 (LSASS Memory)"]},
+            {"id": "O2", "side": "Malicious", "confidence": "Medium", "event_refs": ["E2"], "attacks": ["T1078", "T1078"]},
+            {"id": "O3", "side": "Malicious", "confidence": "Low", "event_refs": ["E3"], "attacks": ["T1021.002"], "retracted": True},
+            {"id": "O4", "side": "Benign", "confidence": "Low", "event_refs": ["E4"], "attacks": ["T1059"]}]
+        return dict({"alerts": [{"id": "A1", "confidence": "High"}], "observations": observations, "attacks": recorded}, **extra)
+
+    def test_the_standing_malicious_observations_show_the_techniques(self):
+        r = inv.resolve(self.ledger())
+        self.assertEqual(r["verdict_id"], 2)
+        self.assertEqual(r["attacks"]["shown"], {"T1003.001": ["O1"], "T1078": ["O2"]},
+                         "a retracted observation shows nothing, a Benign one is not read, a repeat counts once")
+
+    def test_a_recorded_technique_no_standing_observation_shows_is_untraced(self):
+        r = inv.resolve(self.ledger(["T1003", "T1078 (Valid Accounts)", "T1021.002"]))
+        self.assertEqual(r["attacks"]["recorded"], ["T1003", "T1078", "T1021.002"])
+        self.assertEqual(r["attacks"]["untraced"], ["T1021.002"],
+                         "a parent of a shown sub-technique is shown; the retracted observation's technique is not")
+
+    def test_no_incident_keeps_the_case_techniques_empty(self):
+        ledger = {"observations": [{"id": "B1", "side": "Benign", "confidence": "High", "event_refs": ["E"]}],
+                  "attacks": ["T1078"]}
+        r = inv.resolve(ledger)
+        self.assertNotIn("attacks", r)
+        self.assertIn("no Incident is confirmed", r["attacks_note"])
+
+    def test_attacks_must_be_a_list(self):
+        with self.assertRaises(ValueError):
+            inv.resolve(self.ledger("T1078"))
+
+    def test_the_rules_ask_each_malicious_observation_for_its_techniques(self):
+        for rel in ("skills/zerosoc-triage/rules/checks.md", "skills/zerosoc-investigation/rules/tag.md"):
+            with open(os.path.join(ROOT, rel), encoding="utf-8") as f:
+                self.assertIn("A Malicious observation names in `attacks` the techniques it shows", f.read(), rel)
+
+
 class InventoryBasis(unittest.TestCase):
     """A count reproduced from the same evidence by the same identity rule always matches the extraction,
     so a complete inventory reads as verified only when the source supplied the count itself."""

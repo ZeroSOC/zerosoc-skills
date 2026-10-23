@@ -13,7 +13,9 @@ Ledger (JSON):
                 "condition": "false_positive"|"benign"|null,
                 "at": "2026-09-14T15:03:10Z", "artifact": "hash:...", "alert_type": "...", "entity": "...",
                 "retracted": false, "retraction_reason": "", "covered": false,
-                "event_refs": ["<event id or link>"], "first_seen": "2026-09-14T14:55:41Z", "timeline": false}],
+                "event_refs": ["<event id or link>"], "first_seen": "2026-09-14T14:55:41Z", "timeline": false,
+                "attacks": ["T1003.001"]}],
+  "attacks": ["T1003.001"],     the Incident's techniques, recorded at confirmation (§2.5)
   "evidence_inventory": {"extracted": 31, "source_count": 31, "complete": true},
   "detection_metadata": {...},  what the detections asserted (§1.1), carried from triage and refreshed at
                                 this gate: the remediation state as it now stands, and the disposition of
@@ -53,8 +55,15 @@ of each side, which side is proven, the verdict and confidence to record, the re
 timebox, and the next step; with --json also "counted": per side, the ids of the observations standing (not
 retracted) and of those the score counts, once the ones that carry no information are set aside and one alert
 type on one entity, or one artifact, counts once; a Note quotes it rather than recounting.
+"attacks" on an observation are the techniques it shows, as identifiers (`T1003.001`, or `T1003.001 (Name)`):
+an alert's are the ones its detection asserted, and a Malicious observation's the ones it establishes. The
+ledger's own "attacks" are the Incident's, recorded at confirmation from the observations that stand (§2.5).
+On Malicious proven the script lists, under "attacks", the techniques the standing Malicious observations
+show, each with the observations showing it, and names the recorded ones no standing observation shows
+("untraced"); a technique is shown when an observation shows it or one of its sub-techniques. A retracted
+observation shows nothing, so a retraction takes its techniques with it.
 """
-import argparse, json, os, sys
+import argparse, json, os, re, sys
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -73,6 +82,35 @@ LEVELS = ["Low", "Medium", "High"]
 
 
 SEVERITY = {1: "Informational", 2: "Low", 3: "Medium", 4: "High", 5: "Critical"}
+
+TECHNIQUE = re.compile(r"\b((?:AML\.)?T\d{4}(?:\.\d{3})?)\b")
+
+
+def _ids(value, where):
+    """The technique identifiers of an "attacks" list, each written bare or as `ID (Name)`."""
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ValueError(f'{where}: "attacks" is a list of technique identifiers')
+    out = []
+    for entry in value:
+        m = TECHNIQUE.search(str(entry))
+        tid = m.group(1) if m else str(entry).strip()
+        if tid and tid not in out:
+            out.append(tid)
+    return out
+
+
+def techniques(ledger, standing):
+    """The Incident's techniques as the observations that stand show them, and the recorded ones none shows."""
+    shown = {}
+    for f in standing:
+        if f["side"] == "Malicious":
+            for tid in _ids(f.get("attacks"), f"observation {f.get('id')}"):
+                shown.setdefault(tid, []).append(f["id"])
+    recorded = _ids(ledger.get("attacks"), "ledger")
+    untraced = [t for t in recorded if t not in shown and not any(s.startswith(t + ".") for s in shown)]
+    return {"shown": shown, "recorded": recorded, "untraced": untraced}
 
 
 def _once_key(f):
@@ -182,6 +220,7 @@ def proof_beyond(mal, ledger):
 
 def resolve(ledger, now=None):
     standing = [f for f in ledger.get("observations", []) if not f.get("retracted") and f.get("side") in ("Malicious", "Benign")]
+    attacks = techniques(ledger, standing)
     empty, empty_note = no_information.refs(ledger)
     # an observation resting on nothing but results that carried no information is none (§2.4); it is set
     # aside before the count-once rule, so it can neither stand in for a real observation nor lend it weight
@@ -233,13 +272,16 @@ def resolve(ledger, now=None):
     elif malicious_proven:
         conf = max(W[f["confidence"]] for f in mal)
         r.update(outcome="Malicious proven", verdict_id=2, verdict="True Positive", confidence_id=conf, confidence=LEVELS[conf - 1],
-                 next="confirm the Incident (§2.5): re-assess severity, confidence and category, estimate the impact, plan the initial response actions; then the definitive category, start_time carrying T0, the retrospective entity sweep (§3.1) and the Investigation → Response contract" + ("; at Low confidence every containment action requires approval" if conf == 1 else ""))
+                 attacks=attacks,
+                 next="confirm the Incident (§2.5): re-assess severity, confidence and category, estimate the impact, plan the initial response actions; then the definitive category, the Incident's techniques in \"attacks\" from the observations that stand, start_time carrying T0, the retrospective entity sweep (§3.1) and the Investigation → Response contract" + ("; at Low confidence every containment action requires approval" if conf == 1 else ""))
     else:
         if box["expired"] or ledger.get("budget_exhausted"):
             r.update(outcome="Neither proven at timebox/budget expiry", verdict_id=7, verdict="Insufficient Data", confidence_id=None,
                      next="close as Insufficient Data with a monitoring watch (re-open on recurrence of the entities); emit a visibility or tuning ticket; record the state reached")
         else:
             r.update(outcome="Neither proven", verdict_id=None, next="run the remaining discriminating queries (listed or added); seek evidence against the favoured side")
+    if attacks["recorded"] and r.get("verdict_id") != 2:
+        r["attacks_note"] = "the ledger records the Incident's techniques, but no Incident is confirmed: the Case's \"attacks\" stay empty"
     return r
 
 
@@ -266,10 +308,18 @@ def main():
     if r["uncovered_medium_high_malicious"]: print("Uncovered Medium/High Malicious observations (block a Benign verdict): " + ", ".join(r["uncovered_medium_high_malicious"]))
     if r["residual_low_malicious"]: print("Residual Low Malicious observations (listed in the Note, monitoring watch): " + ", ".join(r["residual_low_malicious"]))
     if r.get("confidence_note"): print(r["confidence_note"])
+    if r.get("attacks"):
+        shown = r["attacks"]["shown"]
+        print("Techniques the standing Malicious observations show: "
+              + (", ".join(f"{t} ({', '.join(ids)})" for t, ids in shown.items()) or "none recorded on them"))
+        print("Recorded as the Incident's: " + (", ".join(r["attacks"]["recorded"]) or "none yet"))
+        if r["attacks"]["untraced"]:
+            print("Shown by no standing observation (record it on the observation that shows it, or leave it out): "
+                  + ", ".join(r["attacks"]["untraced"]))
     box = r["timebox"]
     print(f"Timebox: {box['minutes']} min, elapsed {box['elapsed_minutes'] if box['elapsed_minutes'] is not None else '?'} min, {'EXPIRED' if box['expired'] else 'running'} ({box['source']})")
     if r.get("no_information"): print("Carry no information (not counted): " + ", ".join(r["no_information"]))
-    for key in ("timebox_note", "evidence_inventory_note", "no_information_note"):
+    for key in ("timebox_note", "evidence_inventory_note", "no_information_note", "attacks_note"):
         if r.get(key): print("Note: " + r[key])
     for note in r.get("detection_notes", []): print("Note: " + note)
     print("Next: " + r["next"])

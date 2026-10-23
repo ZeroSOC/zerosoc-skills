@@ -148,6 +148,8 @@ Read per alert: the playbook section the script prints.
 7. **Tag every result** as the playbook prescribes: `Malicious` or `Benign` at Low, Medium or High
    (Definitions §7: High establishes the side alone, Medium is a strong signal needing a second, Low is
    consistent but common in normal operation). A result that bears on neither side is context, untagged.
+   A Malicious observation records in `attacks` the techniques it shows; the Case's own stay empty until
+   an Incident is confirmed.
    List in the ledger each result that carried no information (a lookup that knows nothing of the
    indicator, a search that finds no approval, a lookup not answered) under `no_information_refs`, and each
    check that covered the question and found nothing under `scoped_negative_refs`: the decision script gives

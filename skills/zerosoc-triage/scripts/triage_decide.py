@@ -17,7 +17,7 @@ Ledger (JSON):
                 "not_covering": [{"alert": "DF-2", "reason": "..."}],
                 "condition": "false_positive"|"benign"|null, "artifact": "hash:...",
                 "retracted": false, "event_refs": ["<event id or link>"], "first_seen": "2026-09-14T14:55:41Z",
-                "timeline": false}],
+                "timeline": false, "attacks": ["T1053.005"]}],
   "evidence_inventory": {"extracted": 31, "source_count": 31, "source_count_basis": "source", "complete": true},
   "entities": [{"type": "file", "name": "...", "sha256": "...", "alert_ids": ["DF-1"], ...}],
                                  the inventory's entities, as scripts/evidence_inventory.py --json lists them
@@ -26,6 +26,8 @@ Ledger (JSON):
   "duplicate_of": null | "CASE-0"
 }
 Alerts are the first Malicious observations at the tool's confidence, or at the level their severity maps to.
+"attacks" on a Malicious observation are the techniques it shows. The rule does not read them, and the triage
+ledger holds none for the Case: the Incident's techniques are assessed at confirmation (§2.5).
 The observations may list them too, numbered O1, O2, ... as the Note numbers them, each naming its alert in
 "alert": the rule reads an alert once, from "alerts". An "alert" that names no alert of "alerts" is ignored.
 The confidence leaving triage rises on independent alerts of different types **or techniques**, which are

@@ -53,8 +53,8 @@ and the autonomy matrix, §2.1) and [Guardrails §2–§3](references/framework/
    system's built-in principal such as `SYSTEM`; OCSF's User of type System). An identity action is
    selected only for a person's account or a service identity the Case shows was used or exposed; a host's
    own identity is in the scope because something ran under it, and the host is contained instead. Scope
-   that expands during the response is recorded on the Case and the actions re-selected for the new
-   entities.
+   that expands during the response is recorded on the Case, a technique it reveals joins the Case's
+   `attacks`, and the actions are re-selected for the new entities.
 2. **Regulatory clock** (§6, and Detection & Analysis §3.2). If the Incident is `significant`, the
    deadlines run from awareness: NIS2 early warning within 24 hours, notification within 72 hours, final
    report within one month; DORA initial, intermediate and final reports on the regulation's deadlines.

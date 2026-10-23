@@ -107,7 +107,8 @@ per Case: the playbook the script prints.
    Queries must be discriminating and state the reading of both outcomes, so a negative result is
    evidence too (a clean hash is a `Benign` observation, not silence). Tag each result as the query's mapping
    prescribes (`Malicious (…)` if …, `Benign (…)` if …), or as context; decide by judgment only when a
-   result fits neither stated outcome. Observations from the same telemetry artifact count once. Record
+   result fits neither stated outcome. A Malicious observation records in `attacks` the techniques it
+   shows. Observations from the same telemetry artifact count once. Record
    every query run, listed or added, with its outcome and tag, and list each result that carried no
    information under the ledger's `no_information_refs` and each query that covered the question and found
    nothing under `scoped_negative_refs`, as in triage: `resolve.py` gives the first no weight on either side.
@@ -151,10 +152,11 @@ per Case: the playbook the script prints.
     or redundant ones (disabling a local, non-domain account on a host already isolated is redundant), and
     add the ones the Incident, its context, its severity and the impact estimate call for; each planned
     action is a ticket the Case raises, of its kind (`containment`, `eradication`, `recovery`). Then set
-    `verdict_id = 2`; record the definitive Incident Category and the Incident's tactics and techniques
-    as `ID (Name)`, assessed from the Observations that stand: the Alerts' mappings are provisional, so
-    one no Observation shows is left out and a broad one is narrowed; a Malicious Observation carries
-    the techniques it shows; extend the **Case Timeline** triage compiled with the course of the
+    `verdict_id = 2`; record the definitive Incident Category and, in the ledger's `attacks`, the
+    Incident's techniques, assessed from the Observations that stand: the Alerts' mappings are
+    provisional, so one no Observation shows is left out and a broad one is narrowed (`resolve.py`
+    lists the techniques the standing Malicious observations show and names any recorded that none
+    shows); extend the **Case Timeline** triage compiled with the course of the
     attack (interleaved with the detection and the response actions that ran, each entry timestamped in UTC
     with its event reference; the `timeline` of `process_chain.py --json` gives the process entries with their
     alerts as references). The timeline says what happened and is not a field the Case stores: it is the
