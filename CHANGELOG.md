@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **An alert cites only the processes its evidence holds (`--ocsf`).** A process that telemetry
+  filled in carries its descendants' alerts in the graph, and `--ocsf` wrote it into those alerts'
+  evidences, so a stored chain said an alert cited a parent it never named. Its text was right.
 - **The Case keeps its process chain (`--ocsf`).** `process_chain.py --ocsf` prints the chain as the
   `desc` and `related_events` of an Observation with no side, in OCSF's own objects: a Process
   Activity launch per process, with its parentage in `parent_process` and `ancestry` and its decoded

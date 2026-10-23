@@ -997,6 +997,10 @@ class ProcessChainTelemetry(unittest.TestCase):
                          "the extended parentage, the direct parent first")
         self.assertEqual(powershell["process"]["parent_process"]["pid"], 3424)
         self.assertIn(powershell["uid"], {a["uid"] for alert in alerts for a in alert["evidences"]})
+        filled = {uid for uid, e in launches.items() if e["evidences"][0]["data"].get("source") == "telemetry"}
+        self.assertTrue(filled)
+        self.assertFalse(filled & {a["uid"] for alert in alerts for a in alert["evidences"]},
+                         "an alert cites what its evidence holds, never a process telemetry filled in")
         gap = self.node(self.with_, 676)
         self.assertNotIn(f"{gap['device']}|676|{gap['created']}", launches, "a gap is only named as a parent")
         scripts = [e["script"] for e in launches.values() if e.get("script")]
