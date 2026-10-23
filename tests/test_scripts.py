@@ -1400,6 +1400,15 @@ class AlertsAloneDoNotProve(unittest.TestCase):
         restated = {"id": "O3", "side": "Malicious", "confidence": "High", "event_refs": ["x1"]}
         self.assertEqual(inv.resolve({"alerts": self.ALERTS, "observations": self._obs(restated)})["malicious_score"], 4)
 
+    def test_a_restatement_tagged_below_its_alert_keeps_its_tag(self):
+        """Counting a restatement as its alert caps its weight, never raises it: two High alerts read at Low
+        stay undecided."""
+        alerts = [{"id": "x1", "confidence": "High"}, {"id": "x2", "confidence": "High"}]
+        low = [{"id": "O1", "side": "Malicious", "confidence": "Low", "event_refs": ["x1"]},
+               {"id": "O2", "side": "Malicious", "confidence": "Low", "event_refs": ["x2"]}]
+        r = inv.resolve({"alerts": alerts, "observations": low})
+        self.assertEqual((r["malicious_score"], r["outcome"]), (2, "Neither proven"))
+
     def test_a_restatement_of_a_typed_alert_is_that_alert(self):
         typed = {"id": "O1", "side": "Malicious", "confidence": "Medium", "event_refs": ["x1"],
                  "alert_type": "C2 beaconing", "entity": "vwin02"}
