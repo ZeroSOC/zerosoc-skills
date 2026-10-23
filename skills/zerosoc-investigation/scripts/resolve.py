@@ -28,8 +28,8 @@ Ledger (JSON):
 events it rests on and "timeline" whether the Case Timeline shows it; note_elements.py and timeline.py read
 them from this same ledger. This rule reads "event_refs" with "alerts" (the Case's alerts and each one's own
 confidence): a Malicious observation that cites one alert and nothing else counts as that alert, whatever it
-is tagged, and Malicious is proven at 3 only when an alert's own confidence is High or a Malicious observation
-stands beyond the alerts (§2.4). A ledger that names no alerts is resolved by the score alone, and says so.
+is tagged — once, at the alert's own confidence, in the score as in the proof — and Malicious is proven at 3
+only when an alert's own confidence is High or a Malicious observation stands beyond the alerts (§2.4). A ledger that names no alerts is resolved by the score alone, and says so.
 "no_information_refs" are the references whose result carried no information: a lookup that knows nothing
 of the indicator, a search that finds no approval, a query that was not answered. "scoped_negative_refs" are
 the references whose query covered the question and found nothing, such as no child process on a covered
@@ -199,15 +199,45 @@ def alert_bound(f, owner, empty=frozenset()):
     return None
 
 
+def alert_index(ledger):
+    """Each alert id, merged source ids included, to the alert it belongs to; and each alert's own confidence."""
+    alerts = ledger.get("alerts") or []
+    # an alert that stands for several merged source alerts is one alert under each of its ids
+    owner = {str(i): str(a["id"]) for a in alerts if a.get("id") for i in [a["id"], *(a.get("ids") or [])]}
+    return owner, {str(a["id"]): a.get("confidence") for a in alerts if a.get("id")}
+
+
+def as_alerts(observations, ledger, empty):
+    """§2.4: an observation that only restates an alert counts as that alert, in the score as in the proof:
+    the restatements of one alert are one observation, at the alert's own confidence however they are tagged,
+    and the same one as the alert's typed observation where the ledger has one (§1.1)."""
+    owner, own = alert_index(ledger)
+    bound = {f["id"]: alert_bound(f, owner, empty) for f in observations if f["side"] == "Malicious"}
+    typed = {}
+    for f in observations:
+        if bound.get(f["id"]) and f.get("alert_type") and f.get("entity"):
+            typed.setdefault(bound[f["id"]], f)
+    out = []
+    for f in observations:
+        alert = bound.get(f["id"])
+        if alert not in own or f.get("alert_type"):
+            out.append(f); continue
+        g = dict(f, confidence=own[alert] or f["confidence"])
+        if alert in typed:
+            g.update(alert_type=typed[alert]["alert_type"], entity=typed[alert]["entity"])
+        else:
+            g["artifact"] = "alert:" + alert
+        out.append(g)
+    return out
+
+
 def proof_beyond(mal, ledger):
     """§2.4: why a Malicious score of 3 does not prove Malicious, or None when it does. The alerts at Medium
     or Low confidence, and every restatement of them, never prove it alone."""
     alerts = ledger.get("alerts")
     if not alerts:
         return None
-    # an alert that stands for several merged source alerts is one alert under each of its ids
-    owner = {str(i): str(a["id"]) for a in alerts if a.get("id") for i in [a["id"], *(a.get("ids") or [])]}
-    own = {str(a["id"]): a.get("confidence") for a in alerts if a.get("id")}
+    owner, own = alert_index(ledger)
     empty, _ = no_information.refs(ledger)
     bound = {f["id"]: alert_bound(f, owner, empty) for f in mal}
     if any(alert is None for alert in bound.values()):
@@ -225,7 +255,7 @@ def resolve(ledger, now=None):
     # an observation resting on nothing but results that carried no information is none (§2.4); it is set
     # aside before the count-once rule, so it can neither stand in for a real observation nor lend it weight
     weightless = [f for f in standing if no_information.carries_nothing(f, empty)]
-    active = dedupe([f for f in standing if f not in weightless])
+    active = dedupe(as_alerts([f for f in standing if f not in weightless], ledger, empty))
     mal = [f for f in active if f["side"] == "Malicious"]
     ben = [f for f in active if f["side"] == "Benign"]
     mal_score = sum(W[f["confidence"]] for f in mal)
