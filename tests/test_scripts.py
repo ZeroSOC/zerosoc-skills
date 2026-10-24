@@ -750,6 +750,51 @@ class ProcessChain(unittest.TestCase):
         return dict(type="process", name=kw.pop("name", f"p{pid}.exe"), pid=pid, created=created, device=device,
                     parent_pid=parent, parent_created=parent_created, alert_ids=kw.pop("alerts", ["A"]), **kw)
 
+    def test_an_unplaced_process_keeps_its_command_line(self):
+        # a process the evidence only partly describes reached the executor without what it ran
+        built = chain.build([self.row(12, None, name="cmd.exe", command_line="cmd.exe /c vssadmin delete shadows /all")])
+        text = chain.as_text(built)
+        self.assertIn("unplaced: cmd.exe 12 missing created", text)
+        self.assertIn("  $ cmd.exe /c vssadmin delete shadows /all", text)
+
+    def test_an_unplaced_encoded_command_names_its_decoded_script(self):
+        encoded = "powershell.exe -EncodedCommand " + "A" * 60
+        built = chain.build([self.row(12, None, name="powershell.exe", command_line=encoded,
+                                      decoded_command="Get-Process")])
+        text = chain.as_text(built)
+        self.assertIn("  $ powershell.exe -EncodedCommand \u2039encoded: D1\u203a", text)
+        self.assertIn("  decoded: D1", text)
+        self.assertIn("run by powershell.exe 12 (unplaced)", text)
+        self.assertIn("Get-Process", text)
+
+    def test_a_process_time_is_said_to_be_its_start(self):
+        # a system process started at boot sat beside the alert that cited it with a bare time, which a
+        # reader took for the alert's time
+        built = chain.build([self.row(640, "2026-10-22T14:56:16Z", 528, "2026-10-22T14:56:15Z", name="services.exe")])
+        text = chain.as_text(built)
+        self.assertIn("services.exe 640 started 2026-10-22T14:56:16Z -  alerts: A1", text)
+        self.assertIn("[gap] (unnamed) 528 started 2026-10-22T14:56:15Z: ", text)
+        untimed = chain.as_text(chain.build([self.row(640, "2026-10-22T14:56:16Z", 528, name="services.exe")]))
+        self.assertIn("[gap] (unnamed) 528 -: parent creation time not reported", untimed)
+
+    def test_every_command_line_of_a_process_is_shown(self):
+        rows = [self.row(10, "2026-09-13T12:00:00Z", command_line=f"p10.exe /run {n}") for n in range(3)]
+        text = chain.as_text(chain.build(rows))
+        for n in range(3):
+            self.assertIn(f"$ p10.exe /run {n}", text)
+
+    def test_an_unplaced_command_line_survives_the_ocsf_round_trip(self):
+        # the Case keeps the chain in OCSF objects, and its text is rendered again from them
+        encoded = "powershell.exe -EncodedCommand " + "A" * 60
+        built = chain.build([self.row(12, None, name="cmd.exe", command_line="cmd.exe /c whoami"),
+                             self.row(13, None, name="powershell.exe", command_line=encoded,
+                                      decoded_command="Get-Process")])
+        graph = chain.as_json(built)
+        again = chain.render(chain.from_ocsf(chain.as_ocsf(graph)))
+        self.assertEqual(again, chain.render(graph))
+        self.assertIn("  $ cmd.exe /c whoami", again)
+        self.assertIn("  decoded: D1", again)
+
     def test_times_match_at_the_coarser_precision(self):
         built = chain.build([self.row(10, "2026-09-13T12:00:00.254123Z"),
                              self.row(11, "2026-09-13T12:00:01Z", 10, "2026-09-13T12:00:00.254Z", device="ws-01")])
@@ -803,7 +848,7 @@ class ProcessChain(unittest.TestCase):
         text = chain.as_text(built, {"A": {"title": "Suspicious PowerShell"}, "B": {"title": "Credential theft"}})
         self.assertIn("A1   A  Suspicious PowerShell", text)
         self.assertIn("A2   B  Credential theft", text)
-        self.assertIn("p12.exe 12 2026-09-13T12:00:02Z -  alerts: A1 A2", text)
+        self.assertIn("p12.exe 12 started 2026-09-13T12:00:02Z -  alerts: A1 A2", text)
         self.assertNotIn("context:", text, "no per-alert view: every process is in the one tree")
         self.assertEqual(text.count("p10.exe 10"), 1, "every process once")
 
@@ -812,7 +857,7 @@ class ProcessChain(unittest.TestCase):
         self.assertEqual(text.count("[gap]"), len(self.live["gaps"]))
         for node in self.live["nodes"]:
             name = node["names"][0] if node["names"] else "(unnamed)"
-            self.assertEqual(text.count(f"{name} {node['pid']} {node['created']}"), 1, f"{name} {node['pid']}")
+            self.assertEqual(text.count(f"{name} {node['pid']} started {node['created']}"), 1, f"{name} {node['pid']}")
 
     def test_accepts_the_inventory_output_and_renders_the_label(self):
         inventory = evidence.build([self.row(10, "2026-09-13T08:00:00Z"), self.row(10, "2026-09-13T08:00:00Z", alerts=["B"])])
@@ -923,6 +968,7 @@ class ProcessChainTelemetry(unittest.TestCase):
         text = chain.as_text(self.with_)
         self.assertIn("$ WinrsHost.exe -Embedding", text)
         self.assertIn("[telemetry]", text)
+        self.assertRegex(text, r"\[telemetry\] \S+ \d+ started \d{4}-\d\d-\d\dT")
         self.assertIn("-EncodedCommand ‹encoded: D1›", text)
         self.assertNotIn("UABvAHcAZQByAFMAaABlAGwAbAAgAC0ATgBvAFAAcgBvAGYAaQBsAGUAIAAtAE4AbwBuAEkAbgB0AGUAcgBhAGMAdABpAHYAZQAg", text)
         commands = [line for line in text.splitlines() if line.strip().startswith("$ ")]
