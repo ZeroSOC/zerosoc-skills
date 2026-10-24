@@ -181,7 +181,9 @@ def build(rows, telemetry=None, columns=None):
         missing = [k for k, v in (("device", device), ("pid", pid), ("created", time)) if v is None]
         if missing:
             unplaced.append({"name": row.get("name"), "pid": row.get("pid"), "created": row.get("created"),
-                             "device": row.get("device"), "alert_ids": _ids(row), "missing": missing})
+                             "device": row.get("device"), "alert_ids": _ids(row), "missing": missing,
+                             "cmd_line": row.get("command_line"),
+                             **{k: row[k] for k in DECODING if row.get(k)}})
             continue
         node = _find(index, device, pid, time)
         if node is None:
@@ -433,12 +435,29 @@ def as_json(chain, alerts=None):
             if node["attrs"].get("decode_capped"):
                 out["decode_capped"] = True
         processes.append(out)
+    unplaced = []
+    for n, entry in enumerate(chain["unplaced"], 1):
+        u = {k: v for k, v in entry.items() if k not in DECODING}
+        decoded = entry.get("decoded_command")
+        if decoded:
+            content = str(decoded).strip()
+            script = by_content.get(content)
+            if script is None:
+                type_id, caption = _script_type(u.get("name"), u.get("cmd_line"))
+                script = {"uid": f"D{len(scripts) + 1}", "type_id": type_id, "type": caption,
+                          "script_content": content, "process_uids": []}
+                scripts.append(script)
+                by_content[content] = script
+            script["process_uids"].append(f"unplaced:{n}")
+            u["script_uid"] = script["uid"]
+            u.update({k: entry[k] for k in ("decode_rounds", "decode_capped") if entry.get(k)})
+        unplaced.append(u)
     return {"process_chain": dict(summary(chain), alerts_citing_a_process=len(labels)),
             "alerts": labels,
             "devices": [{"device": d["device"], "roots": [_uid(r) for r in sorted(d["roots"], key=_key)]}
                         for d in chain["devices"]],
             "processes": processes, "gaps": gaps, "scripts": scripts,
-            "unplaced": chain["unplaced"], "anomalies": chain["anomalies"], "timeline": timeline(chain)}
+            "unplaced": unplaced, "anomalies": chain["anomalies"], "timeline": timeline(chain)}
 
 
 LAUNCH = {"type_uid": 100701, "type_name": "Process Activity: Launch"}
@@ -496,11 +515,15 @@ def as_ocsf(graph):
         for alert in p["alert_ids"] if p["source"] == "evidence" else []:
             cited.setdefault(alert, []).append({"name": "process", "uid": p["uid"], "process": _entity(p, full=False)})
     for n, u in enumerate(graph["unplaced"], 1):
-        process = {k: v for k, v in (("name", u.get("name")), ("pid", u.get("pid")), ("created_time_dt", u.get("created")))
-                   if v is not None}
-        event = dict(LAUNCH, uid=f"unplaced:{n}", process=process, evidences=[{"name": "process", "data": {"missing": u["missing"]}}])
+        process = {k: v for k, v in (("name", u.get("name")), ("pid", u.get("pid")), ("created_time_dt", u.get("created")),
+                                     ("cmd_line", u.get("cmd_line"))) if v is not None}
+        data = {"missing": u["missing"], **{k: u[k] for k in ("decode_rounds", "decode_capped") if u.get(k)}}
+        event = dict(LAUNCH, uid=f"unplaced:{n}", process=process, evidences=[{"name": "process", "data": data}])
         if u.get("device"):
             event["device"] = {"hostname": u["device"]}
+        if u.get("script_uid"):
+            s = scripts[u["script_uid"]]
+            event["script"] = {k: s[k] for k in ("uid", "type_id", "type", "script_content")}
         launches.append(event)
     alerts = [dict(DETECTION, uid=a["alert_id"], **({"title": a["title"]} if a.get("title") else {}),
                    evidences=cited.get(a["alert_id"], [])) for a in graph["alerts"]]
@@ -524,8 +547,17 @@ def from_ocsf(observation):
         state = dict(((e.get("evidences") or [{}])[0]).get("data") or {})
         device = (e.get("device") or {}).get("hostname")
         if str(e["uid"]).startswith("unplaced:"):
-            unplaced.append({"name": proc.get("name"), "pid": proc.get("pid"), "created": proc.get("created_time_dt"),
-                             "device": device, "alert_ids": [], "missing": state.get("missing") or []})
+            u = {"name": proc.get("name"), "pid": proc.get("pid"), "created": proc.get("created_time_dt"),
+                 "device": device, "alert_ids": [], "missing": state.get("missing") or [], "cmd_line": proc.get("cmd_line")}
+            if e.get("script"):
+                s = e["script"]
+                script = scripts.setdefault(s["uid"], {"uid": s["uid"], "type_id": s.get("type_id", 0),
+                                                       "type": s.get("type") or "Unknown",
+                                                       "script_content": s.get("script_content") or "", "process_uids": []})
+                script["process_uids"].append(e["uid"])
+                u["script_uid"] = s["uid"]
+                u.update({k: state[k] for k in ("decode_rounds", "decode_capped") if k in state})
+            unplaced.append(u)
             continue
         parent = proc.get("parent_process")
         out = {"uid": e["uid"], "device": device, "pid": proc.get("pid"), "name": proc.get("name"),
@@ -645,12 +677,7 @@ def render(graph, width=WIDTH):
             else:
                 cited = " ".join(label.get(a, a) for a in sorted(p["alert_ids"], key=lambda a: int(label.get(a, "A0")[1:])))
                 out.append(f"{pad}{name}{also} {p['pid']} {p['created']} {'/'.join(p.get('verdicts') or []) or '-'}  alerts: {cited}")
-            for cmd in (p.get("cmd_lines") or [p["cmd_line"]] if p["cmd_line"] else [])[:2]:
-                out.append(f"{pad}  $ {_short(_command(cmd, p.get('script_uid')), width)}")
-            if p.get("script_uid"):
-                rounds = p.get("decode_rounds")
-                layers = f" ({rounds} layers of encoding{', still encoded' if p.get('decode_capped') else ''})" if rounds else ""
-                out.append(f"{pad}  decoded: {p['script_uid']}{layers}")
+            _ran(out, p, pad, width)
             attrs = p.get("attributes") or {}
             state = " ".join(str(attrs[k]) for k in ("remediation_status", "detection_status") if attrs.get(k))
             if state:
@@ -664,15 +691,30 @@ def render(graph, width=WIDTH):
         out.append(d["device"])
         for root in d["roots"]:
             line(root, 1)
+    unplaced = {f"unplaced:{n}": u for n, u in enumerate(graph["unplaced"], 1)}
     if graph["scripts"]:
         out.append("scripts:")
         for script in graph["scripts"]:
-            runs = ", ".join(f"{nodes[u]['name']} {nodes[u]['pid']}" for u in script["process_uids"] if u in nodes)
+            runs = ", ".join(f"{nodes[u]['name']} {nodes[u]['pid']}" if u in nodes else
+                             f"{unplaced[u].get('name') or '(unnamed)'} {unplaced[u].get('pid')} (unplaced)"
+                             for u in script["process_uids"] if u in nodes or u in unplaced)
             out.append(f"  {script['uid']}  {script['type']}, run by {runs}")
             out += [f"      {text}" for text in script["script_content"].splitlines()]
-    out += [f"unplaced: {u.get('name') or '(unnamed)'} {u.get('pid')} missing {', '.join(u['missing'])}" for u in graph["unplaced"]]
+    for u in graph["unplaced"]:
+        out.append(f"unplaced: {u.get('name') or '(unnamed)'} {u.get('pid')} missing {', '.join(u['missing'])}")
+        _ran(out, u, "", width)
     out += [f"anomaly: {a}" for a in graph["anomalies"]]
     return "\n".join(out)
+
+
+def _ran(out, p, pad, width):
+    """Every command line a process was seen with, its encoded payload replaced by the script it decodes to."""
+    for cmd in p.get("cmd_lines") or ([p["cmd_line"]] if p.get("cmd_line") else []):
+        out.append(f"{pad}  $ {_short(_command(cmd, p.get('script_uid')), width)}")
+    if p.get("script_uid"):
+        rounds = p.get("decode_rounds")
+        layers = f" ({rounds} layers of encoding{', still encoded' if p.get('decode_capped') else ''})" if rounds else ""
+        out.append(f"{pad}  decoded: {p['script_uid']}{layers}")
 
 
 def as_text(chain, alerts=None, width=WIDTH):

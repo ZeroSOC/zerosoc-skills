@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **The chain's text prints every command line (#87).** A process the chain cannot place (no device,
+  PID or creation time) was listed without what it ran. It is now printed with its command line, its
+  encoded payload replaced by the script it decodes to as for a placed process, and `scripts:` names it
+  as unplaced. A process seen with more than two command lines showed the first two; it now shows each
+  of them. In the JSON an unplaced entry carries `cmd_line` and, for a decoded command, `script_uid`.
+  The Observation `--ocsf` writes keeps both, so `--from-graph` prints the same text.
 - **A declared alert type is kept (framework DD-28).** An alert whose source declared its alert
   type, writing its detections for the framework's alert types, keeps it: triage step 4 and
   `rules/types.md` type only the others, and `alert_types.py` still refuses a type the taxonomy does

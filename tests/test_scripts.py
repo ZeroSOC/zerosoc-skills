@@ -750,6 +750,41 @@ class ProcessChain(unittest.TestCase):
         return dict(type="process", name=kw.pop("name", f"p{pid}.exe"), pid=pid, created=created, device=device,
                     parent_pid=parent, parent_created=parent_created, alert_ids=kw.pop("alerts", ["A"]), **kw)
 
+    def test_an_unplaced_process_keeps_its_command_line(self):
+        # a process the evidence only partly describes reached the executor without what it ran
+        built = chain.build([self.row(12, None, name="cmd.exe", command_line="cmd.exe /c vssadmin delete shadows /all")])
+        text = chain.as_text(built)
+        self.assertIn("unplaced: cmd.exe 12 missing created", text)
+        self.assertIn("  $ cmd.exe /c vssadmin delete shadows /all", text)
+
+    def test_an_unplaced_encoded_command_names_its_decoded_script(self):
+        encoded = "powershell.exe -EncodedCommand " + "A" * 60
+        built = chain.build([self.row(12, None, name="powershell.exe", command_line=encoded,
+                                      decoded_command="Get-Process")])
+        text = chain.as_text(built)
+        self.assertIn("  $ powershell.exe -EncodedCommand \u2039encoded: D1\u203a", text)
+        self.assertIn("  decoded: D1", text)
+        self.assertIn("run by powershell.exe 12 (unplaced)", text)
+        self.assertIn("Get-Process", text)
+
+    def test_every_command_line_of_a_process_is_shown(self):
+        rows = [self.row(10, "2026-09-13T12:00:00Z", command_line=f"p10.exe /run {n}") for n in range(3)]
+        text = chain.as_text(chain.build(rows))
+        for n in range(3):
+            self.assertIn(f"$ p10.exe /run {n}", text)
+
+    def test_an_unplaced_command_line_survives_the_ocsf_round_trip(self):
+        # the Case keeps the chain in OCSF objects, and its text is rendered again from them
+        encoded = "powershell.exe -EncodedCommand " + "A" * 60
+        built = chain.build([self.row(12, None, name="cmd.exe", command_line="cmd.exe /c whoami"),
+                             self.row(13, None, name="powershell.exe", command_line=encoded,
+                                      decoded_command="Get-Process")])
+        graph = chain.as_json(built)
+        again = chain.render(chain.from_ocsf(chain.as_ocsf(graph)))
+        self.assertEqual(again, chain.render(graph))
+        self.assertIn("  $ cmd.exe /c whoami", again)
+        self.assertIn("  decoded: D1", again)
+
     def test_times_match_at_the_coarser_precision(self):
         built = chain.build([self.row(10, "2026-09-13T12:00:00.254123Z"),
                              self.row(11, "2026-09-13T12:00:01Z", 10, "2026-09-13T12:00:00.254Z", device="ws-01")])
