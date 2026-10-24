@@ -7,7 +7,8 @@ data beside it, and does not restate it.
 `$language` stands for the language the deployment writes its Notes in. Whoever gives this text to an
 executor puts that language in its place; read as it is, it means the language of the deployment.
 
-- Give each detection the alert type of the taxonomy that describes what it fires on. Read its
+- A detection whose source declared its alert type keeps it: the source wrote it for that type.
+- Give each other detection the alert type of the taxonomy that describes what it fires on. Read its
   description, its evidence, its techniques and what detected it. The title is the source's name for
   the detection and decides nothing, and so is the source's own category for it.
 - A detection that matches an indicator fires on the indicator being seen: type the act that put it
