@@ -108,7 +108,8 @@ Read per alert: the playbook section the script prints.
    detected it. The title is the source's name for the detection and decides nothing; the type's
    *Distinct from* clause separates it from its neighbours. The type's domain is the one the taxonomy files
    it under, so the alerts of one Case may open the playbooks of several domains. Write the type on the
-   alert as `alert_type`. An alert no type describes — a source's correlation, attribution or containment
+   alert as `alert_type`. An alert whose source declared its type, writing its detections for the
+   framework's alert types, arrives with `alert_type` and keeps it. An alert no type describes — a source's correlation, attribution or containment
    record states a conclusion rather than a behaviour — carries `no_type_reason` instead, and its checks come from
    the domain's Alert Catalog and §1.2–§1.5 directly. Then, for each type you chose, run:
    `python3 scripts/select_playbook.py --domain Endpoint --alert-type "Malware / loader execution" --bindings zerosoc.capabilities.json`.
@@ -223,7 +224,8 @@ Read per alert: the playbook section the script prints.
     Promote: `verdict_id` stays 0 and the Case carries the **Triage → Investigation contract** of
     [Playbook Architecture §5](references/framework/04-Playbooks/playbook_architecture.md): `uid`,
     `status_id`, `severity_id`, `confidence_id`, `impact_id` when known, `start_time`, `observables`,
-    `finding_info_list` (the Alerts and every triage Observation, each with the techniques it carries),
+    `finding_info_list` (the Alerts, each with its `alert_type`, and every triage Observation, each with
+    the techniques it carries),
     `candidate_incident_categories`, `entry_path`, `master_case_uid`
     when correlated, `visibility_gaps`, `provenance`, `desc`, and `notes` carrying the Triage Note.
     The contract states which fields must be populated at the boundary; one Case object crosses every

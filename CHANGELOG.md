@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **A declared alert type is kept (framework DD-28).** An alert whose source declared its alert
+  type, writing its detections for the framework's alert types, keeps it: triage step 4 and
+  `rules/types.md` type only the others, and `alert_types.py` still refuses a type the taxonomy does
+  not hold. The Triage → Investigation contract carries each Alert's `alert_type` in
+  `finding_info_list`.
 - **An alert cites only the processes its evidence holds (`--ocsf`).** A process that telemetry
   filled in carries its descendants' alerts in the graph, and `--ocsf` wrote it into those alerts'
   evidences, so a stored chain said an alert cited a parent it never named. Its text was right.
