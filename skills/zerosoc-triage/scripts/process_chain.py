@@ -666,17 +666,17 @@ def render(graph, width=WIDTH):
         pad = "  " * depth
         if uid in gaps:
             g = gaps[uid]
-            out.append(f"{pad}[gap] {g['name'] or '(unnamed)'} {g['pid']} {g['created'] or '-'}: {g['reason']}")
+            out.append(f"{pad}[gap] {g['name'] or '(unnamed)'} {g['pid']} {_started(g['created'])}: {g['reason']}")
             kids = g["children"]
         else:
             p = nodes[uid]
             name = p["name"] or "(unnamed)"
             also = f" (also {', '.join(p['names'][1:])})" if len(p.get("names") or []) > 1 else ""
             if p["source"] == "telemetry":
-                out.append(f"{pad}[telemetry] {name}{also} {p['pid']} {p['created']} (not cited by any alert)")
+                out.append(f"{pad}[telemetry] {name}{also} {p['pid']} {_started(p['created'])} (not cited by any alert)")
             else:
                 cited = " ".join(label.get(a, a) for a in sorted(p["alert_ids"], key=lambda a: int(label.get(a, "A0")[1:])))
-                out.append(f"{pad}{name}{also} {p['pid']} {p['created']} {'/'.join(p.get('verdicts') or []) or '-'}  alerts: {cited}")
+                out.append(f"{pad}{name}{also} {p['pid']} {_started(p['created'])} {'/'.join(p.get('verdicts') or []) or '-'}  alerts: {cited}")
             _ran(out, p, pad, width)
             attrs = p.get("attributes") or {}
             state = " ".join(str(attrs[k]) for k in ("remediation_status", "detection_status") if attrs.get(k))
@@ -705,6 +705,12 @@ def render(graph, width=WIDTH):
         _ran(out, u, "", width)
     out += [f"anomaly: {a}" for a in graph["anomalies"]]
     return "\n".join(out)
+
+
+def _started(created):
+    """A process's creation time, said to be one: a process can start long before the alert that cites
+    it, and a bare time beside the alert's label was read as the alert's."""
+    return f"started {created}" if created else "-"
 
 
 def _ran(out, p, pad, width):

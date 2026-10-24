@@ -767,6 +767,16 @@ class ProcessChain(unittest.TestCase):
         self.assertIn("run by powershell.exe 12 (unplaced)", text)
         self.assertIn("Get-Process", text)
 
+    def test_a_process_time_is_said_to_be_its_start(self):
+        # a system process started at boot sat beside the alert that cited it with a bare time, which a
+        # reader took for the alert's time
+        built = chain.build([self.row(640, "2026-10-22T14:56:16Z", 528, "2026-10-22T14:56:15Z", name="services.exe")])
+        text = chain.as_text(built)
+        self.assertIn("services.exe 640 started 2026-10-22T14:56:16Z -  alerts: A1", text)
+        self.assertIn("[gap] (unnamed) 528 started 2026-10-22T14:56:15Z: ", text)
+        untimed = chain.as_text(chain.build([self.row(640, "2026-10-22T14:56:16Z", 528, name="services.exe")]))
+        self.assertIn("[gap] (unnamed) 528 -: parent creation time not reported", untimed)
+
     def test_every_command_line_of_a_process_is_shown(self):
         rows = [self.row(10, "2026-09-13T12:00:00Z", command_line=f"p10.exe /run {n}") for n in range(3)]
         text = chain.as_text(chain.build(rows))
@@ -838,7 +848,7 @@ class ProcessChain(unittest.TestCase):
         text = chain.as_text(built, {"A": {"title": "Suspicious PowerShell"}, "B": {"title": "Credential theft"}})
         self.assertIn("A1   A  Suspicious PowerShell", text)
         self.assertIn("A2   B  Credential theft", text)
-        self.assertIn("p12.exe 12 2026-09-13T12:00:02Z -  alerts: A1 A2", text)
+        self.assertIn("p12.exe 12 started 2026-09-13T12:00:02Z -  alerts: A1 A2", text)
         self.assertNotIn("context:", text, "no per-alert view: every process is in the one tree")
         self.assertEqual(text.count("p10.exe 10"), 1, "every process once")
 
@@ -847,7 +857,7 @@ class ProcessChain(unittest.TestCase):
         self.assertEqual(text.count("[gap]"), len(self.live["gaps"]))
         for node in self.live["nodes"]:
             name = node["names"][0] if node["names"] else "(unnamed)"
-            self.assertEqual(text.count(f"{name} {node['pid']} {node['created']}"), 1, f"{name} {node['pid']}")
+            self.assertEqual(text.count(f"{name} {node['pid']} started {node['created']}"), 1, f"{name} {node['pid']}")
 
     def test_accepts_the_inventory_output_and_renders_the_label(self):
         inventory = evidence.build([self.row(10, "2026-09-13T08:00:00Z"), self.row(10, "2026-09-13T08:00:00Z", alerts=["B"])])
@@ -958,6 +968,7 @@ class ProcessChainTelemetry(unittest.TestCase):
         text = chain.as_text(self.with_)
         self.assertIn("$ WinrsHost.exe -Embedding", text)
         self.assertIn("[telemetry]", text)
+        self.assertRegex(text, r"\[telemetry\] \S+ \d+ started \d{4}-\d\d-\d\dT")
         self.assertIn("-EncodedCommand ‹encoded: D1›", text)
         self.assertNotIn("UABvAHcAZQByAFMAaABlAGwAbAAgAC0ATgBvAFAAcgBvAGYAaQBsAGUAIAAtAE4AbwBuAEkAbgB0AGUAcgBhAGMAdABpAHYAZQAg", text)
         commands = [line for line in text.splitlines() if line.strip().startswith("$ ")]

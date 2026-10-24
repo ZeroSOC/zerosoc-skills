@@ -7,7 +7,10 @@
   encoded payload replaced by the script it decodes to as for a placed process, and `scripts:` names it
   as unplaced. A process seen with more than two command lines showed the first two; it now shows each
   of them. In the JSON an unplaced entry carries `cmd_line` and, for a decoded command, `script_uid`.
-  The Observation `--ocsf` writes keeps both, so `--from-graph` prints the same text.
+  The Observation `--ocsf` writes keeps both, so `--from-graph` prints the same text. Each process's
+  time is printed as when it started (`services.exe 640 started 2026-10-22T14:56:16Z`): a system
+  process that started at boot sat beside the alert citing it with a bare time, and was read as the
+  alert's time.
 - **A declared alert type is kept (framework DD-28).** An alert whose source declared its alert
   type, writing its detections for the framework's alert types, keeps it: triage step 4 and
   `rules/types.md` type only the others, and `alert_types.py` still refuses a type the taxonomy does
