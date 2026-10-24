@@ -162,8 +162,8 @@ per Case: the playbook the script prints.
     lists the techniques the standing Malicious observations show and names any recorded that none
     shows); extend the **Case Timeline** triage compiled with the course of the
     attack (interleaved with the detection and the response actions that ran, each entry timestamped in UTC
-    with its event reference; the `timeline` of `process_chain.py --json` gives the process entries with their
-    alerts as references). The timeline says what happened and is not a field the Case stores: it is the
+    with its event reference; a process is an entry only through an Observation that establishes it, its
+    `first_seen` the creation time the `timeline` of `process_chain.py --json` gives). The timeline says what happened and is not a field the Case stores: it is the
     Observations flagged `zerosoc:timeline`, rendered in `first_seen_time` order, with a `detection` entry per
     Alert and an `action` entry per response action that ran. Your validation queries are not entries: each is
     the Observation it produced, and a handover is a lifecycle event. Give each observation its `first_seen` (when the thing happened, never when the

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **A process is on the Case Timeline only through an Observation (investigation).** The procedure
+  said the chain's `timeline` "gives the process entries", which read as every process of the chain
+  being an entry. A process is an entry only through an Observation that establishes it, dated by the
+  creation time the chain gives; the chain itself shows every process, per device.
 - **The chain's text prints every command line (#87).** A process the chain cannot place (no device,
   PID or creation time) was listed without what it ran. It is now printed with its command line, its
   encoded payload replaced by the script it decodes to as for a placed process, and `scripts:` names it
