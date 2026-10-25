@@ -309,6 +309,9 @@ def lands(profile: dict[str, Any], case_schema: dict[str, Any], where: str) -> l
             elif not _declared(target, case_schema, case_schema, ocsf):
                 problems.append(f"{where}: {entry['path']!r} lands on {target!r}, which neither the Case Schema "
                                 f"nor OCSF {version} declares")
+            elif ocsf is not None and (said := _deprecation(target, ocsf)):
+                problems.append(f"{where}: {entry['path']!r} lands on {target!r}, which OCSF {version} "
+                                f"deprecates ({said})")
     for at, held in _filled(profile["extension"]["properties"], ""):
         if not any(t in (own + at, own + at + "[]") for t in landed.get(held["from"], [])):
             problems.append(f"{where}: extension property {at!r} is read from {held['from']!r}, whose case_map "
@@ -335,6 +338,23 @@ def _ocsf_kind(path: str, ocsf: dict[str, Any]) -> str | None:
             return None
         kind = declared.removesuffix("[]")
     return kind
+
+
+def _deprecation(target: str, ocsf: dict[str, Any]) -> str | None:
+    """What OCSF says of the first attribute on a path that it deprecates, or None where it
+    deprecates none of them. A deprecated attribute still compiles, and a source mapped onto it
+    is mapped onto what OCSF is removing."""
+    kind = OCSF_CLASS
+    for step in target.split("."):
+        name = step.removesuffix("[]")
+        said = (ocsf.get("deprecated", {}).get(kind) or {}).get(name)
+        if said:
+            return f"{kind}.{name}: {said}"
+        declared = (ocsf["class"].get(kind) or ocsf["objects"].get(kind) or {}).get(name)
+        if declared is None:
+            return None
+        kind = declared.removesuffix("[]")
+    return None
 
 
 def _unmet(landed: dict[str, list[str]], ocsf: dict[str, Any], version: Any, where: str) -> list[str]:

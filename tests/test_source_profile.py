@@ -231,6 +231,18 @@ class Coherence(unittest.TestCase):
         self.assertIn("'finding_info_list[].tags[]' is an OCSF key_value_object and needs at least one of "
                       "value, values", found)
 
+    def test_a_target_ocsf_deprecates_is_refused_with_what_to_use_instead(self) -> None:
+        """OCSF 1.9 deprecates a finding's `comment` for `notes`. A deprecated attribute still
+        compiles, so only this says that a source mapped onto it is mapped onto what OCSF is
+        removing."""
+        entry = next(e for e in self.profile["case_map"] if e["path"] == "resolvingComment")
+        entry["case"] = "comment"
+        self.profile["case_map"].append({"path": "alerts[].x", "case": "finding_info_list[].product_uid"})
+        found = "\n".join(check_profiles.lands(self.profile, self.case_schema(), "p"))
+        self.assertIn("'resolvingComment' lands on 'comment', which OCSF 1.9.0 deprecates", found)
+        self.assertIn("Use the `notes` attribute instead. (since 1.9.0)", found)
+        self.assertIn("finding_info.product_uid: Use the `product.uid` attribute instead", found)
+
     def test_the_ocsf_release_the_case_schema_follows_has_been_extracted(self) -> None:
         for skill in sorted(ROOT.glob("skills/*/references/framework/02-Taxonomy/case_schema.json")):
             schema = json.loads(skill.read_text())

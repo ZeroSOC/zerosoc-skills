@@ -10,7 +10,8 @@ Written to `tools/ocsf_<version>.json`; the checker reads the release the Case S
 its `ocsf_version`. An attribute's type is OCSF's scalar type (`string_t`, ...) or the name of the
 object it holds, with `[]` when it is a list. Profile attributes are included: a Case that declares
 the profile carries them. `constraints` keeps OCSF's own rules on an object's attributes, such as a
-user that needs at least one of `account`, `name` or `uid`.
+user that needs at least one of `account`, `name` or `uid`, and `deprecated` the attributes OCSF
+deprecates, with what it says to use instead.
 
 Standard library only. Reads the OCSF schema server's API.
 
@@ -20,6 +21,7 @@ Usage:
 from __future__ import annotations
 
 import json
+import re
 import sys
 import urllib.request
 from pathlib import Path
@@ -44,11 +46,22 @@ def _types(definition: dict[str, Any]) -> dict[str, str]:
     return out
 
 
+def _deprecated(definition: dict[str, Any]) -> dict[str, str]:
+    held = {}
+    for name, attribute in sorted(definition["attributes"].items()):
+        if attribute.get("@deprecated"):
+            note = attribute["@deprecated"]
+            message = re.sub(r"</?code>", "`", str(note.get("message") or "deprecated"))
+            held[name] = f"{message} (since {note.get('since', '?')})"
+    return held
+
+
 def extract(version: str) -> dict[str, Any]:
     case = _fetch(version, "classes", CLASS)
     attributes = _types(case)
     objects: dict[str, dict[str, str]] = {}
     constraints: dict[str, dict[str, list[str]]] = {CLASS: case["constraints"]} if case.get("constraints") else {}
+    deprecated: dict[str, dict[str, str]] = {CLASS: _deprecated(case)} if _deprecated(case) else {}
     pending = sorted({t.removesuffix("[]") for t in attributes.values() if not t.endswith("_t") and not t.endswith("_t[]")})
     while pending:
         name = pending.pop()
@@ -58,6 +71,8 @@ def extract(version: str) -> dict[str, Any]:
         objects[name] = _types(definition)
         if definition.get("constraints"):
             constraints[name] = definition["constraints"]
+        if _deprecated(definition):
+            deprecated[name] = _deprecated(definition)
         pending += [t.removesuffix("[]") for t in objects[name].values()
                     if not t.removesuffix("[]").endswith("_t") and t.removesuffix("[]") not in objects]
     return {
@@ -66,6 +81,7 @@ def extract(version: str) -> dict[str, Any]:
         "class": {CLASS: attributes},
         "objects": dict(sorted(objects.items())),
         "constraints": dict(sorted(constraints.items())),
+        "deprecated": dict(sorted(deprecated.items())),
     }
 
 

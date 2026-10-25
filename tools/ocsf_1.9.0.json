@@ -2167,5 +2167,105 @@
     "service_type_id"
    ]
   }
+ },
+ "deprecated": {
+  "actor": {
+   "app_name": "Use the `application.name` attribute instead. (since 1.9.0)",
+   "app_uid": "Use the `application.uid` attribute instead. (since 1.9.0)",
+   "invoked_by": "Use the `application` attribute instead. (since 1.2.0)"
+  },
+  "analytic": {
+   "related_analytics": "Related Analytics has been decoupled from this object, instead use `finding_info.related_analytics`. (since 1.0.0)"
+  },
+  "attack": {
+   "tactics": "Use the `tactic` attribute instead. (since 1.1.0)"
+  },
+  "cloud": {
+   "project_uid": "Use the `account.uid` attribute instead. (since 1.4.0)"
+  },
+  "container": {
+   "tag": "Use the `labels` or `tags` attribute instead. (since 1.4.0)"
+  },
+  "cve": {
+   "cwe": "Use `related_cwes` attribute instead. (since 1.4.0)",
+   "cwe_uid": "Use the `related_cwes[*].uid` attribute instead. (since 1.1.0)",
+   "cwe_url": "Use the `related_cwes[*].src_url` attribute instead. (since 1.1.0)"
+  },
+  "device": {
+   "imei": "Use the `imei_list` attribute instead. (since 1.4.0)"
+  },
+  "device_hw_info": {
+   "cpu_architecture": "Use `cpu_info_list[*].cpu_architecture` instead. (since 1.9.0)",
+   "cpu_architecture_id": "Use `cpu_info_list[*].cpu_architecture_id` instead. (since 1.9.0)",
+   "cpu_bits": "Use `cpu_info_list[*].cpu_bits` instead. (since 1.9.0)",
+   "cpu_cores": "Use `cpu_info_list[*].cores` instead. (since 1.9.0)",
+   "cpu_speed": "Use `cpu_info_list[*].speed_mhz` instead. (since 1.9.0)",
+   "cpu_type": "Use `cpu_info_list[*].model` and `cpu_info_list[*].vendor_name` instead. (since 1.9.0)"
+  },
+  "discovery_details": {
+   "occurrence_details": "Use `occurrences` instead. (since 1.4.0)"
+  },
+  "dns_answer": {
+   "flag_ids": "Use `dns_activity.flag_ids` instead. (since 1.9.0)",
+   "flags": "Use `dns_activity.flags` instead. (since 1.9.0)",
+   "packet_uid": "Use `dns_activity.transaction_id` instead. (since 1.9.0)"
+  },
+  "email": {
+   "data_classification": "Use the attribute `data_classifications` instead (since 1.4.0)",
+   "delivered_to": "Use the `delivered_to_list` attribute instead. (since 1.4.0)",
+   "reply_to": "Use the `reply_to_list` attribute instead. (since 1.4.0)",
+   "smtp_from": "Use the `from` attribute instead. (since 1.4.0)",
+   "smtp_to": "Use the `to` attribute instead. (since 1.4.0)"
+  },
+  "file": {
+   "data_classification": "Use the attribute `data_classifications` instead (since 1.4.0)",
+   "signature": "Use the `signatures` attribute. (since 1.8.0)"
+  },
+  "finding_info": {
+   "product_uid": "Use the `product.uid` attribute instead. (since 1.4.0)"
+  },
+  "image": {
+   "tag": "Use the `labels` or `tags` attribute instead. (since 1.4.0)"
+  },
+  "incident_finding": {
+   "comment": "Use the `notes` attribute instead. (since 1.9.0)",
+   "ticket": "Use `tickets` instead. (since 1.5.0)"
+  },
+  "location": {
+   "coordinates": "Use the `lat` and `long` attributes instead. (since 1.2.0)",
+   "isp": "Use the `network_endpoint.isp` or `whois.isp` attribute according to your use-case. (since 1.5.0)"
+  },
+  "malware": {
+   "path": "Use the `files[*].path` attribute instead. (since 1.5.0)"
+  },
+  "metadata": {
+   "data_classification": "Use the attribute `data_classifications` instead (since 1.4.0)",
+   "extension": "Use the `extensions` attribute instead. (since 1.1.0)"
+  },
+  "process": {
+   "lineage": "Use the `ancestry` attribute. (since 1.4.0)",
+   "tid": "`tid` is deprecated in favor of `ptid`. `ptid` has type `long_t` which can accommodate the thread identifiers returned by all platforms (e.g. 64-bit on MacOS). (since 1.6.0)"
+  },
+  "product": {
+   "data_classification": "Use the attribute `data_classifications` instead (since 1.4.0)"
+  },
+  "related_event": {
+   "product_uid": "Use the `product.uid` attribute instead. (since 1.4.0)"
+  },
+  "remediation": {
+   "kb_articles": "Use the `kb_article_list` attribute instead. (since 1.1.0)"
+  },
+  "resource_details": {
+   "data_classification": "Use the attribute `data_classifications` instead (since 1.4.0)"
+  },
+  "user": {
+   "credential_uid": "Use `programmatic_credentials` instead. (since 1.6.0)"
+  },
+  "vulnerability": {
+   "fix_available": "Use the `is_fix_available` attribute instead. (since 1.1.0)",
+   "kb_article_list": "Use `advisory` attribute instead. (since 1.4.0)",
+   "kb_articles": "Use the `kb_article_list` attribute instead. (since 1.1.0)",
+   "packages": "Use the `affected_packages` attribute instead. (since 1.1.0)"
+  }
  }
 }
