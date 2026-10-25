@@ -1,0 +1,232 @@
+{
+ "desc": "evidence-only chain: 3 processes on 1 devices (3 from 5 evidence rows); 1 lineage gaps, 1 unplaced, 0 anomalies",
+ "related_events": [
+  {
+   "type_uid": 200401,
+   "type_name": "Detection Finding: Create",
+   "uid": "da-1",
+   "title": "Suspicious PowerShell",
+   "evidences": [
+    {
+     "name": "process",
+     "uid": "ws-02|100|2026-09-13T11:00:00Z",
+     "process": {
+      "uid": "ws-02|100|2026-09-13T11:00:00Z",
+      "pid": 100,
+      "name": "explorer.exe"
+     }
+    },
+    {
+     "name": "process",
+     "uid": "ws-02|200|2026-09-13T11:05:00Z",
+     "process": {
+      "uid": "ws-02|200|2026-09-13T11:05:00Z",
+      "pid": 200,
+      "name": "powershell.exe"
+     }
+    }
+   ]
+  },
+  {
+   "type_uid": 200401,
+   "type_name": "Detection Finding: Create",
+   "uid": "da-2",
+   "title": "Whoami run from a script",
+   "evidences": [
+    {
+     "name": "process",
+     "uid": "ws-02|200|2026-09-13T11:05:00Z",
+     "process": {
+      "uid": "ws-02|200|2026-09-13T11:05:00Z",
+      "pid": 200,
+      "name": "powershell.exe"
+     }
+    },
+    {
+     "name": "process",
+     "uid": "ws-02|300|2026-09-13T11:06:00Z",
+     "process": {
+      "uid": "ws-02|300|2026-09-13T11:06:00Z",
+      "pid": 300,
+      "name": "cmd.exe"
+     }
+    }
+   ]
+  },
+  {
+   "type_uid": 100701,
+   "type_name": "Process Activity: Launch",
+   "uid": "ws-02|100|2026-09-13T11:00:00Z",
+   "first_seen_time": 1789297200000,
+   "count": 1,
+   "device": {
+    "hostname": "ws-02"
+   },
+   "process": {
+    "uid": "ws-02|100|2026-09-13T11:00:00Z",
+    "pid": 100,
+    "name": "explorer.exe",
+    "created_time": 1789297200000,
+    "created_time_dt": "2026-09-13T11:00:00Z"
+   },
+   "evidences": [
+    {
+     "name": "process",
+     "uid": "ws-02|100|2026-09-13T11:00:00Z",
+     "data": {
+      "source": "evidence",
+      "verdicts": [
+       "suspicious"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "type_uid": 100701,
+   "type_name": "Process Activity: Launch",
+   "uid": "ws-02|200|2026-09-13T11:05:00Z",
+   "first_seen_time": 1789297500000,
+   "count": 2,
+   "device": {
+    "hostname": "ws-02"
+   },
+   "process": {
+    "uid": "ws-02|200|2026-09-13T11:05:00Z",
+    "pid": 200,
+    "name": "powershell.exe",
+    "created_time": 1789297500000,
+    "created_time_dt": "2026-09-13T11:05:00Z",
+    "cmd_line": "powershell.exe -EncodedCommand RwBlAHQALQBQAHIAbwBjAGUAcwBzADsAIAB3AGgAbwBhAG0AaQA=",
+    "file": {
+     "path": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0",
+     "hashes": [
+      {
+       "algorithm_id": 3,
+       "algorithm": "SHA-256",
+       "value": "abababababababababababababababababababababababababababababababab"
+      }
+     ]
+    },
+    "user": {
+     "name": "lab\\anna",
+     "uid": "S-1-5-21-1001"
+    },
+    "parent_process": {
+     "uid": "ws-02|100|2026-09-13T11:00:00Z",
+     "pid": 100,
+     "name": "explorer.exe",
+     "created_time": 1789297200000,
+     "created_time_dt": "2026-09-13T11:00:00Z"
+    },
+    "ancestry": [
+     {
+      "uid": "ws-02|100|2026-09-13T11:00:00Z",
+      "pid": 100,
+      "name": "explorer.exe",
+      "created_time": 1789297200000,
+      "created_time_dt": "2026-09-13T11:00:00Z"
+     }
+    ]
+   },
+   "evidences": [
+    {
+     "name": "process",
+     "uid": "ws-02|200|2026-09-13T11:05:00Z",
+     "data": {
+      "source": "evidence",
+      "cmd_lines": [
+       "powershell.exe -EncodedCommand RwBlAHQALQBQAHIAbwBjAGUAcwBzADsAIAB3AGgAbwBhAG0AaQA=",
+       "powershell.exe -NoProfile"
+      ],
+      "verdicts": [
+       "malicious",
+       "suspicious"
+      ],
+      "decode_rounds": 2,
+      "upn": "anna@lab.local",
+      "mde_device_id": "2f7c0a",
+      "remediation_status": "remediated",
+      "detection_status": "detected",
+      "elevation_token": "TokenElevationTypeFull"
+     }
+    }
+   ],
+   "script": {
+    "uid": "D1",
+    "type_id": 2,
+    "type": "PowerShell",
+    "script_content": "Get-Process; whoami"
+   }
+  },
+  {
+   "type_uid": 100701,
+   "type_name": "Process Activity: Launch",
+   "uid": "ws-02|300|2026-09-13T11:06:00Z",
+   "first_seen_time": 1789297560000,
+   "count": 1,
+   "device": {
+    "hostname": "ws-02"
+   },
+   "process": {
+    "uid": "ws-02|300|2026-09-13T11:06:00Z",
+    "pid": 300,
+    "name": "cmd.exe",
+    "created_time": 1789297560000,
+    "created_time_dt": "2026-09-13T11:06:00Z",
+    "cmd_line": "cmd.exe /c whoami",
+    "parent_process": {
+     "uid": "ws-02|250|2026-09-13T11:05:30Z",
+     "pid": 250,
+     "name": "conhost.exe",
+     "created_time": 1789297530000,
+     "created_time_dt": "2026-09-13T11:05:30Z"
+    },
+    "ancestry": [
+     {
+      "uid": "ws-02|250|2026-09-13T11:05:30Z",
+      "pid": 250,
+      "name": "conhost.exe",
+      "created_time": 1789297530000,
+      "created_time_dt": "2026-09-13T11:05:30Z"
+     }
+    ]
+   },
+   "evidences": [
+    {
+     "name": "process",
+     "uid": "ws-02|300|2026-09-13T11:06:00Z",
+     "data": {
+      "source": "evidence",
+      "verdicts": [
+       "unknown"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "type_uid": 100701,
+   "type_name": "Process Activity: Launch",
+   "uid": "unplaced:1",
+   "process": {
+    "name": "b.exe",
+    "pid": 12,
+    "cmd_line": "b.exe /x"
+   },
+   "evidences": [
+    {
+     "name": "process",
+     "data": {
+      "missing": [
+       "created"
+      ]
+     }
+    }
+   ],
+   "device": {
+    "hostname": "ws-02"
+   }
+  }
+ ]
+}

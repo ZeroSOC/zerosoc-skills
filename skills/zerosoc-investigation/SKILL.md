@@ -4,7 +4,7 @@ description: Investigate a promoted Case under the ZeroSOC Framework (Phase 2.b)
 license: Apache-2.0
 metadata:
   version: "0.4.1"
-  framework: "zerosoc-framework@6a427b0 (2026-10-25)"
+  framework: "zerosoc-framework@48c2ddd (2026-10-25)"
   status: draft
   author: ZeroSOC
 ---
@@ -75,10 +75,12 @@ per Case: the playbook the script prints.
    lineage the evidence does not show. Command lines, their decodings and the remediation state of each process
    are observations in their own right, not decoration, and so is the number of layers a command was encoded
    in: decoding stops at five rounds, and a command still encoded there is recorded as such.
-   Keep the chain with the Case: the same command with `--ocsf` prints it as the `desc` and `related_events`
-   of an Observation with no side (each process an OCSF `process` with its `parent_process` and `ancestry`,
-   each decoded command a `script`, each alert naming its processes). Record it once, and replace it when
-   alerts that joined rebuild the chain; `--from-graph observation.json` prints its text again.
+   Keep the chain with the Case: the same command with `--ocsf --bindings zerosoc.capabilities.json` prints
+   the `desc` and `related_events` of an Observation with no side, and the OCSF `events` they cite: a Process
+   Activity per process (its `parent_process`, its `ancestry`, and the process that launched it as `actor`), a
+   Script Activity per decoded command, and a Detection Finding per alert naming its processes in `evidences`.
+   Record the Observation once and keep its events with the Case, and replace both when alerts that joined
+   rebuild the chain; `--from-graph observation.json` prints its text again.
    Carry the Case's `detection_metadata` across and **refresh it at this gate**: alerts appended since
    triage bring their own assertions, and the remediation state changes while a Case is open. Re-run
    `python3 scripts/alert_metadata.py alerts.json --bindings zerosoc.capabilities.json --evidence evidence.json --json`
