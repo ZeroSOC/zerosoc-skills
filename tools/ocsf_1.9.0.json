@@ -76,6 +76,217 @@
    "vendor_attributes": "vendor_attributes",
    "verdict": "string_t",
    "verdict_id": "integer_t"
+  },
+  "detection_finding": {
+   "action": "string_t",
+   "action_id": "integer_t",
+   "activity_id": "integer_t",
+   "activity_name": "string_t",
+   "actor": "actor",
+   "anomaly_analyses": "anomaly_analysis[]",
+   "api": "api",
+   "assignee": "user",
+   "assignee_group": "group",
+   "attacks": "attack[]",
+   "attestation_list": "attestation[]",
+   "authorizations": "authorization[]",
+   "category_name": "string_t",
+   "category_uid": "integer_t",
+   "class_name": "string_t",
+   "class_uid": "integer_t",
+   "cloud": "cloud",
+   "comment": "string_t",
+   "confidence": "string_t",
+   "confidence_id": "integer_t",
+   "confidence_score": "integer_t",
+   "count": "integer_t",
+   "device": "device",
+   "disposition": "string_t",
+   "disposition_id": "integer_t",
+   "duration": "long_t",
+   "end_time": "timestamp_t",
+   "end_time_dt": "datetime_t",
+   "enrichments": "enrichment[]",
+   "evidences": "evidences[]",
+   "finding_info": "finding_info",
+   "firewall_rule": "firewall_rule",
+   "impact": "string_t",
+   "impact_id": "integer_t",
+   "impact_score": "integer_t",
+   "is_alert": "boolean_t",
+   "is_suspected_breach": "boolean_t",
+   "malware": "malware[]",
+   "malware_scan_info": "malware_scan_info",
+   "message": "string_t",
+   "metadata": "metadata",
+   "notes": "note[]",
+   "observables": "observable[]",
+   "osint": "osint[]",
+   "policy": "policy",
+   "priority": "string_t",
+   "priority_id": "integer_t",
+   "raw_data": "string_t",
+   "raw_data_hash": "fingerprint",
+   "raw_data_size": "long_t",
+   "remediation": "remediation",
+   "resources": "resource_details[]",
+   "risk_details": "string_t",
+   "risk_level": "string_t",
+   "risk_level_id": "integer_t",
+   "risk_score": "integer_t",
+   "severity": "string_t",
+   "severity_id": "integer_t",
+   "src_url": "url_t",
+   "start_time": "timestamp_t",
+   "start_time_dt": "datetime_t",
+   "status": "string_t",
+   "status_code": "string_t",
+   "status_detail": "string_t",
+   "status_id": "integer_t",
+   "ticket": "ticket",
+   "tickets": "ticket[]",
+   "time": "timestamp_t",
+   "time_dt": "datetime_t",
+   "timezone_offset": "integer_t",
+   "type_name": "string_t",
+   "type_uid": "long_t",
+   "unmapped": "object",
+   "vendor_attributes": "vendor_attributes",
+   "verdict": "string_t",
+   "verdict_id": "integer_t",
+   "vulnerabilities": "vulnerability[]"
+  },
+  "process_activity": {
+   "action": "string_t",
+   "action_id": "integer_t",
+   "activity_id": "integer_t",
+   "activity_name": "string_t",
+   "actor": "actor",
+   "actual_permissions": "integer_t",
+   "ai_agent": "ai_agent",
+   "ai_model": "ai_model",
+   "api": "api",
+   "attacks": "attack[]",
+   "attestation_list": "attestation[]",
+   "authorizations": "authorization[]",
+   "category_name": "string_t",
+   "category_uid": "integer_t",
+   "class_name": "string_t",
+   "class_uid": "integer_t",
+   "cloud": "cloud",
+   "confidence": "string_t",
+   "confidence_id": "integer_t",
+   "confidence_score": "integer_t",
+   "count": "integer_t",
+   "delegation": "delegation",
+   "device": "device",
+   "disposition": "string_t",
+   "disposition_id": "integer_t",
+   "duration": "long_t",
+   "end_time": "timestamp_t",
+   "end_time_dt": "datetime_t",
+   "enrichments": "enrichment[]",
+   "exit_code": "integer_t",
+   "firewall_rule": "firewall_rule",
+   "injection_type": "string_t",
+   "injection_type_id": "integer_t",
+   "is_alert": "boolean_t",
+   "launch_type": "string_t",
+   "launch_type_id": "integer_t",
+   "malware": "malware[]",
+   "malware_scan_info": "malware_scan_info",
+   "message": "string_t",
+   "message_context": "message_context",
+   "metadata": "metadata",
+   "module": "module",
+   "observables": "observable[]",
+   "osint": "osint[]",
+   "policy": "policy",
+   "process": "process",
+   "raw_data": "string_t",
+   "raw_data_hash": "fingerprint",
+   "raw_data_size": "long_t",
+   "requested_permissions": "integer_t",
+   "risk_details": "string_t",
+   "risk_level": "string_t",
+   "risk_level_id": "integer_t",
+   "risk_score": "integer_t",
+   "severity": "string_t",
+   "severity_id": "integer_t",
+   "start_time": "timestamp_t",
+   "start_time_dt": "datetime_t",
+   "status": "string_t",
+   "status_code": "string_t",
+   "status_detail": "string_t",
+   "status_id": "integer_t",
+   "time": "timestamp_t",
+   "time_dt": "datetime_t",
+   "timezone_offset": "integer_t",
+   "type_name": "string_t",
+   "type_uid": "long_t",
+   "unmapped": "object"
+  },
+  "script_activity": {
+   "action": "string_t",
+   "action_id": "integer_t",
+   "activity_id": "integer_t",
+   "activity_name": "string_t",
+   "actor": "actor",
+   "ai_agent": "ai_agent",
+   "ai_model": "ai_model",
+   "api": "api",
+   "attacks": "attack[]",
+   "attestation_list": "attestation[]",
+   "authorizations": "authorization[]",
+   "category_name": "string_t",
+   "category_uid": "integer_t",
+   "class_name": "string_t",
+   "class_uid": "integer_t",
+   "cloud": "cloud",
+   "confidence": "string_t",
+   "confidence_id": "integer_t",
+   "confidence_score": "integer_t",
+   "count": "integer_t",
+   "delegation": "delegation",
+   "device": "device",
+   "disposition": "string_t",
+   "disposition_id": "integer_t",
+   "duration": "long_t",
+   "end_time": "timestamp_t",
+   "end_time_dt": "datetime_t",
+   "enrichments": "enrichment[]",
+   "firewall_rule": "firewall_rule",
+   "is_alert": "boolean_t",
+   "malware": "malware[]",
+   "malware_scan_info": "malware_scan_info",
+   "message": "string_t",
+   "message_context": "message_context",
+   "metadata": "metadata",
+   "observables": "observable[]",
+   "osint": "osint[]",
+   "policy": "policy",
+   "raw_data": "string_t",
+   "raw_data_hash": "fingerprint",
+   "raw_data_size": "long_t",
+   "risk_details": "string_t",
+   "risk_level": "string_t",
+   "risk_level_id": "integer_t",
+   "risk_score": "integer_t",
+   "script": "script",
+   "severity": "string_t",
+   "severity_id": "integer_t",
+   "start_time": "timestamp_t",
+   "start_time_dt": "datetime_t",
+   "status": "string_t",
+   "status_code": "string_t",
+   "status_detail": "string_t",
+   "status_id": "integer_t",
+   "time": "timestamp_t",
+   "time_dt": "datetime_t",
+   "timezone_offset": "integer_t",
+   "type_name": "string_t",
+   "type_uid": "long_t",
+   "unmapped": "object"
   }
  },
  "objects": {
@@ -185,6 +396,10 @@
    "uid_numeric": "long_t",
    "version": "string_t"
   },
+  "analysis_target": {
+   "name": "string_t",
+   "type": "string_t"
+  },
   "analytic": {
    "algorithm": "string_t",
    "category": "string_t",
@@ -199,6 +414,17 @@
    "uid": "string_t",
    "uid_numeric": "long_t",
    "version": "string_t"
+  },
+  "anomaly": {
+   "observation_parameter": "string_t",
+   "observation_type": "string_t",
+   "observations": "observation[]",
+   "observed_pattern": "string_t"
+  },
+  "anomaly_analysis": {
+   "analysis_targets": "analysis_target[]",
+   "anomalies": "anomaly[]",
+   "baselines": "baseline[]"
   },
   "api": {
    "group": "group",
@@ -266,6 +492,12 @@
   "autonomous_system": {
    "name": "string_t",
    "number": "integer_t"
+  },
+  "baseline": {
+   "observation_parameter": "string_t",
+   "observation_type": "string_t",
+   "observations": "observation[]",
+   "observed_pattern": "string_t"
   },
   "campaign": {
    "name": "string_t"
@@ -391,6 +623,67 @@
    "status_details": "string_t[]",
    "status_id": "integer_t",
    "total": "integer_t",
+   "uid": "string_t"
+  },
+  "database": {
+   "created_time": "timestamp_t",
+   "created_time_dt": "datetime_t",
+   "data_classification": "data_classification",
+   "data_classifications": "data_classification[]",
+   "desc": "string_t",
+   "embedding_model": "string_t",
+   "groups": "group[]",
+   "modified_time": "timestamp_t",
+   "modified_time_dt": "datetime_t",
+   "name": "string_t",
+   "size": "long_t",
+   "type": "string_t",
+   "type_id": "integer_t",
+   "uid": "string_t",
+   "uid_numeric": "long_t"
+  },
+  "databucket": {
+   "agent_list": "agent[]",
+   "cloud_partition": "string_t",
+   "created_time": "timestamp_t",
+   "created_time_dt": "datetime_t",
+   "criticality": "string_t",
+   "data": "json_t",
+   "data_classification": "data_classification",
+   "data_classifications": "data_classification[]",
+   "desc": "string_t",
+   "encryption_details": "encryption_details",
+   "file": "file",
+   "group": "group",
+   "groups": "group[]",
+   "hostname": "hostname_t",
+   "ip": "ip_t",
+   "is_backed_up": "boolean_t",
+   "is_encrypted": "boolean_t",
+   "is_public": "boolean_t",
+   "labels": "string_t[]",
+   "modified_time": "timestamp_t",
+   "modified_time_dt": "datetime_t",
+   "name": "string_t",
+   "namespace": "string_t",
+   "owner": "user",
+   "region": "string_t",
+   "resource_relationship": "graph",
+   "size": "long_t",
+   "tags": "key_value_object[]",
+   "type": "string_t",
+   "type_id": "integer_t",
+   "uid": "resource_uid_t",
+   "uid_alt": "resource_uid_t",
+   "uid_numeric": "long_t",
+   "version": "string_t",
+   "zone": "string_t"
+  },
+  "delegation": {
+   "created_time": "timestamp_t",
+   "created_time_dt": "datetime_t",
+   "issuer_uid": "string_t",
+   "parent_uid": "string_t",
    "uid": "string_t"
   },
   "device": {
@@ -523,6 +816,14 @@
    "ttl": "integer_t",
    "type": "string_t"
   },
+  "dns_query": {
+   "class": "string_t",
+   "hostname": "hostname_t",
+   "opcode": "string_t",
+   "opcode_id": "integer_t",
+   "packet_uid": "integer_t",
+   "type": "string_t"
+  },
   "domain_contact": {
    "email_addr": "email_t",
    "location": "location",
@@ -622,6 +923,40 @@
    "percentile": "float_t",
    "score": "string_t",
    "version": "string_t"
+  },
+  "evidences": {
+   "actor": "actor",
+   "ai_agent": "ai_agent",
+   "api": "api",
+   "connection_info": "network_connection_info",
+   "container": "container",
+   "data": "json_t",
+   "database": "database",
+   "databucket": "databucket",
+   "device": "device",
+   "dst_endpoint": "network_endpoint",
+   "email": "email",
+   "file": "file",
+   "http_request": "http_request",
+   "http_response": "http_response",
+   "ja4_fingerprint_list": "ja4_fingerprint[]",
+   "job": "job",
+   "name": "string_t",
+   "process": "process",
+   "query": "dns_query",
+   "reg_key": "win/reg_key",
+   "reg_value": "win/reg_value",
+   "resources": "resource_details[]",
+   "script": "script",
+   "src_endpoint": "network_endpoint",
+   "tls": "tls",
+   "uid": "string_t",
+   "uid_numeric": "long_t",
+   "url": "url",
+   "user": "user",
+   "verdict": "string_t",
+   "verdict_id": "integer_t",
+   "win_service": "win/win_service"
   },
   "extension": {
    "name": "string_t",
@@ -739,6 +1074,11 @@
    "uid_numeric": "long_t",
    "version": "string_t"
   },
+  "function_invocation": {
+   "error": "string_t",
+   "parameters": "parameter[]",
+   "return_value": "string_t"
+  },
   "gpu_info": {
    "bus_type": "string_t",
    "bus_type_id": "integer_t",
@@ -774,6 +1114,29 @@
   "http_header": {
    "name": "string_t",
    "value": "string_t"
+  },
+  "http_request": {
+   "args": "string_t",
+   "body_length": "integer_t",
+   "http_headers": "http_header[]",
+   "http_method": "string_t",
+   "length": "integer_t",
+   "referrer": "string_t",
+   "uid": "string_t",
+   "url": "url",
+   "user_agent": "string_t",
+   "version": "string_t",
+   "x_forwarded_for": "ip_t[]"
+  },
+  "http_response": {
+   "body_length": "integer_t",
+   "code": "integer_t",
+   "content_type": "string_t",
+   "http_headers": "http_header[]",
+   "latency": "integer_t",
+   "length": "integer_t",
+   "message": "string_t",
+   "status": "string_t"
   },
   "iam_role": {
    "account": "account",
@@ -812,6 +1175,56 @@
    "tags": "key_value_object[]",
    "uid": "string_t",
    "uid_numeric": "long_t"
+  },
+  "ja4_fingerprint": {
+   "section_a": "string_t",
+   "section_b": "string_t",
+   "section_c": "string_t",
+   "section_d": "string_t",
+   "type": "string_t",
+   "type_id": "integer_t",
+   "value": "string_t"
+  },
+  "job": {
+   "cmd_line": "string_t",
+   "created_time": "timestamp_t",
+   "created_time_dt": "datetime_t",
+   "desc": "string_t",
+   "file": "file",
+   "job_actions": "job_action[]",
+   "job_triggers": "job_trigger[]",
+   "last_run_time": "timestamp_t",
+   "last_run_time_dt": "datetime_t",
+   "name": "string_t",
+   "next_run_time": "timestamp_t",
+   "next_run_time_dt": "datetime_t",
+   "run_state": "string_t",
+   "run_state_id": "integer_t",
+   "type": "string_t",
+   "type_id": "integer_t",
+   "uid": "string_t",
+   "user": "user"
+  },
+  "job_action": {
+   "cmd_line": "string_t",
+   "com_class_uuid": "uuid_t",
+   "file": "file",
+   "properties": "key_value_object[]",
+   "type": "string_t",
+   "type_id": "integer_t",
+   "working_directory": "string_t"
+  },
+  "job_trigger": {
+   "event_codes": "string_t[]",
+   "last_run_time": "timestamp_t",
+   "last_run_time_dt": "datetime_t",
+   "log_sources": "string_t[]",
+   "next_run_time": "timestamp_t",
+   "next_run_time_dt": "datetime_t",
+   "properties": "key_value_object[]",
+   "type": "string_t",
+   "type_id": "integer_t",
+   "user": "user"
   },
   "kb_article": {
    "avg_timespan": "timespan",
@@ -951,6 +1364,20 @@
    "uid_numeric": "long_t",
    "unique_malware_count": "integer_t"
   },
+  "message_context": {
+   "ai_role": "string_t",
+   "ai_role_id": "integer_t",
+   "application": "application",
+   "completion_tokens": "integer_t",
+   "name": "string_t",
+   "prompt_text": "string_t",
+   "prompt_tokens": "integer_t",
+   "response_text": "string_t",
+   "service": "service",
+   "total_tokens": "integer_t",
+   "uid": "string_t",
+   "uid_numeric": "long_t"
+  },
   "metadata": {
    "correlation_uid": "string_t",
    "data_classification": "data_classification",
@@ -1002,6 +1429,31 @@
    "src_url": "url_t",
    "uid": "string_t",
    "uid_numeric": "long_t"
+  },
+  "module": {
+   "base_address": "string_t",
+   "file": "file",
+   "function_invocation": "function_invocation",
+   "function_name": "string_t",
+   "load_type": "string_t",
+   "load_type_id": "integer_t",
+   "start_address": "string_t",
+   "type": "string_t"
+  },
+  "network_connection_info": {
+   "boundary": "string_t",
+   "boundary_id": "integer_t",
+   "community_uid": "string_t",
+   "direction": "string_t",
+   "direction_id": "integer_t",
+   "flag_history": "string_t",
+   "protocol_name": "string_t",
+   "protocol_num": "integer_t",
+   "protocol_ver": "string_t",
+   "protocol_ver_id": "integer_t",
+   "session": "session",
+   "tcp_flags": "integer_t",
+   "uid": "string_t"
   },
   "network_endpoint": {
    "agent_list": "agent[]",
@@ -1117,6 +1569,11 @@
    "type_uid": "long_t",
    "value": "string_t"
   },
+  "observation": {
+   "count": "integer_t",
+   "timespan": "timespan",
+   "value": "string_t"
+  },
   "occurrence_details": {
    "cell_name": "string_t",
    "column_name": "string_t",
@@ -1221,6 +1678,11 @@
    "uid": "string_t",
    "vendor_name": "string_t",
    "version": "string_t"
+  },
+  "parameter": {
+   "name": "string_t",
+   "post_value": "string_t",
+   "pre_value": "string_t"
   },
   "peripheral_device": {
    "class": "string_t",
@@ -1593,6 +2055,28 @@
    "type": "string_t",
    "type_id": "integer_t"
   },
+  "tls": {
+   "alert": "integer_t",
+   "certificate": "certificate",
+   "certificate_chain": "string_t[]",
+   "cipher": "string_t",
+   "client_ciphers": "string_t[]",
+   "extension_list": "tls_extension[]",
+   "handshake_dur": "integer_t",
+   "ja3_hash": "fingerprint",
+   "ja3s_hash": "fingerprint",
+   "key_length": "integer_t",
+   "sans": "san[]",
+   "server_ciphers": "string_t[]",
+   "sni": "string_t",
+   "tls_extension_list": "tls_extension[]",
+   "version": "string_t"
+  },
+  "tls_extension": {
+   "data": "json_t",
+   "type": "string_t",
+   "type_id": "integer_t"
+  },
   "token": {
    "created_time": "timestamp_t",
    "created_time_dt": "datetime_t",
@@ -1720,6 +2204,28 @@
    "subdomains": "string_t[]",
    "subnet": "subnet_t"
   },
+  "win/reg_key": {
+   "is_system": "boolean_t",
+   "modified_time": "timestamp_t",
+   "modified_time_dt": "datetime_t",
+   "path": "reg_key_path_t",
+   "security_descriptor": "string_t"
+  },
+  "win/reg_value": {
+   "data": "json_t",
+   "is_default": "boolean_t",
+   "is_system": "boolean_t",
+   "modified_time": "timestamp_t",
+   "modified_time_dt": "datetime_t",
+   "name": "string_t",
+   "path": "reg_key_path_t",
+   "reg_binary_data": "bytestring_t",
+   "reg_integer_data": "long_t",
+   "reg_string_data": "string_t",
+   "reg_string_list_data": "string_t[]",
+   "type": "string_t",
+   "type_id": "integer_t"
+  },
   "win/win_service": {
    "cmd_line": "string_t",
    "hosting_process": "process_entity",
@@ -1842,6 +2348,18 @@
     "confidentiality_id"
    ]
   },
+  "database": {
+   "at_least_one": [
+    "name",
+    "uid"
+   ]
+  },
+  "databucket": {
+   "at_least_one": [
+    "name",
+    "uid"
+   ]
+  },
   "device": {
    "at_least_one": [
     "ip",
@@ -1872,6 +2390,30 @@
     "to"
    ]
   },
+  "evidences": {
+   "at_least_one": [
+    "actor",
+    "api",
+    "connection_info",
+    "data",
+    "database",
+    "databucket",
+    "device",
+    "dst_endpoint",
+    "email",
+    "file",
+    "process",
+    "query",
+    "src_endpoint",
+    "url",
+    "user",
+    "job",
+    "script",
+    "reg_key",
+    "reg_value",
+    "win_service"
+   ]
+  },
   "extension": {
    "at_least_one": [
     "name",
@@ -1888,6 +2430,13 @@
    "at_least_one": [
     "name",
     "uid"
+   ]
+  },
+  "function_invocation": {
+   "at_least_one": [
+    "parameters",
+    "return_value",
+    "error"
    ]
   },
   "graph": {
@@ -1918,6 +2467,12 @@
    "at_least_one": [
     "assignee",
     "assignee_group"
+   ]
+  },
+  "job": {
+   "at_least_one": [
+    "name",
+    "type_id"
    ]
   },
   "kb_article": {
@@ -1958,10 +2513,22 @@
     "uid"
    ]
   },
+  "message_context": {
+   "at_least_one": [
+    "application",
+    "service"
+   ]
+  },
   "mitigation": {
    "at_least_one": [
     "name",
     "uid"
+   ]
+  },
+  "module": {
+   "at_least_one": [
+    "load_type_id",
+    "function_name"
    ]
   },
   "network_endpoint": {
@@ -2016,6 +2583,13 @@
    "at_least_one": [
     "name",
     "uid"
+   ]
+  },
+  "parameter": {
+   "at_least_one": [
+    "name",
+    "pre_value",
+    "post_value"
    ]
   },
   "peripheral_device": {
@@ -2168,6 +2742,307 @@
    ]
   }
  },
+ "required": {
+  "advisory": [
+   "uid"
+  ],
+  "affected_code": [
+   "file"
+  ],
+  "affected_package": [
+   "name",
+   "version"
+  ],
+  "ai_model": [
+   "ai_provider",
+   "name"
+  ],
+  "analysis_target": [
+   "name"
+  ],
+  "analytic": [
+   "type_id"
+  ],
+  "anomaly": [
+   "observation_parameter",
+   "observations"
+  ],
+  "anomaly_analysis": [
+   "analysis_targets",
+   "anomalies"
+  ],
+  "api": [
+   "operation"
+  ],
+  "auth_factor": [
+   "factor_type_id"
+  ],
+  "baseline": [
+   "observation_parameter",
+   "observations"
+  ],
+  "campaign": [
+   "name"
+  ],
+  "certificate": [
+   "issuer",
+   "serial_number"
+  ],
+  "cis_control": [
+   "name"
+  ],
+  "classifier_details": [
+   "type"
+  ],
+  "cloud": [
+   "provider"
+  ],
+  "cve": [
+   "uid"
+  ],
+  "cvss": [
+   "base_score",
+   "version"
+  ],
+  "cwe": [
+   "uid"
+  ],
+  "database": [
+   "type_id"
+  ],
+  "databucket": [
+   "type_id"
+  ],
+  "delegation": [
+   "uid"
+  ],
+  "detection_finding": [
+   "activity_id",
+   "category_uid",
+   "class_uid",
+   "finding_info",
+   "metadata",
+   "severity_id",
+   "time",
+   "type_uid"
+  ],
+  "device": [
+   "type_id"
+  ],
+  "digital_signature": [
+   "algorithm_id"
+  ],
+  "dns_answer": [
+   "rdata"
+  ],
+  "dns_query": [
+   "hostname"
+  ],
+  "domain_contact": [
+   "type_id"
+  ],
+  "edge": [
+   "source",
+   "target"
+  ],
+  "enrichment": [
+   "data",
+   "name",
+   "value"
+  ],
+  "environment_variable": [
+   "name",
+   "value"
+  ],
+  "epss": [
+   "score"
+  ],
+  "extension": [
+   "version"
+  ],
+  "file": [
+   "name",
+   "type_id"
+  ],
+  "finding_info": [
+   "uid"
+  ],
+  "fingerprint": [
+   "algorithm_id",
+   "value"
+  ],
+  "graph": [
+   "nodes"
+  ],
+  "http_header": [
+   "name",
+   "value"
+  ],
+  "http_response": [
+   "code"
+  ],
+  "image": [
+   "uid"
+  ],
+  "incident_finding": [
+   "activity_id",
+   "category_uid",
+   "class_uid",
+   "finding_info_list",
+   "metadata",
+   "severity_id",
+   "status_id",
+   "time",
+   "type_uid"
+  ],
+  "ja4_fingerprint": [
+   "type_id",
+   "value"
+  ],
+  "job_action": [
+   "type_id"
+  ],
+  "job_trigger": [
+   "type_id"
+  ],
+  "key_value_object": [
+   "name"
+  ],
+  "kill_chain_phase": [
+   "phase_id"
+  ],
+  "long_string": [
+   "value"
+  ],
+  "malware": [
+   "classification_ids"
+  ],
+  "malware_scan_info": [
+   "type_id"
+  ],
+  "metadata": [
+   "product",
+   "version"
+  ],
+  "metric": [
+   "name",
+   "value"
+  ],
+  "network_connection_info": [
+   "direction_id"
+  ],
+  "node": [
+   "uid"
+  ],
+  "note": [
+   "comment"
+  ],
+  "observable": [
+   "type_id"
+  ],
+  "observation": [
+   "value"
+  ],
+  "os": [
+   "name",
+   "type_id"
+  ],
+  "osint": [
+   "type_id",
+   "value"
+  ],
+  "package": [
+   "name",
+   "version"
+  ],
+  "peripheral_device": [
+   "name"
+  ],
+  "port_info": [
+   "port"
+  ],
+  "prev_event": [
+   "uid"
+  ],
+  "process_activity": [
+   "activity_id",
+   "actor",
+   "category_uid",
+   "class_uid",
+   "device",
+   "metadata",
+   "process",
+   "severity_id",
+   "time",
+   "type_uid"
+  ],
+  "programmatic_credential": [
+   "uid"
+  ],
+  "related_event": [
+   "uid"
+  ],
+  "remediation": [
+   "desc"
+  ],
+  "reputation": [
+   "base_score",
+   "score_id"
+  ],
+  "request": [
+   "uid"
+  ],
+  "san": [
+   "name",
+   "type"
+  ],
+  "sbom": [
+   "package",
+   "software_components"
+  ],
+  "script": [
+   "script_content",
+   "type_id"
+  ],
+  "script_activity": [
+   "activity_id",
+   "actor",
+   "category_uid",
+   "class_uid",
+   "device",
+   "metadata",
+   "script",
+   "severity_id",
+   "time",
+   "type_uid"
+  ],
+  "sensor_info": [
+   "sensor_layer_id"
+  ],
+  "software_component": [
+   "name",
+   "version"
+  ],
+  "threat_actor": [
+   "name"
+  ],
+  "tls": [
+   "version"
+  ],
+  "tls_extension": [
+   "type_id"
+  ],
+  "win/reg_key": [
+   "path"
+  ],
+  "win/reg_value": [
+   "name",
+   "path"
+  ],
+  "win/win_service": [
+   "name"
+  ]
+ },
  "deprecated": {
   "actor": {
    "app_name": "Use the `application.name` attribute instead. (since 1.9.0)",
@@ -2191,6 +3066,17 @@
    "cwe_uid": "Use the `related_cwes[*].uid` attribute instead. (since 1.1.0)",
    "cwe_url": "Use the `related_cwes[*].src_url` attribute instead. (since 1.1.0)"
   },
+  "database": {
+   "data_classification": "Use the attribute `data_classifications` instead (since 1.4.0)"
+  },
+  "databucket": {
+   "data_classification": "Use the attribute `data_classifications` instead (since 1.4.0)",
+   "group": "Use the `groups` attribute instead. (since 1.6.0)"
+  },
+  "detection_finding": {
+   "comment": "Use the `notes` attribute instead. (since 1.9.0)",
+   "ticket": "Use `tickets` instead. (since 1.5.0)"
+  },
   "device": {
    "imei": "Use the `imei_list` attribute instead. (since 1.4.0)"
   },
@@ -2210,6 +3096,11 @@
    "flags": "Use `dns_activity.flags` instead. (since 1.9.0)",
    "packet_uid": "Use `dns_activity.transaction_id` instead. (since 1.9.0)"
   },
+  "dns_query": {
+   "opcode": "Use `dns_activity.opcode` instead. (since 1.9.0)",
+   "opcode_id": "Use `dns_activity.opcode_id` instead. (since 1.9.0)",
+   "packet_uid": "Use `dns_activity.transaction_id` instead. (since 1.9.0)"
+  },
   "email": {
    "data_classification": "Use the attribute `data_classifications` instead (since 1.4.0)",
    "delivered_to": "Use the `delivered_to_list` attribute instead. (since 1.4.0)",
@@ -2224,12 +3115,22 @@
   "finding_info": {
    "product_uid": "Use the `product.uid` attribute instead. (since 1.4.0)"
   },
+  "http_response": {
+   "message": "Redundant with the `code` and `status` attributes, which together convey the HTTP status code and its reason phrase. Use `code` for the numeric value and `status` for the human-readable label. (since 1.9.0)"
+  },
   "image": {
    "tag": "Use the `labels` or `tags` attribute instead. (since 1.4.0)"
   },
   "incident_finding": {
    "comment": "Use the `notes` attribute instead. (since 1.9.0)",
    "ticket": "Use `tickets` instead. (since 1.5.0)"
+  },
+  "job": {
+   "cmd_line": "Use the `job_action.cmd_line` attribute instead. (since 1.9.0)",
+   "last_run_time": "Use the `job_trigger.last_run_time` attribute instead. (since 1.9.0)",
+   "last_run_time_dt": "Use the `job_trigger.last_run_time` attribute instead. (since 1.9.0)",
+   "next_run_time": "Use the `job_trigger.next_run_time` attribute instead. (since 1.9.0)",
+   "next_run_time_dt": "Use the `job_trigger.next_run_time` attribute instead. (since 1.9.0)"
   },
   "location": {
    "coordinates": "Use the `lat` and `long` attributes instead. (since 1.2.0)",
@@ -2257,6 +3158,10 @@
   },
   "resource_details": {
    "data_classification": "Use the attribute `data_classifications` instead (since 1.4.0)"
+  },
+  "tls": {
+   "extension_list": "Use the `tls_extension_list` attribute instead. (since 1.1.0)",
+   "sans": "Use `tls.certificate.sans` attribute instead. (since 1.4.0)"
   },
   "user": {
    "credential_uid": "Use `programmatic_credentials` instead. (since 1.6.0)"

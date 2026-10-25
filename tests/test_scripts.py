@@ -24,6 +24,31 @@ XDR_PROFILE = os.path.join(ROOT, "skills", "zerosoc-defender-xdr", "source_profi
 DFB_PROFILE = os.path.join(CAPABILITIES, "zerosoc.capabilities.defender-for-business.json")
 PLACEHOLDER_SOURCES = {"<telemetry source>"}
 FIXTURES = os.path.join(ROOT, "tests", "fixtures")
+PRODUCT = {"name": "Microsoft Defender XDR", "vendor_name": "Microsoft"}
+with open(os.path.join(ROOT, "tools", "ocsf_1.9.0.json"), encoding="utf-8") as _f:
+    OCSF = json.load(_f)
+
+
+def ocsf_lacks(node, kind, path):
+    """What OCSF requires of `node` as a `kind` (a class or an object) that it lacks, and what it carries that
+    OCSF does not declare, all the way down. OCSF's open `object` takes anything."""
+    if kind == "object":
+        return []
+    out = [f"{path}.{name}" for name in OCSF["required"].get(kind, []) if node.get(name) in (None, "", [], {})]
+    for names in (OCSF["constraints"].get(kind) or {}).values():
+        if not any(node.get(n) not in (None, "", [], {}) for n in names):
+            out.append(f"{path}: none of {', '.join(names)}")
+    declared = OCSF["class"].get(kind) or OCSF["objects"].get(kind) or {}
+    for name, value in node.items():
+        kind_of = declared.get(name)
+        if kind_of is None:
+            out.append(f"{path}.{name}: not an attribute of {kind}")
+        elif not kind_of.removesuffix("[]").endswith("_t"):
+            many = kind_of.endswith("[]")
+            for n, item in enumerate(value if many else [value]):
+                if isinstance(item, dict):
+                    out += ocsf_lacks(item, kind_of.removesuffix("[]"), f"{path}.{name}" + (f"[{n}]" if many else ""))
+    return out
 
 
 class TriageRule(unittest.TestCase):
@@ -790,7 +815,7 @@ class ProcessChain(unittest.TestCase):
                              self.row(13, None, name="powershell.exe", command_line=encoded,
                                       decoded_command="Get-Process")])
         graph = chain.as_json(built)
-        again = chain.render(chain.from_ocsf(chain.as_ocsf(graph)))
+        again = chain.render(chain.from_ocsf(chain.as_ocsf(graph, PRODUCT)))
         self.assertEqual(again, chain.render(graph))
         self.assertIn("  $ cmd.exe /c whoami", again)
         self.assertIn("  decoded: D1", again)
@@ -1031,26 +1056,27 @@ class ProcessChainTelemetry(unittest.TestCase):
         stored = json.loads(json.dumps(chain.as_json(self.with_)))
         self.assertEqual(chain.render(stored), chain.as_text(self.with_))
 
-    def test_the_case_keeps_the_chain_in_ocsf_objects(self):
-        observation = chain.as_ocsf(chain.as_json(self.with_))
-        events = observation["related_events"]
-        launches = {e["uid"]: e for e in events if e["type_uid"] == 100701}
+    def test_the_case_keeps_the_chain_as_ocsf_events(self):
+        observation = chain.as_ocsf(chain.as_json(self.with_), PRODUCT)
+        events = observation["events"]
+        launches = {e["metadata"]["uid"]: e for e in events if e["type_uid"] == 100701}
         alerts = [e for e in events if e["type_uid"] == 200401]
         self.assertEqual(len(launches), 45, "a launch per process, the ones telemetry filled in included")
-        self.assertEqual([a["uid"] for a in alerts], [a["alert_id"] for a in chain.legend(self.with_)])
+        self.assertEqual([a["metadata"]["uid"] for a in alerts], [a["alert_id"] for a in chain.legend(self.with_)])
         powershell = next(e for e in launches.values() if e["process"]["pid"] == 3664)
         self.assertEqual([p["pid"] for p in powershell["process"]["ancestry"]], [3424, 5316, 2772, 948, 816, 676],
                          "the extended parentage, the direct parent first")
         self.assertEqual(powershell["process"]["parent_process"]["pid"], 3424)
-        self.assertIn(powershell["uid"], {a["uid"] for alert in alerts for a in alert["evidences"]})
-        filled = {uid for uid, e in launches.items() if e["evidences"][0]["data"].get("source") == "telemetry"}
-        self.assertTrue(filled)
-        self.assertFalse(filled & {a["uid"] for alert in alerts for a in alert["evidences"]},
-                         "an alert cites what its evidence holds, never a process telemetry filled in")
+        self.assertEqual(powershell["actor"]["process"]["pid"], 3424, "the process that launched it")
+        named = {a["process"]["uid"] for alert in alerts for a in alert["evidences"]}
+        self.assertIn(powershell["metadata"]["uid"], named)
+        filled = {uid for uid in launches if uid not in named}
+        self.assertEqual(len(filled), 12, "the processes telemetry filled in: no alert's evidence names them")
         gap = self.node(self.with_, 676)
         self.assertNotIn(f"{gap['device']}|676|{gap['created']}", launches, "a gap is only named as a parent")
-        scripts = [e["script"] for e in launches.values() if e.get("script")]
-        self.assertTrue(scripts and all(s["type_id"] == 2 and s["script_content"] for s in scripts))
+        scripts = [e for e in events if e["type_uid"] == 100901]
+        self.assertTrue(scripts and all(e["script"]["type_id"] == 2 and e["script"]["script_content"] for e in scripts))
+        self.assertTrue(all(e["actor"]["process"]["uid"] in launches for e in scripts), "run by a process the chain holds")
         self.assertEqual(observation["desc"].splitlines()[0], chain.as_text(self.with_).splitlines()[0])
 
     def test_the_text_renders_again_from_the_stored_observation(self):
@@ -1063,8 +1089,9 @@ class ProcessChainTelemetry(unittest.TestCase):
                            {"type": "process", "name": "b.exe", "pid": 12, "device": "ws-01", "alert_ids": ["A"]}])
         self.assertTrue(odd["anomalies"] and odd["unplaced"])
         for built in (self.with_, self.without, live, odd):
-            stored = json.loads(json.dumps(chain.as_ocsf(chain.as_json(built))))
+            stored = json.loads(json.dumps(chain.as_ocsf(chain.as_json(built), PRODUCT)))
             self.assertEqual(chain.render(chain.from_ocsf(stored)), chain.as_text(built))
+            self.assertEqual(chain.as_ocsf(chain.from_ocsf(stored), PRODUCT), stored, "what is kept is read back whole")
 
     def test_the_script_writes_and_reads_the_stored_observation(self):
         import subprocess, sys, tempfile
@@ -1077,10 +1104,16 @@ class ProcessChainTelemetry(unittest.TestCase):
             return subprocess.run([sys.executable, script, *args], cwd=base, capture_output=True, text=True, check=True).stdout
 
         with open(os.path.join(base, "observation.json"), "w", encoding="utf-8") as f:
-            f.write(run("evidence.json", "--ocsf"))
+            f.write(run("evidence.json", "--ocsf", f"--profile={XDR_PROFILE}"))
         self.assertEqual(run("--from-graph", "observation.json"), run("evidence.json"))
         with open(os.path.join(base, "observation.json"), encoding="utf-8") as f:
-            self.assertEqual(json.loads(run("--from-graph", "observation.json", "--ocsf")), json.load(f))
+            kept = json.load(f)
+        # the kept events name their product, so reading them back needs no profile
+        self.assertEqual(json.loads(run("--from-graph", "observation.json", "--ocsf")), kept)
+        self.assertEqual({e["metadata"]["product"]["name"] for e in kept["events"]}, {"Microsoft Defender XDR"})
+        refused = subprocess.run([sys.executable, script, "evidence.json", "--ocsf"], cwd=base, capture_output=True, text=True)
+        self.assertEqual(refused.returncode, 2, "an event names the product that reported it, which only a profile says")
+        self.assertIn("--profile", refused.stderr)
 
     def test_one_script_shared_by_two_processes_is_printed_once(self):
         rows = [{"type": "process", "name": "powershell.exe", "pid": pid, "created": created, "device": "ws-01",
@@ -1091,6 +1124,115 @@ class ProcessChainTelemetry(unittest.TestCase):
         self.assertEqual(text.count("decoded: D1"), 2)
         self.assertIn("run by powershell.exe 10, powershell.exe 11", text)
 
+
+class ChainKeptAsEvents(unittest.TestCase):
+    """The chain as the Case keeps it (framework DD-30): the Observation cites, and the events are OCSF events of
+    their own class. A small chain with every kind of entry: a root whose parent no row names, a process two
+    alerts cite with different rows, a decoded command, a gap, an unplaced row and the source's state."""
+
+    ALERTS = {"da-1": {"title": "Suspicious PowerShell", "severity": "high", "created_time": 1757761500000},
+              "da-2": {"title": "Whoami run from a script", "severity": "medium", "created_time": 1757761560000}}
+
+    @classmethod
+    def setUpClass(cls):
+        with open(os.path.join(FIXTURES, "chain_small_evidence.json"), encoding="utf-8") as f:
+            cls.rows = json.load(f)
+        cls.built = chain.build(cls.rows)
+        cls.kept = json.loads(json.dumps(chain.as_ocsf(chain.as_json(cls.built, cls.ALERTS), PRODUCT)))
+        cls.events = {e["metadata"]["uid"]: e for e in cls.kept["events"]}
+
+    def launch(self, pid):
+        return next(e for e in self.kept["events"] if e["type_uid"] == 100701 and e["process"].get("pid") == pid)
+
+    def test_every_event_is_what_ocsf_requires_of_its_class(self):
+        classes = {1007: "process_activity", 1009: "script_activity", 2004: "detection_finding"}
+        with open(os.path.join(FIXTURES, "winrm_case_evidence.json"), encoding="utf-8") as f:
+            evidence = json.load(f)
+        with open(os.path.join(FIXTURES, "winrm_case_telemetry.json"), encoding="utf-8") as f:
+            larger = chain.as_ocsf(chain.as_json(chain.build(evidence, json.load(f))), PRODUCT)
+        for kept in (self.kept, larger):
+            for event in kept["events"]:
+                uid = event["metadata"]["uid"]
+                self.assertEqual(event["type_uid"], event["class_uid"] * 100 + event["activity_id"])
+                self.assertEqual(event["metadata"]["version"], OCSF["ocsf_version"])
+                # what the evidence does not say is not made up: a root no row names a parent of has no actor,
+                # an unplaced row no time or device, and an alert alerts.json gives no time none either
+                said = {f"{uid}.{k}" for k in ("actor", "time", "device")}
+                lacks = ocsf_lacks(event, classes[event["class_uid"]], uid)
+                self.assertEqual([gap for gap in lacks if gap not in said], [], uid)
+        self.assertNotIn("actor", self.launch(100), "no row names explorer.exe's parent")
+        timed = [e for e in self.kept["events"] if e["type_uid"] == 200401 and e["metadata"]["uid"] in self.ALERTS]
+        self.assertTrue(timed and all("time" in e for e in timed), "an alert alerts.json gives a time to has it")
+
+    def test_a_citation_names_an_event_and_says_what_and_when_it_was(self):
+        citations = self.kept["related_events"]
+        self.assertEqual(sorted(c["uid"] for c in citations), sorted(self.events), "each event cited once")
+        for c in citations:
+            event = self.events[c["uid"]]
+            self.assertLessEqual(set(c), {"uid", "type_uid", "type_name", "title", "first_seen_time"})
+            self.assertEqual((c["type_uid"], c["type_name"]), (event["type_uid"], event["type_name"]))
+            self.assertEqual(c.get("first_seen_time"), event.get("time"))
+            self.assertEqual(ocsf_lacks(c, "related_event", c["uid"]), [])
+
+    def test_an_alert_names_each_process_as_its_rows_reported_it(self):
+        whoami = self.events["da-2"]
+        self.assertEqual((whoami["severity_id"], whoami["time"], whoami["finding_info"]),
+                         (3, 1757761560000, {"uid": "da-2", "title": "Whoami run from a script"}))
+        named = [(a["process"]["pid"], a.get("verdict"), a["process"].get("cmd_line", "")[:25], a.get("data"))
+                 for a in whoami["evidences"]]
+        self.assertEqual(named, [
+            (200, "malicious", "powershell.exe -EncodedCo", {"remediation_status": "remediated", "detection_status": "detected"}),
+            (200, "suspicious", "powershell.exe -NoProfile", None),
+            (300, "unknown", "cmd.exe /c whoami", None),
+        ])
+        self.assertTrue(all(a["verdict_id"] == 99 for a in whoami["evidences"]), "the source's own word, as Other")
+        shared = {a["uid"] for a in self.events["da-1"]["evidences"]} & {a["uid"] for a in whoami["evidences"]}
+        self.assertEqual(len(shared), 1, "a row both alerts cite is one row")
+
+    def test_a_decoded_command_is_a_script_activity_its_process_ran(self):
+        powershell = self.launch(200)
+        (run,) = [e for e in self.kept["events"] if e["type_uid"] == 100901]
+        self.assertEqual(run["actor"]["process"]["uid"], powershell["metadata"]["uid"])
+        self.assertEqual((run["script"]["type"], run["script"]["script_content"]), ("PowerShell", "Get-Process; whoami"))
+        self.assertEqual(run["time"], powershell["time"])
+        (decoded,) = powershell["enrichments"]
+        self.assertEqual((decoded["name"], decoded["type"], decoded["data"]),
+                         ("process.cmd_line", "decoded command", {"script_uid": run["script"]["uid"], "decode_rounds": 2}))
+
+    def test_a_launch_names_the_process_that_launched_it(self):
+        self.assertEqual(self.launch(200)["actor"]["process"]["name"], "explorer.exe")
+        cmd = self.launch(300)
+        self.assertEqual((cmd["actor"]["process"]["pid"], cmd["actor"]["process"]["name"]), (250, "conhost.exe"),
+                         "a parent the evidence does not show, with what is known of it")
+        self.assertNotIn("ws-02|250|2026-09-13T11:05:30Z", self.events, "a gap is no event of its own")
+
+    def test_what_ocsf_s_process_has_no_attribute_for_is_in_its_extended_attributes(self):
+        powershell = self.launch(200)
+        process = powershell["process"]
+        self.assertEqual(process["user"], {"name": "lab\\anna", "uid": "S-1-5-21-1001", "email_addr": "anna@lab.local"})
+        self.assertEqual(powershell["device"], {"hostname": "ws-02", "type_id": 0, "uid": "2f7c0a"})
+        self.assertEqual(process["xattributes"]["token_elevation"], "TokenElevationTypeFull")
+        self.assertEqual(len(process["xattributes"]["cmd_lines"]), 2, "every command line the rows gave it")
+        self.assertEqual(process["file"]["hashes"], [{"algorithm_id": 3, "algorithm": "SHA-256", "value": "ab" * 32}])
+
+    def test_an_alert_that_cites_only_an_unplaced_process_has_no_label(self):
+        unplaced = self.events["da-3"]
+        self.assertEqual([a["process"]["uid"] for a in unplaced["evidences"]], ["unplaced:1"])
+        again = chain.from_ocsf(self.kept)
+        self.assertEqual([a["alert_id"] for a in again["alerts"]], ["da-1", "da-2"])
+        self.assertEqual(again["unplaced"][0]["alert_ids"], ["da-3"])
+
+    def test_the_kept_chain_renders_and_reads_back_whole(self):
+        self.assertEqual(chain.render(chain.from_ocsf(self.kept)), chain.as_text(self.built, self.ALERTS))
+        self.assertEqual(chain.as_ocsf(chain.from_ocsf(self.kept), PRODUCT), self.kept)
+
+    def test_a_chain_kept_before_its_events_renders_as_it_did(self):
+        # written by the script before framework DD-30: each process on its citation
+        with open(os.path.join(FIXTURES, "chain_kept_before_dd30.json"), encoding="utf-8") as f:
+            legacy = json.load(f)
+        self.assertNotIn("events", legacy)
+        alerts = {k: {"title": v["title"]} for k, v in self.ALERTS.items()}
+        self.assertEqual(chain.render(chain.from_ocsf(legacy)), chain.as_text(self.built, alerts))
 
 class RunCheck(unittest.TestCase):
     """The acceptance harness for a live run: it must catch a ledger that reports what it did not do."""

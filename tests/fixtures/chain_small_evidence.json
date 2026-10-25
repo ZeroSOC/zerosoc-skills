@@ -1,0 +1,79 @@
+[
+ {
+  "type": "process",
+  "name": "explorer.exe",
+  "pid": 100,
+  "created": "2026-09-13T11:00:00Z",
+  "device": "ws-02",
+  "alert_ids": [
+   "da-1"
+  ],
+  "verdict": "suspicious"
+ },
+ {
+  "type": "process",
+  "name": "powershell.exe",
+  "pid": 200,
+  "created": "2026-09-13T11:05:00Z",
+  "device": "ws-02",
+  "parent_pid": 100,
+  "parent_created": "2026-09-13T11:00:00Z",
+  "parent_name": "explorer.exe",
+  "alert_ids": [
+   "da-1",
+   "da-2"
+  ],
+  "command_line": "powershell.exe -EncodedCommand RwBlAHQALQBQAHIAbwBjAGUAcwBzADsAIAB3AGgAbwBhAG0AaQA=",
+  "decoded_command": "Get-Process; whoami",
+  "decode_rounds": 2,
+  "verdict": "malicious",
+  "remediation_status": "remediated",
+  "detection_status": "detected",
+  "sha256": "abababababababababababababababababababababababababababababababab",
+  "path": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0",
+  "account": "lab\\anna",
+  "user_sid": "S-1-5-21-1001",
+  "upn": "anna@lab.local",
+  "mde_device_id": "2f7c0a",
+  "elevation_token": "TokenElevationTypeFull"
+ },
+ {
+  "type": "process",
+  "name": "powershell.exe",
+  "pid": 200,
+  "created": "2026-09-13T11:05:00Z",
+  "device": "ws-02",
+  "parent_pid": 100,
+  "parent_created": "2026-09-13T11:00:00Z",
+  "alert_ids": [
+   "da-2"
+  ],
+  "command_line": "powershell.exe -NoProfile",
+  "verdict": "suspicious"
+ },
+ {
+  "type": "process",
+  "name": "cmd.exe",
+  "pid": 300,
+  "created": "2026-09-13T11:06:00Z",
+  "device": "ws-02",
+  "parent_pid": 250,
+  "parent_created": "2026-09-13T11:05:30Z",
+  "parent_name": "conhost.exe",
+  "alert_ids": [
+   "da-2"
+  ],
+  "command_line": "cmd.exe /c whoami",
+  "verdict": "unknown"
+ },
+ {
+  "type": "process",
+  "name": "b.exe",
+  "pid": 12,
+  "device": "ws-02",
+  "alert_ids": [
+   "da-3"
+  ],
+  "command_line": "b.exe /x"
+ }
+]

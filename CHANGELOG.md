@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+- **Framework pin to `48c2ddd`, and the process chain is kept as OCSF events (framework #118, DD-30).**
+  `process_chain.py --ocsf` prints the chain's Observation (`desc` and `related_events`) and, in
+  `events`, the OCSF events it cites, each citation's `uid` the event's `metadata.uid`. A process is a
+  Process Activity (Launch) with its parentage in `parent_process` and `ancestry` and the process
+  that launched it as the `actor`. A decoded command is a Script Activity (Execute) its process ran,
+  and the number of layers it was encoded in is an enrichment of the command line. An alert that
+  cites a process is a Detection Finding whose `evidences` name each process as the alert's row
+  reported it, with the source's verdict (Other, the source's own word) and its remediation and
+  detection state. The events name the product that reported them, read from the source profile
+  (`--bindings` or `--profile`), and `alerts.json` may give an alert's `severity` and
+  `created_time`, which its Detection Finding carries. A chain kept before DD-30, with each process
+  on its citation, still renders. The chain's JSON keeps each evidence row as its alerts reported it.
+  The process image is an OCSF file with its name and type, the folder the rows give in
+  `parent_folder` and the full path in `path`. `tools/ocsf_extract.py` now also reads the Detection
+  Finding, Process Activity and Script Activity classes and what OCSF requires of each class and
+  object, and a test checks every event the chain prints against them.
 - **Framework pin to `6a427b0`, and the skills follow it (framework #117).** A Case is identified by
   `metadata.correlation_uid` (DD-29): the defender-xdr profile lands an incident's identifier there,
   and in `metadata.original_event_uid`. OCSF 1.9 deprecates a finding's `comment` for `notes`, so the
