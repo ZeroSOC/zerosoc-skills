@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Framework pin to `6a427b0`, and the skills follow it (framework #117).** A Case is identified by
+  `metadata.correlation_uid` (DD-29): the defender-xdr profile lands an incident's identifier there,
+  and in `metadata.original_event_uid`. OCSF 1.9 deprecates a finding's `comment` for `notes`, so the
+  remark an incident was resolved with is one more note of the Case. `tools/ocsf_extract.py` keeps
+  OCSF's deprecations in `tools/ocsf_<version>.json`, and `tools/check_profiles.py` refuses a target
+  OCSF deprecates, with what OCSF says to use instead.
 - **The defender-xdr profile fills only objects OCSF accepts.** A comment's author lands on
   `notes[].owner.name`: an OCSF user needs an account, a name or a uid, and the name the source
   gives (`User-` and a person's sign-in name, or `API-App:` and an application's display name) is

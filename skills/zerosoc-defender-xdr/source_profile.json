@@ -509,10 +509,10 @@
     {
       "path": "id",
       "case": [
-        "uid",
+        "metadata.correlation_uid",
         "metadata.original_event_uid"
       ],
-      "note": "A Case of one incident takes the incident's identifier as its uid. original_event_uid keeps the source's identifier on every Case, a campaign Case among them, whose uid is its own"
+      "note": "A Case of one incident takes the incident's identifier as its own, metadata.correlation_uid. original_event_uid keeps the source's identifier on every Case, a campaign Case among them, whose identifier is its own"
     },
     {
       "path": "displayName",
@@ -602,8 +602,8 @@
     },
     {
       "path": "resolvingComment",
-      "case": "comment",
-      "note": "the remark left on the incident when it was resolved in the source. One this executor wrote there is its own closure, which its Note states, and is left out"
+      "case": "notes[].comment",
+      "note": "the remark the incident was resolved with in the source, as one note of the Case: OCSF deprecates the finding's comment for notes. One this executor wrote there is its own closure, which its Note states, and is left out"
     },
     {
       "path": "customTags",

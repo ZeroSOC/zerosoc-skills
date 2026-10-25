@@ -10,7 +10,7 @@ required_data_sources:
   - API gateway logs
 status: draft
 ---
-<!-- generated from zerosoc-framework@ecabc9362cc9 : 04-Playbooks/01-Triage/application.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@6a427b0190ed : 04-Playbooks/01-Triage/application.md — do not edit; regenerate with tools/build_references.py -->
 
 # Application Triage Playbook
 
