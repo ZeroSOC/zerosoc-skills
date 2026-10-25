@@ -4,8 +4,9 @@ The documents under fixtures/documents are **samples**: every key and every enum
 source sends, and every value is invented. The case_map was measured against real records of a
 tenant — 155 distinct paths, all of them in the map and none in the map that the records lack —
 and those records are not published, because a tenant's incidents name its people and its
-addresses. The samples carry every path of the map, so the guard below runs over the whole shape
-of a record, and a real record dropped beside them is checked the same way.
+addresses. Three more, the keys of a comment on an alert, which those records did not carry, are
+the source's documented shape. The samples carry every path of the map, so the guard below runs
+over the whole shape of a record, and a real record dropped beside them is checked the same way.
 
 The point of the case_map is that it is executable. Over one recorded incident, 15 of 49 distinct
 keys of this source's records were read by nothing here — some read elsewhere, some deliberately
@@ -45,6 +46,16 @@ def paths_of(node: Any, prefix: str = "", found: set[str] | None = None) -> set[
     return found
 
 
+def kept_whole(profile: dict[str, Any]) -> set[str]:
+    """The paths of the record whose value the source's object keeps whole, as its own key-value pairs."""
+    return {held["from"] for _at, held in check_profiles._filled(profile["extension"]["properties"], "")
+            if held["type"] == "object"}
+
+
+def within(path: str, whole: set[str]) -> bool:
+    return any(path.startswith(w + ".") or path.startswith(w + "[]") for w in whole)
+
+
 class SourceProfile(unittest.TestCase):
     def setUp(self) -> None:
         self.assertTrue(PROFILES, "no source profile to check")
@@ -64,13 +75,14 @@ class SourceProfile(unittest.TestCase):
     def test_every_key_of_a_recorded_document_is_mapped_or_ignored(self) -> None:
         profile = json.loads((ROOT / "skills" / "zerosoc-defender-xdr" / "source_profile.json").read_text())
         known = {entry["path"] for entry in profile["case_map"]}
+        whole = kept_whole(profile)
         documents = sorted(DOCUMENTS.glob("*.json"))
         self.assertTrue(documents, "no sample document to check the profile against")
 
         unexamined: dict[str, str] = {}
         for document in documents:
             for path in paths_of(json.loads(document.read_text())):
-                if path not in known:
+                if path not in known and not within(path, whole):
                     unexamined.setdefault(path, document.name)
 
         self.assertEqual(
@@ -123,6 +135,20 @@ class SourceProfile(unittest.TestCase):
         del document["alerts"][0]["newVendorFieldNobodyExamined"]
         self.assertEqual({p for p in paths_of(document) if p not in known}, set())
 
+    def test_a_key_of_a_bag_the_sources_object_keeps_whole_is_the_detections_own(self) -> None:
+        """A custom detection names its own keys, so they are no paths of the source's record: the
+        bag lands whole in the source's object. A key beside the bag is still the vendor's."""
+        profile = json.loads((ROOT / "skills" / "zerosoc-defender-xdr" / "source_profile.json").read_text())
+        known = {entry["path"] for entry in profile["case_map"]}
+        whole = kept_whole(profile)
+        self.assertEqual(whole, {"alerts[].customDetails", "alerts[].additionalData"})
+        document = json.loads((DOCUMENTS / "incident_ransomware.json").read_text())
+        document["alerts"][0]["customDetails"] = {"TargetShare": "\\\\fs01\\finance", "Hits": ["a", "b"]}
+        document["alerts"][0]["customDetailsNew"] = "a vendor key beside the bag"
+
+        self.assertEqual({p for p in paths_of(document) if p not in known and not within(p, whole)},
+                         {"alerts[].customDetailsNew"})
+
     def test_an_ignored_path_states_a_reason(self) -> None:
         for path, profile in self.profiles.items():
             for entry in profile["case_map"]:
@@ -157,17 +183,92 @@ class Coherence(unittest.TestCase):
         return json.loads((ROOT / "skills" / "zerosoc-defender-xdr" / "references" / "framework"
                            / "02-Taxonomy" / "case_schema.json").read_text())
 
-    def test_every_mapped_path_lands_on_a_field_the_case_schema_declares(self) -> None:
+    def test_every_mapped_path_lands_on_a_field_the_case_schema_or_ocsf_declares(self) -> None:
         self.assertEqual(check_profiles.lands(self.profile, self.case_schema(), "p"), [])
 
     def test_a_target_the_case_schema_does_not_declare_is_said_even_on_an_open_object(self) -> None:
         self.profile["case_map"][0]["case"] = "no_such_case_field"
         self.profile["case_map"].append({"path": "alerts[].x", "case": "finding_info_list[].severity_id"})
-        self.profile["case_map"].append({"path": "alerts[].y", "case": "microsoft.no_such_extension_property"})
+        self.profile["case_map"].append({"path": "alerts[].y", "case": "unmapped.microsoft.no_such_extension_property"})
+        self.profile["case_map"].append({"path": "alerts[].z", "case": "metadata.no_such_attribute"})
+        self.profile["case_map"].append({"path": "alerts[].w", "case": "src_url[]"})
         found = "\n".join(check_profiles.lands(self.profile, self.case_schema(), "p"))
-        self.assertIn("no_such_case_field", found)
-        self.assertIn("finding_info_list[].severity_id", found)
-        self.assertIn("no_such_extension_property", found)
+        self.assertIn("'no_such_case_field', which neither the Case Schema nor OCSF", found)
+        self.assertIn("'finding_info_list[].severity_id', which neither", found)
+        self.assertIn("'unmapped.microsoft.no_such_extension_property', which the source's object", found)
+        self.assertIn("'metadata.no_such_attribute', which neither", found)
+        self.assertIn("'src_url[]', which neither", found, "a [] step on an attribute that holds no list")
+
+    def test_an_attribute_the_framework_leaves_to_ocsf_is_a_target_as_ocsf_declares_it(self) -> None:
+        """DD-23: the Case Schema states only what OCSF leaves open, and any other attribute of the
+        class is used as OCSF defines it. Each target here is one the Case Schema does not state."""
+        schema = self.case_schema()
+        ocsf = check_profiles.ocsf_for(schema)
+        for target in ("src_url", "priority", "status_code", "comment", "metadata.tenant_uid", "metadata.labels[]",
+                       "notes[].owner.display_name", "finding_info_list[].src_url",
+                       "finding_info_list[].related_analytics[].uid",
+                       "finding_info_list[].tags[].name"):
+            with self.subTest(target=target):
+                self.assertFalse(check_profiles._declared(target, schema, schema), "the Case Schema states it")
+                self.assertTrue(check_profiles._declared(target, schema, schema, ocsf))
+        for target in ("metadata.tenant_id", "notes[].owner.displayName", "finding_info_list[].src_url.host",
+                       "metadata[].labels", "zerosoc.no_such_field"):
+            with self.subTest(target=target):
+                self.assertFalse(check_profiles._declared(target, schema, schema, ocsf))
+
+    def test_the_ocsf_release_the_case_schema_follows_has_been_extracted(self) -> None:
+        for skill in sorted(ROOT.glob("skills/*/references/framework/02-Taxonomy/case_schema.json")):
+            schema = json.loads(skill.read_text())
+            with self.subTest(skill=skill.parts[-5]):
+                ocsf = check_profiles.ocsf_for(schema)
+                self.assertIsNotNone(ocsf, f"run python3 tools/ocsf_extract.py {schema.get('ocsf_version')}")
+                self.assertEqual(ocsf["ocsf_version"], schema["ocsf_version"])
+        schema = {**self.case_schema(), "ocsf_version": "0.0.1"}
+        found = "\n".join(check_profiles.lands(self.profile, schema, "p"))
+        self.assertIn("tools/ocsf_0.0.1.json is not there", found)
+        self.assertIn("python3 tools/ocsf_extract.py 0.0.1", found)
+
+    def test_the_sources_own_object_is_under_unmapped_and_nowhere_else(self) -> None:
+        """Case Schema §4 (framework #116): one object per source, under unmapped, keyed by the
+        source's own identifier. The Case's root holds OCSF's attributes and the framework's."""
+        self.profile["case_map"].append({"path": "alerts[].x", "case": "microsoft.description"})
+        self.profile["case_map"].append({"path": "alerts[].y", "case": "unmapped.another_source.description"})
+        self.profile["case_map"].append({"path": "alerts[].z", "case": "unmapped.microsoft.description"})
+        found = check_profiles.lands(self.profile, self.case_schema(), "p")
+        self.assertEqual([p.split(" lands on ")[1].split(",")[0] for p in found],
+                         ["'microsoft.description'", "'unmapped.another_source.description'"])
+
+    def test_the_sources_object_declares_items_of_an_alert_and_keeps_free_form_bags_whole(self) -> None:
+        schema = self.case_schema()
+        for target, declared in (("unmapped.microsoft.alerts[].custom_details", True),
+                                 ("unmapped.microsoft.alerts[].categories[]", True),
+                                 ("unmapped.microsoft.alerts[]", True),
+                                 ("unmapped.microsoft.alerts[].custom_details.reason", False),
+                                 ("unmapped.microsoft.alerts.uid", False),
+                                 ("unmapped.microsoft.summary[]", False)):
+            with self.subTest(target=target):
+                self.profile["case_map"] = [e for e in self.profile["case_map"] if e["path"] != "alerts[].x"]
+                self.profile["case_map"].append({"path": "alerts[].x", "case": target})
+                self.assertEqual(check_profiles.lands(self.profile, schema, "p") == [], declared)
+
+    def test_a_property_of_the_sources_object_is_filled_by_the_path_it_says(self) -> None:
+        summary = next(e for e in self.profile["case_map"] if e["path"] == "summary")
+        summary["case"] = "message"
+        found = "\n".join(check_profiles.lands(self.profile, self.case_schema(), "p"))
+        self.assertIn("extension property 'summary' is read from 'summary', whose case_map entry does not land on "
+                      "'unmapped.microsoft.summary'", found)
+
+    def test_an_array_of_the_sources_object_says_what_its_items_are(self) -> None:
+        held = self.profile["extension"]["properties"]
+        held["alerts"]["items"]["properties"]["categories"].pop("items")
+        held["summary"]["items"] = {"type": "string"}
+        held["alerts"]["items"]["properties"]["uid"]["from"] = "alerts[].no_such_path"
+        found = self.problems()
+        self.assertIn("extension.alerts[].categories is an array without items", found)
+        self.assertIn("extension.summary is no array, with items", found)
+        self.assertIn("extension.alerts[].uid reads 'alerts[].no_such_path'", found)
+        held["alerts"]["items"] = {"type": "string", "properties": {}}
+        self.assertIn("extension.alerts.items declares both a type and properties", self.problems())
 
     def test_an_alerts_severity_lands_on_its_detection_finding_and_on_the_observations_confidence(self) -> None:
         entry = next(e for e in self.profile["case_map"] if e["path"] == "alerts[].severity")

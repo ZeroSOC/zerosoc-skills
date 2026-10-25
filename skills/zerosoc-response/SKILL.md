@@ -4,7 +4,7 @@ description: Respond to a confirmed Incident under the ZeroSOC Framework (Phase 
 license: Apache-2.0
 metadata:
   version: "0.4.1"
-  framework: "zerosoc-framework@e422bde (2026-10-23)"
+  framework: "zerosoc-framework@ecabc93 (2026-10-25)"
   status: draft
   author: ZeroSOC
 ---

@@ -9,6 +9,9 @@ failed was silently nothing.
 The validator covers the subset of JSON Schema the profile schema uses. A keyword it does not know
 is an error rather than a pass, so the schema cannot quietly outgrow the check.
 
+A mapped path lands on what the Case Schema declares or, where the framework leaves an attribute of the
+OCSF class to OCSF (DD-23), on what that OCSF release declares, read from tools/ocsf_<version>.json.
+
 Standard library only. Exit 1 on any violation.
 
 A deployment that lays a local override over a shipped profile checks its binding: the override
@@ -31,6 +34,8 @@ from typing import Any
 ROOT = Path(__file__).resolve().parent.parent
 SCHEMA = ROOT / "capabilities" / "source_profile.schema.json"
 OVERRIDE_SCHEMA = ROOT / "capabilities" / "source_profile_override.schema.json"
+OCSF_CLASS = "incident_finding"
+"""The OCSF class a Case maps to: where a target the Case Schema does not state is looked up."""
 
 sys.path.insert(0, str(ROOT / "tools" / "shared"))
 import source_profile  # noqa: E402
@@ -194,23 +199,70 @@ def coherent(profile: dict[str, Any], where: str) -> list[str]:
                 problems.append(
                     f"{where}: fields.{group}.{name} reads {path!r}, which the case_map does not name"
                 )
-    for name, held in profile["extension"]["properties"].items():
-        if held["from"] not in paths:
-            problems.append(f"{where}: extension.{name} reads {held['from']!r}, which the case_map does not name")
+    problems += _extension(profile["extension"]["properties"], "", paths, where)
     return problems
 
 
-def _declared(target: str, schema: dict[str, Any], root: dict[str, Any]) -> bool:
-    """Whether the Case Schema declares a dotted path. An open object is no excuse: an OCSF object
-    takes any attribute, and a target nothing declares is a target nobody will read."""
+def _extension(properties: dict[str, Any], at: str, paths: set[str], where: str) -> list[str]:
+    """The source's own object, property by property: each read from a path the case_map names, and
+    an array, and only an array, saying what its items are."""
+    problems: list[str] = []
+    for name, held in properties.items():
+        here = f"{at}.{name}"
+        if held["from"] not in paths:
+            problems.append(f"{where}: extension{here} reads {held['from']!r}, which the case_map does not name")
+        items = held.get("items")
+        if (held["type"] == "array") != (items is not None):
+            problems.append(f"{where}: extension{here} is {'an array without' if items is None else 'no array, with'} "
+                            "items; an array, and only an array, declares what its items are")
+        elif items is not None and ("type" in items) == ("properties" in items):
+            problems.append(f"{where}: extension{here}.items declares {'both' if 'type' in items else 'neither'} "
+                            "a type and properties; its items are one or the other")
+        elif items is not None and "properties" in items:
+            problems += _extension(items["properties"], f"{here}[]", paths, where)
+    return problems
+
+
+def ocsf_for(case_schema: dict[str, Any]) -> dict[str, Any] | None:
+    """The attributes of the OCSF release the Case Schema follows, as tools/ocsf_extract.py wrote
+    them, or None where that release has not been extracted."""
+    held = ROOT / "tools" / f"ocsf_{case_schema.get('ocsf_version')}.json"
+    return json.loads(held.read_text(encoding="utf-8")) if held.exists() else None
+
+
+def _in_ocsf(steps: list[str], kind: str, ocsf: dict[str, Any]) -> bool:
+    """Whether OCSF declares the rest of a path, from its class or from an object of this kind."""
+    for n, step in enumerate(steps):
+        name, into_list = (step[:-2], True) if step.endswith("[]") else (step, False)
+        declared = (ocsf["class"].get(kind) or ocsf["objects"].get(kind) or {}).get(name)
+        if declared is None:
+            return False
+        many = declared.endswith("[]")
+        # a [] step needs a list, and a list is passed through only by a [] step, unless it ends the path
+        if (into_list and not many) or (many and not into_list and n < len(steps) - 1):
+            return False
+        kind = declared.removesuffix("[]")
+    return True
+
+
+def _declared(target: str, schema: dict[str, Any], root: dict[str, Any],
+              ocsf: dict[str, Any] | None = None) -> bool:
+    """Whether the Case Schema declares a dotted path, or OCSF does where the Case Schema stops at an
+    OCSF object (its class at the root, `x-ocsf-object` below it) and states no more of it: the
+    framework states only what OCSF leaves open, and any other attribute of the class is used as OCSF
+    defines it (DD-23). An open object is no excuse: a target nothing declares is a target nobody
+    will read."""
     node: dict[str, Any] = schema
-    for step in target.split("."):
+    steps = target.split(".")
+    for n, step in enumerate(steps):
         name, into_list = (step[:-2], True) if step.endswith("[]") else (step, False)
         while "$ref" in node:
             node = root["$defs"][node["$ref"].split("/")[-1]]
-        node = (node.get("properties") or {}).get(name)
-        if node is None:
-            return False
+        kind = OCSF_CLASS if node is schema else node.get("x-ocsf-object")
+        held = (node.get("properties") or {}).get(name)
+        if held is None:
+            return kind is not None and ocsf is not None and _in_ocsf(steps[n:], kind, ocsf)
+        node = held
         while "$ref" in node:
             node = root["$defs"][node["$ref"].split("/")[-1]]
         if into_list:
@@ -218,20 +270,49 @@ def _declared(target: str, schema: dict[str, Any], root: dict[str, Any]) -> bool
     return True
 
 
+def _extension_declares(target: str, properties: dict[str, Any]) -> bool:
+    """Whether the source's own object declares a dotted path: a property, an item of an array, or a
+    property of an item. The keys of an object it keeps whole are the source's, and none is a target."""
+    steps = target.split(".")
+    for n, step in enumerate(steps):
+        name, into_list = (step[:-2], True) if step.endswith("[]") else (step, False)
+        held = properties.get(name)
+        last = n == len(steps) - 1
+        if held is None or (into_list and held["type"] != "array"):
+            return False
+        if last:
+            return True
+        properties = ((held.get("items") or {}).get("properties") or {}) if into_list else {}
+    return False
+
+
 def lands(profile: dict[str, Any], case_schema: dict[str, Any], where: str) -> list[str]:
-    """Every mapped path lands on a field the pinned Case Schema declares, or on a property of the
-    source's own extension object, which the profile itself declares."""
+    """Every mapped path lands on a field the pinned Case Schema declares, on an attribute of the
+    OCSF class it maps the Case to, or on a property of the source's own object under unmapped,
+    which the profile itself declares and fills from the paths that land there."""
     problems: list[str] = []
-    own = profile["extension"]["key"]
+    version = case_schema.get("ocsf_version")
+    ocsf = ocsf_for(case_schema)
+    if ocsf is None:
+        problems.append(f"{where}: the Case Schema follows OCSF {version}, and tools/ocsf_{version}.json is not "
+                        f"there to read its attributes from: run python3 tools/ocsf_extract.py {version}")
+    own = f"unmapped.{profile['extension']['key']}."
+    landed: dict[str, list[str]] = {}
     for entry in profile["case_map"]:
         targets = entry.get("case") or []
         for target in [targets] if isinstance(targets, str) else targets:
-            if target.startswith(f"{own}."):
-                ok = target[len(own) + 1:] in profile["extension"]["properties"]
-            else:
-                ok = _declared(target, case_schema, case_schema)
-            if not ok:
-                problems.append(f"{where}: {entry['path']!r} lands on {target!r}, which the Case Schema does not declare")
+            landed.setdefault(entry["path"], []).append(target)
+            if target.startswith(own):
+                if not _extension_declares(target[len(own):], profile["extension"]["properties"]):
+                    problems.append(f"{where}: {entry['path']!r} lands on {target!r}, which the source's "
+                                    "object (extension) does not declare")
+            elif not _declared(target, case_schema, case_schema, ocsf):
+                problems.append(f"{where}: {entry['path']!r} lands on {target!r}, which neither the Case Schema "
+                                f"nor OCSF {version} declares")
+    for at, held in _filled(profile["extension"]["properties"], ""):
+        if not any(t in (own + at, own + at + "[]") for t in landed.get(held["from"], [])):
+            problems.append(f"{where}: extension property {at!r} is read from {held['from']!r}, whose case_map "
+                            f"entry does not land on {own + at!r}")
     # a vocabulary turns the source's word into a value of the Case: it has to be one the Case has
     for name, field in (("severity", "severity_id"), ("status", "status_id"), ("verdict", "verdict_id")):
         allowed = (case_schema.get("properties") or {}).get(field, {}).get("enum")
@@ -271,6 +352,16 @@ def _determination(profile: dict[str, Any], case_schema: dict[str, Any], where: 
             problems.append(f"{where}: verdict {verdict} has {len(sole)} determinations marked `only` "
                             f"({', '.join(sole)}); `only` says there is nothing to choose")
     return problems
+
+
+def _filled(properties: dict[str, Any], at: str) -> list[tuple[str, dict[str, Any]]]:
+    """Each property of the source's object, at its path within it."""
+    out: list[tuple[str, dict[str, Any]]] = []
+    for name, held in properties.items():
+        here = f"{at}.{name}" if at else name
+        out.append((here, held))
+        out += _filled(((held.get("items") or {}).get("properties") or {}), f"{here}[]")
+    return out
 
 
 def case_schema_beside(path: Path) -> dict[str, Any] | None:

@@ -5,7 +5,7 @@
     "product": "Microsoft Defender XDR",
     "api": "Microsoft Graph security API",
     "api_version": "v1.0",
-    "profile_version": "2026-09-21",
+    "profile_version": "2026-10-25",
     "description": "An incident of this source is a Case: same identifier, its alerts the Case's alerts, its evidence the Case's observables."
   },
   "fields": {
@@ -379,6 +379,64 @@
         "type": "Other"
       }
     },
+    "tactics": {
+      "Reconnaissance": {
+        "uid": "TA0043",
+        "name": "Reconnaissance"
+      },
+      "ResourceDevelopment": {
+        "uid": "TA0042",
+        "name": "Resource Development"
+      },
+      "InitialAccess": {
+        "uid": "TA0001",
+        "name": "Initial Access"
+      },
+      "Execution": {
+        "uid": "TA0002",
+        "name": "Execution"
+      },
+      "Persistence": {
+        "uid": "TA0003",
+        "name": "Persistence"
+      },
+      "PrivilegeEscalation": {
+        "uid": "TA0004",
+        "name": "Privilege Escalation"
+      },
+      "DefenseEvasion": {
+        "uid": "TA0005",
+        "name": "Defense Evasion"
+      },
+      "CredentialAccess": {
+        "uid": "TA0006",
+        "name": "Credential Access"
+      },
+      "Discovery": {
+        "uid": "TA0007",
+        "name": "Discovery"
+      },
+      "LateralMovement": {
+        "uid": "TA0008",
+        "name": "Lateral Movement"
+      },
+      "Collection": {
+        "uid": "TA0009",
+        "name": "Collection"
+      },
+      "CommandAndControl": {
+        "uid": "TA0011",
+        "name": "Command and Control"
+      },
+      "Exfiltration": {
+        "uid": "TA0010",
+        "name": "Exfiltration"
+      },
+      "Impact": {
+        "uid": "TA0040",
+        "name": "Impact"
+      }
+    },
     "remediation_states": {
       "prevented": {
         "neutralized": true,
@@ -450,7 +508,11 @@
   "case_map": [
     {
       "path": "id",
-      "case": "uid"
+      "case": [
+        "uid",
+        "metadata.original_event_uid"
+      ],
+      "note": "A Case of one incident takes the incident's identifier as its uid. original_event_uid keeps the source's identifier on every Case, a campaign Case among them, whose uid is its own"
     },
     {
       "path": "displayName",
@@ -462,7 +524,11 @@
     },
     {
       "path": "status",
-      "case": "status_id"
+      "case": [
+        "status_id",
+        "status_code"
+      ],
+      "note": "status_id through vocabularies.status; status_code keeps the source's own word"
     },
     {
       "path": "createdDateTime",
@@ -470,27 +536,27 @@
     },
     {
       "path": "lastUpdateDateTime",
-      "case": "microsoft.last_update_time"
+      "case": "unmapped.microsoft.last_update_time"
     },
     {
       "path": "tenantId",
-      "case": "microsoft.tenant_id"
+      "case": "metadata.tenant_uid"
     },
     {
       "path": "incidentWebUrl",
-      "case": "microsoft.incident_web_url"
+      "case": "src_url"
     },
     {
       "path": "classification",
-      "case": "microsoft.classification"
+      "case": "unmapped.microsoft.classification"
     },
     {
       "path": "determination",
-      "case": "microsoft.determination"
+      "case": "unmapped.microsoft.determination"
     },
     {
       "path": "assignedTo",
-      "case": "microsoft.assigned_to"
+      "case": "unmapped.microsoft.assigned_to"
     },
     {
       "path": "redirectIncidentId",
@@ -498,31 +564,37 @@
     },
     {
       "path": "comments",
-      "ignored": "the analyst thread on the source's record. A writer of Notes to the source reads it so as not to write the same Note twice, and a comment is not Case data: the Case's account is its Notes"
+      "case": "notes[]",
+      "note": "one note for each comment a person wrote. A comment this executor wrote is one of its own Notes written back, which the Case already holds, and is left out; a writer of Notes to the source also reads the thread so as not to write the same Note twice"
     },
     {
       "path": "comments[].comment",
-      "ignored": "one entry of the analyst thread: its text. A writer of Notes to the source reads the thread so as not to write the same Note twice; nothing of it lands on the Case"
+      "case": "notes[].comment"
     },
     {
       "path": "comments[].createdByDisplayName",
-      "ignored": "who wrote the entry, as a display name — a person's or an application's. It is not an identity the Case can cite"
+      "case": "notes[].owner.display_name",
+      "note": "the author as the source shows them: a display name, a person's or an application's, and no identity the Case can resolve"
     },
     {
       "path": "comments[].createdDateTime",
-      "ignored": "when the entry was written. With the entry it belongs to: on the source's thread, not on the Case"
+      "case": "notes[].created_time"
     },
     {
       "path": "description",
-      "case": "microsoft.description"
+      "case": "unmapped.microsoft.description"
     },
     {
       "path": "summary",
-      "ignored": "the source's generated summary. Empty on every record observed at this licence tier, and listed so that the day the source fills it is a day somebody decides where it lands"
+      "case": "unmapped.microsoft.summary"
     },
     {
       "path": "priorityScore",
-      "ignored": "the source's own 0–100 priority for its queue. The Case's severity is assessed by triage (§1.4), and a second, unexplained score beside it would be weighed by nobody"
+      "case": [
+        "priority",
+        "priority_id"
+      ],
+      "note": "priority holds the score as the source writes it, and priority_id is Other (99): the source publishes no thresholds that would place its 0–100 score on OCSF's Low to Critical. A priority set on the Case by other means replaces both, and the score then stays on the source's record"
     },
     {
       "path": "lastModifiedBy",
@@ -530,15 +602,18 @@
     },
     {
       "path": "resolvingComment",
-      "ignored": "the remark left on the source's record when it was resolved there. The Case's closure is stated by its Note, which is what is written back"
+      "case": "comment",
+      "note": "the remark left on the incident when it was resolved in the source. One this executor wrote there is its own closure, which its Note states, and is left out"
     },
     {
       "path": "customTags",
-      "ignored": "the operator's own tags on the source's record. Nothing in the framework reads them, and a deployment that wants them says so here rather than having them appear on a Case unexamined"
+      "case": "metadata.labels[]",
+      "note": "the tags people put on the incident. The tag this executor puts on the incidents it works is its own mark, and is left out"
     },
     {
       "path": "systemTags",
-      "ignored": "the source's own tags on the incident. Same: read by nothing, and recorded here so that a tag the vendor starts sending is not silence"
+      "case": "metadata.labels[]",
+      "note": "the source's own tags on the incident"
     },
     {
       "path": "@odata.context",
@@ -546,11 +621,19 @@
     },
     {
       "path": "alerts",
-      "case": "finding_info_list[]"
+      "case": [
+        "finding_info_list[]",
+        "unmapped.microsoft.alerts[]"
+      ],
+      "note": "In the source's object, an item for each alert that states anything neither OCSF nor the framework carries"
     },
     {
       "path": "alerts[].id",
-      "case": "finding_info_list[].uid"
+      "case": [
+        "finding_info_list[].uid",
+        "unmapped.microsoft.alerts[].uid"
+      ],
+      "note": "In the source's object it names the alert the values beside it belong to"
     },
     {
       "path": "alerts[].title",
@@ -590,8 +673,7 @@
     },
     {
       "path": "alerts[].recommendedActions",
-      "case": "finding_info_list[].desc",
-      "note": "the source's own procedure. It reaches the Case as the disposition of each recommendation — the Observation a followed one produced, or the Observation that states why it was set aside — never as a block of text on the alert"
+      "ignored": "the source's own procedure for the alert, read from its record at triage. It reaches the Case only as the disposition of each recommendation: the Observation a followed one produced, or the Observation that states why it was set aside"
     },
     {
       "path": "alerts[].firstActivityDateTime",
@@ -603,15 +685,20 @@
     },
     {
       "path": "alerts[].createdDateTime",
-      "case": "finding_info_list[].created_time"
+      "case": [
+        "finding_info_list[].created_time",
+        "finding_info_list[].first_seen_time"
+      ],
+      "note": "first_seen_time only where the alert gives no firstActivityDateTime: the source raised the alert after its activity began, so this is the latest that activity can have started"
     },
     {
       "path": "alerts[].productName",
-      "case": "zerosoc.provenance.products[].name"
+      "case": "finding_info_list[].product.name"
     },
     {
       "path": "alerts[].serviceSource",
-      "ignored": "which Defender workload raised the alert. detectionSource is the finer of the two and is what the analytic carries; this one is kept out rather than recorded twice"
+      "case": "finding_info_list[].product.uid",
+      "note": "the workload that raised the alert, by the source's identifier for it. detectionSource, the finer of the two, is the analytic's type"
     },
     {
       "path": "alerts[].providerAlertId",
@@ -627,7 +714,12 @@
     },
     {
       "path": "alerts[].category",
-      "ignored": "the source's own kill-chain category. The framework's alert type is chosen by what the detection fires on, and its Incident Category by the adversary's objective; neither reads this"
+      "case": [
+        "finding_info_list[].attacks[].tactic.uid",
+        "finding_info_list[].attacks[].tactic.name",
+        "unmapped.microsoft.alerts[].categories[]"
+      ],
+      "note": "A category vocabularies.tactics names is that ATT&CK tactic, on an attack of its own, since the source does not say which of the alert's techniques it goes with. Any other category is kept in the source's object. The framework's alert type is chosen by what the detection fires on and is never read from this"
     },
     {
       "path": "alerts[].status",
@@ -647,15 +739,35 @@
     },
     {
       "path": "alerts[].categories",
-      "ignored": "the source's kill-chain categories for the alert, as a list; category is the older single value. The framework's alert type is chosen by what the detection fires on, never from these"
+      "case": [
+        "finding_info_list[].attacks[].tactic.uid",
+        "finding_info_list[].attacks[].tactic.name",
+        "unmapped.microsoft.alerts[].categories[]"
+      ],
+      "note": "the list form of category, read the same way; a word in both is taken once"
     },
     {
       "path": "alerts[].systemTags",
-      "ignored": "the source's own tags on the alert. As the incident's: read by nothing, and listed so that a tag that starts to carry meaning is noticed"
+      "case": "finding_info_list[].tags[].name",
+      "note": "the source's own tags on the alert, one tag each"
     },
     {
       "path": "alerts[].comments",
-      "ignored": "the analyst thread of one alert. Notes are written to the incident's thread, and this one is read by nothing"
+      "case": "notes[]",
+      "note": "one note for each comment a person wrote on the alert, its title naming the alert. A comment this executor wrote is left out, as on the incident"
+    },
+    {
+      "path": "alerts[].comments[].comment",
+      "case": "notes[].comment"
+    },
+    {
+      "path": "alerts[].comments[].createdByDisplayName",
+      "case": "notes[].owner.display_name",
+      "note": "as on the incident: a display name, and no identity the Case can resolve"
+    },
+    {
+      "path": "alerts[].comments[].createdDateTime",
+      "case": "notes[].created_time"
     },
     {
       "path": "alerts[].investigationState",
@@ -663,15 +775,17 @@
     },
     {
       "path": "alerts[].actorDisplayName",
-      "ignored": "the threat actor the source attributes the alert to. Empty on every record observed at this licence tier, and listed so that the day the source fills it is a day somebody decides where it lands: an attribution is a lead for the Malicious hypothesis, as the threat family is"
+      "case": "finding_info_list[].traits[].name",
+      "note": "on a trait of category threat_actor, as the threat's family and name are on one of category malware: an attribution is a lead for the Malicious hypothesis"
     },
     {
       "path": "alerts[].alertPolicyId",
-      "ignored": "the custom-detection policy behind the alert. detectorId identifies the detector for every alert, custom or not. Empty on every record observed at this licence tier, and listed so that the day the source fills it is a day somebody decides where it lands"
+      "case": "finding_info_list[].related_analytics[].uid",
+      "note": "the custom-detection policy behind the alert. detectorId, which every alert carries, is the analytic itself"
     },
     {
       "path": "alerts[].alertWebUrl",
-      "ignored": "the portal's page for the alert. The Case cites the alert by its uid, and the link a reader follows is the incident's, on the extension object"
+      "case": "finding_info_list[].src_url"
     },
     {
       "path": "alerts[].incidentWebUrl",
@@ -687,11 +801,13 @@
     },
     {
       "path": "alerts[].additionalData",
-      "ignored": "a free-form bag the detector may fill. Empty on every alert observed; a key inside it arrives as a path of its own and is caught like any other"
+      "case": "unmapped.microsoft.alerts[].additional_data",
+      "note": "a free-form bag the detector may fill, kept whole"
     },
     {
       "path": "alerts[].customDetails",
-      "ignored": "the custom detection's own key-value pairs. Empty on every alert observed; a key inside it arrives as a path of its own"
+      "case": "unmapped.microsoft.alerts[].custom_details",
+      "note": "what a custom detection reports, as its own key-value pairs, kept whole"
     },
     {
       "path": "alerts[].evidence",
@@ -735,7 +851,7 @@
     },
     {
       "path": "alerts[].evidence[].mdeDeviceId",
-      "case": "observables[].value"
+      "ignored": "the source's identifier for the device, which questions to the source about the device use. The device's observable is its DNS name, and the identifier travels with the evidence row the inventory builds"
     },
     {
       "path": "alerts[].evidence[].deviceDnsName",
@@ -875,7 +991,7 @@
     },
     {
       "path": "alerts[].evidence[].userAccount.azureAdUserId",
-      "case": "observables[].value"
+      "ignored": "the cloud directory's identifier for the account. The account's observable is its principal name. With userSid and domainName, the identifier tells which directory holds the account, which response needs to know what a connected service can do to it; the framework's Case has no field for that, and an implementation that keeps it does so in its own storage"
     },
     {
       "path": "alerts[].evidence[].userAccount.domainName",
@@ -1076,32 +1192,17 @@
   ],
   "extension": {
     "key": "microsoft",
-    "description": "What this source states about the incident and the framework has no field for. Nothing the framework carries is repeated here: that would be a mapping, not an extension.",
+    "description": "What this source states about the incident and its alerts that neither OCSF nor the framework carries, kept on the Case under unmapped.microsoft. Anything OCSF or the framework carries is a mapping in the case_map and is never repeated here.",
     "properties": {
-      "incident_id": {
-        "type": "string",
-        "from": "id",
-        "description": "The source's identifier, which is also the Case's uid; kept so the extension reads whole on its own."
-      },
-      "incident_web_url": {
-        "type": "string",
-        "from": "incidentWebUrl",
-        "description": "Where an analyst opens the incident in the source's portal."
-      },
-      "tenant_id": {
-        "type": "string",
-        "from": "tenantId",
-        "description": "The tenant the incident belongs to; an incident of another tenant is not a Case of this deployment."
-      },
-      "status": {
-        "type": "string",
-        "from": "status",
-        "description": "The source's own status, in its own word."
-      },
       "description": {
         "type": "string",
         "from": "description",
         "description": "The source's own narrative of the incident, seeded from the alert that raised it. It says what the incident is about in the source's words, which the per-alert descriptions do not give on their own, so triage reads it as an input the source asserts. It is the source's account and never the Case's: the Case's account is its Notes. A description the executor itself wrote there (its Note and the Case, written back for the analysts who work in the source) is not the source's account and is not read as one (Detection & Analysis §1.1)."
+      },
+      "summary": {
+        "type": "string",
+        "from": "summary",
+        "description": "The source's generated summary of the incident. Like its description, it is the source's account and is read as one."
       },
       "classification": {
         "type": "string",
@@ -1118,15 +1219,42 @@
         "from": "assignedTo",
         "description": "Who owns the incident in the source; the Case's assignee is the executor's own."
       },
-      "redirect_incident_id": {
-        "type": "string",
-        "from": "redirectIncidentId",
-        "description": "The master this incident was merged into."
-      },
       "last_update_time": {
         "type": "integer",
         "from": "lastUpdateDateTime",
-        "description": "When the source last changed the record; a poller resumes from it."
+        "description": "When the source last changed the record; a poller resumes from it. OCSF's metadata.modified_time would be the Case's own last change, so it is kept here."
+      },
+      "alerts": {
+        "type": "array",
+        "from": "alerts",
+        "description": "What the source states about an alert and neither OCSF nor the framework carries: one item for each alert that states any of it.",
+        "items": {
+          "properties": {
+            "uid": {
+              "type": "string",
+              "from": "alerts[].id",
+              "description": "The alert, by the uid of its finding_info."
+            },
+            "categories": {
+              "type": "array",
+              "from": "alerts[].categories",
+              "items": {
+                "type": "string"
+              },
+              "description": "The source's categories for the alert that name no ATT&CK tactic, such as SuspiciousActivity or Malware."
+            },
+            "custom_details": {
+              "type": "object",
+              "from": "alerts[].customDetails",
+              "description": "What a custom detection reports, as its own key-value pairs."
+            },
+            "additional_data": {
+              "type": "object",
+              "from": "alerts[].additionalData",
+              "description": "The free-form bag the detector may fill."
+            }
+          }
+        }
       }
     }
   },

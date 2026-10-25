@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+- **Framework pin to `ecabc93`, and the defender-xdr profile follows it (framework #116).** The
+  framework states only the mappings OCSF leaves open, and a source's own record moves under
+  `unmapped`.
+  - *The source's object is `unmapped.microsoft`.* It keeps what Defender states and neither OCSF
+    nor the framework carries: the incident's description, summary, classification, determination,
+    assignee and last update, and per alert its custom details, its additional data and the
+    categories that name no ATT&CK tactic. The rest moved to OCSF's own attributes: the tenant to
+    `metadata.tenant_uid`, the incident's identifier also to `metadata.original_event_uid`, its
+    status word to `status_code` and its link to `src_url`; `redirectIncidentId` lands only on
+    `zerosoc.master_case_uid`.
+  - *Fields nothing read now land.* The comments people wrote on the incident and on its alerts
+    are the Case's `notes`, the closing remark its `comment`, the incident's tags its
+    `metadata.labels`, and `priorityScore` its `priority`, with `priority_id` Other (99). Per alert:
+    the product and the workload that raised it (`product.name`, `product.uid`), the ATT&CK tactics
+    its categories name (`vocabularies.tactics`), the custom-detection policy (`related_analytics`),
+    its tags, its link, and the threat actor the source attributes it to, as a `threat_actor` trait.
+  - *Where the profile and the intake disagreed.* `recommendedActions` is read at triage and never
+    lands as the alert's `desc`; an alert's `createdDateTime` is its `first_seen_time` where it gives
+    no first activity; `mdeDeviceId` and `azureAdUserId` are no observable values.
+  - *The profile check reads OCSF.* `tools/check_profiles.py` accepts a target the Case Schema
+    leaves to OCSF where the OCSF release it follows declares it, read from
+    `tools/ocsf_<version>.json`, which `tools/ocsf_extract.py` writes from the OCSF schema server. It
+    also checks that each property of the source's object is filled by a path that lands there, and
+    that an array says what its items are. A key inside a bag the object keeps whole, such as a custom
+    detection's details, is the detection's own and no path of the record.
 - **A process is on the Case Timeline only through an Observation (investigation).** The procedure
   said the chain's `timeline` "gives the process entries", which read as every process of the chain
   being an entry. A process is an entry only through an Observation that establishes it, dated by the

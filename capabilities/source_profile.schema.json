@@ -257,6 +257,26 @@
               }
             }
           }
+        },
+        "tactics": {
+          "type": "object",
+          "description": "The source's category -> the ATT&CK tactic it names. A category not listed names no tactic.",
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "uid",
+              "name"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "uid": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            }
+          }
         }
       }
     },
@@ -284,7 +304,7 @@
               "type": "string"
             },
             "minItems": 1,
-            "description": "Where it lands on the Case, as a dotted path of the Case Schema ([] steps into a list; the source's own object is addressed by its extension key). A list where one path of the source lands in more than one place."
+            "description": "Where it lands on the Case, as a dotted path of the Case Schema ([] steps into a list; the source's own object as unmapped.<extension key>; an attribute of the OCSF class the Case Schema does not state is addressed as OCSF names it). A list where one path of the source lands in more than one place."
           },
           "ignored": {
             "type": "string",
@@ -298,7 +318,7 @@
     },
     "extension": {
       "type": "object",
-      "description": "The object this source keeps on the Case for what it states and the framework has no field for.",
+      "description": "The object this source keeps on the Case, under unmapped, for what it states and neither OCSF nor the framework carries.",
       "required": [
         "key",
         "properties"
@@ -307,7 +327,7 @@
       "properties": {
         "key": {
           "type": "string",
-          "description": "The Case attribute this source's object is under."
+          "description": "The key of this source's object under the Case's unmapped: the source's own identifier."
         },
         "description": {
           "type": "string"
@@ -315,29 +335,7 @@
         "properties": {
           "type": "object",
           "additionalProperties": {
-            "type": "object",
-            "required": [
-              "type",
-              "from"
-            ],
-            "additionalProperties": false,
-            "properties": {
-              "type": {
-                "type": "string",
-                "enum": [
-                  "string",
-                  "integer",
-                  "boolean"
-                ]
-              },
-              "from": {
-                "type": "string",
-                "description": "The path on the source's record it is read from."
-              },
-              "description": {
-                "type": "string"
-              }
-            }
+            "$ref": "#/$defs/extension_property"
           }
         }
       }
@@ -445,6 +443,55 @@
           },
           "note": {
             "type": "string"
+          }
+        }
+      }
+    },
+    "extension_property": {
+      "type": "object",
+      "required": [
+        "type",
+        "from"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "string",
+            "integer",
+            "boolean",
+            "object",
+            "array"
+          ],
+          "description": "An object is the source's own key-value pairs, kept whole; an array declares its items."
+        },
+        "from": {
+          "type": "string",
+          "description": "The path on the source's record it is read from."
+        },
+        "description": {
+          "type": "string"
+        },
+        "items": {
+          "type": "object",
+          "description": "What each item of an array is: a value of a scalar type, or an object whose properties are declared as these are.",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "string",
+                "integer",
+                "boolean"
+              ]
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/extension_property"
+              }
+            }
           }
         }
       }
