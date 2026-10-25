@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **The defender-xdr profile fills only objects OCSF accepts.** A comment's author lands on
+  `notes[].owner.name`: an OCSF user needs an account, a name or a uid, and the name the source
+  gives (`User-` and a person's sign-in name, or `API-App:` and an application's display name) is
+  the one it has. Every comment but this executor's own is a note, another application's included. An alert's `systemTags` are the `values` of one tag named
+  `systemTags`, since an OCSF tag pairs a key with a value or values. `alertPolicyId` is the policy
+  that generated the alert, a customer's or a built-in one, as an analytic of type Rule.
+  `tools/ocsf_extract.py` keeps OCSF's constraints in `tools/ocsf_<version>.json`, and
+  `tools/check_profiles.py` checks each object a profile fills against them.
 - **Framework pin to `ecabc93`, and the defender-xdr profile follows it (framework #116).** The
   framework states only the mappings OCSF leaves open, and a source's own record moves under
   `unmapped`.

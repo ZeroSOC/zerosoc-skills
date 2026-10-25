@@ -216,6 +216,21 @@ class Coherence(unittest.TestCase):
             with self.subTest(target=target):
                 self.assertFalse(check_profiles._declared(target, schema, schema, ocsf))
 
+    def test_an_object_the_profile_fills_is_one_ocsf_accepts(self) -> None:
+        """OCSF's own rules on an object's attributes: a user needs an account, a name or a uid, and a
+        tag a value or values. A profile that fills only the rest leaves an object OCSF refuses. The
+        Case's own rule (an assignee or an assignee group) is the executor's to meet."""
+        self.assertEqual(check_profiles.lands(self.profile, self.case_schema(), "p"), [])
+        for entry in self.profile["case_map"]:
+            if entry["path"] in ("comments[].createdByDisplayName", "alerts[].comments[].createdByDisplayName"):
+                entry["case"] = "notes[].owner.display_name"
+            if entry["path"] == "alerts[].systemTags":
+                entry["case"] = "finding_info_list[].tags[].name"
+        found = "\n".join(check_profiles.lands(self.profile, self.case_schema(), "p"))
+        self.assertIn("'notes[].owner' is an OCSF user and needs at least one of account, name, uid", found)
+        self.assertIn("'finding_info_list[].tags[]' is an OCSF key_value_object and needs at least one of "
+                      "value, values", found)
+
     def test_the_ocsf_release_the_case_schema_follows_has_been_extracted(self) -> None:
         for skill in sorted(ROOT.glob("skills/*/references/framework/02-Taxonomy/case_schema.json")):
             schema = json.loads(skill.read_text())

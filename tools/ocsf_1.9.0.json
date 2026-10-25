@@ -1743,5 +1743,429 @@
    "uid_numeric": "long_t",
    "version": "string_t"
   }
+ },
+ "constraints": {
+  "account": {
+   "at_least_one": [
+    "name",
+    "uid"
+   ]
+  },
+  "actor": {
+   "at_least_one": [
+    "process",
+    "user",
+    "iam_role",
+    "invoked_by",
+    "session",
+    "application",
+    "app_name",
+    "app_uid"
+   ]
+  },
+  "agent": {
+   "at_least_one": [
+    "uid",
+    "name"
+   ]
+  },
+  "ai_agent": {
+   "at_least_one": [
+    "name",
+    "uid"
+   ]
+  },
+  "ai_model": {
+   "at_least_one": [
+    "name",
+    "uid"
+   ]
+  },
+  "analytic": {
+   "at_least_one": [
+    "name",
+    "uid"
+   ]
+  },
+  "application": {
+   "at_least_one": [
+    "uid",
+    "name"
+   ]
+  },
+  "attack": {
+   "at_least_one": [
+    "tactic",
+    "technique",
+    "sub_technique"
+   ]
+  },
+  "attestation": {
+   "at_least_one": [
+    "fingerprint",
+    "signatures"
+   ]
+  },
+  "autonomous_system": {
+   "at_least_one": [
+    "number",
+    "name"
+   ]
+  },
+  "container": {
+   "at_least_one": [
+    "uid",
+    "name"
+   ]
+  },
+  "d3f_tactic": {
+   "at_least_one": [
+    "name",
+    "uid"
+   ]
+  },
+  "d3f_technique": {
+   "at_least_one": [
+    "name",
+    "uid"
+   ]
+  },
+  "d3fend": {
+   "at_least_one": [
+    "d3f_tactic",
+    "d3f_technique"
+   ]
+  },
+  "data_classification": {
+   "at_least_one": [
+    "category_id",
+    "confidentiality_id"
+   ]
+  },
+  "device": {
+   "at_least_one": [
+    "ip",
+    "uid",
+    "name",
+    "hostname",
+    "instance_uid",
+    "interface_uid",
+    "interface_name"
+   ]
+  },
+  "download_info": {
+   "at_least_one": [
+    "src_endpoint",
+    "src_url",
+    "type_id"
+   ]
+  },
+  "edge": {
+   "at_least_one": [
+    "name",
+    "uid"
+   ]
+  },
+  "email": {
+   "at_least_one": [
+    "from",
+    "to"
+   ]
+  },
+  "extension": {
+   "at_least_one": [
+    "name",
+    "uid"
+   ]
+  },
+  "feature": {
+   "at_least_one": [
+    "name",
+    "uid"
+   ]
+  },
+  "firewall_rule": {
+   "at_least_one": [
+    "name",
+    "uid"
+   ]
+  },
+  "graph": {
+   "at_least_one": [
+    "name",
+    "uid"
+   ]
+  },
+  "group": {
+   "at_least_one": [
+    "name",
+    "uid"
+   ]
+  },
+  "iam_role": {
+   "at_least_one": [
+    "name",
+    "uid"
+   ]
+  },
+  "idp": {
+   "at_least_one": [
+    "name",
+    "uid"
+   ]
+  },
+  "incident_finding": {
+   "at_least_one": [
+    "assignee",
+    "assignee_group"
+   ]
+  },
+  "kb_article": {
+   "at_least_one": [
+    "uid",
+    "src_url"
+   ]
+  },
+  "key_value_object": {
+   "at_least_one": [
+    "value",
+    "values"
+   ]
+  },
+  "location": {
+   "at_least_one": [
+    "city",
+    "country",
+    "postal_code",
+    "region"
+   ]
+  },
+  "logger": {
+   "at_least_one": [
+    "name",
+    "uid"
+   ]
+  },
+  "malware": {
+   "at_least_one": [
+    "name",
+    "uid"
+   ]
+  },
+  "malware_scan_info": {
+   "at_least_one": [
+    "name",
+    "uid"
+   ]
+  },
+  "mitigation": {
+   "at_least_one": [
+    "name",
+    "uid"
+   ]
+  },
+  "network_endpoint": {
+   "at_least_one": [
+    "ip",
+    "uid",
+    "name",
+    "hostname",
+    "svc_name",
+    "instance_uid",
+    "interface_uid",
+    "interface_name",
+    "domain"
+   ]
+  },
+  "network_interface": {
+   "at_least_one": [
+    "ip",
+    "mac",
+    "name",
+    "hostname",
+    "uid"
+   ]
+  },
+  "network_proxy": {
+   "at_least_one": [
+    "ip",
+    "uid",
+    "name",
+    "hostname",
+    "svc_name",
+    "instance_uid",
+    "interface_uid",
+    "interface_name",
+    "domain"
+   ]
+  },
+  "occurrence_details": {
+   "at_least_one": [
+    "cell_name",
+    "column_name",
+    "column_number",
+    "end_line",
+    "json_path",
+    "page_number",
+    "record_index_in_array",
+    "row_number",
+    "start_line"
+   ]
+  },
+  "organization": {
+   "at_least_one": [
+    "name",
+    "uid"
+   ]
+  },
+  "peripheral_device": {
+   "at_least_one": [
+    "name",
+    "uid"
+   ]
+  },
+  "policy": {
+   "at_least_one": [
+    "name",
+    "type",
+    "uid"
+   ]
+  },
+  "process": {
+   "at_least_one": [
+    "pid",
+    "uid",
+    "cpid"
+   ]
+  },
+  "process_entity": {
+   "at_least_one": [
+    "cmd_line",
+    "name",
+    "path",
+    "pid",
+    "uid",
+    "cpid"
+   ]
+  },
+  "product": {
+   "at_least_one": [
+    "name",
+    "uid"
+   ]
+  },
+  "reporter": {
+   "at_least_one": [
+    "hostname",
+    "ip",
+    "name",
+    "uid"
+   ]
+  },
+  "resource_details": {
+   "at_least_one": [
+    "name",
+    "uid"
+   ]
+  },
+  "rule": {
+   "at_least_one": [
+    "name",
+    "uid"
+   ]
+  },
+  "sensor_info": {
+   "at_least_one": [
+    "name",
+    "uid"
+   ]
+  },
+  "service": {
+   "at_least_one": [
+    "name",
+    "uid"
+   ]
+  },
+  "sub_technique": {
+   "at_least_one": [
+    "name",
+    "uid"
+   ]
+  },
+  "tactic": {
+   "at_least_one": [
+    "name",
+    "uid"
+   ]
+  },
+  "technique": {
+   "at_least_one": [
+    "name",
+    "uid"
+   ]
+  },
+  "ticket": {
+   "at_least_one": [
+    "src_url",
+    "uid"
+   ]
+  },
+  "timespan": {
+   "at_least_one": [
+    "duration",
+    "duration_days",
+    "duration_hours",
+    "duration_mins",
+    "duration_months",
+    "duration_secs",
+    "duration_weeks",
+    "duration_years",
+    "end_time",
+    "start_time"
+   ]
+  },
+  "trait": {
+   "at_least_one": [
+    "name",
+    "uid"
+   ]
+  },
+  "transformation_info": {
+   "at_least_one": [
+    "name",
+    "uid"
+   ]
+  },
+  "url": {
+   "at_least_one": [
+    "url_string",
+    "path"
+   ]
+  },
+  "user": {
+   "at_least_one": [
+    "account",
+    "name",
+    "uid"
+   ]
+  },
+  "vulnerability": {
+   "just_one": [
+    "advisory",
+    "cve",
+    "cwe"
+   ]
+  },
+  "win/win_service": {
+   "at_least_one": [
+    "cmd_line",
+    "service_category_id",
+    "service_dependencies",
+    "service_error_control_id",
+    "service_start_name",
+    "service_start_type_id",
+    "service_type_id"
+   ]
+  }
  }
 }

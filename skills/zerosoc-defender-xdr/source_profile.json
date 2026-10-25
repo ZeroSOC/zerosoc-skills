@@ -565,7 +565,7 @@
     {
       "path": "comments",
       "case": "notes[]",
-      "note": "one note for each comment a person wrote. A comment this executor wrote is one of its own Notes written back, which the Case already holds, and is left out; a writer of Notes to the source also reads the thread so as not to write the same Note twice"
+      "note": "one note for each comment on the thread but this executor's own: a comment it wrote is one of its own Notes written back, which the Case already holds. A writer of Notes to the source also reads the thread so as not to write the same Note twice"
     },
     {
       "path": "comments[].comment",
@@ -573,8 +573,8 @@
     },
     {
       "path": "comments[].createdByDisplayName",
-      "case": "notes[].owner.display_name",
-      "note": "the author as the source shows them: a display name, a person's or an application's, and no identity the Case can resolve"
+      "case": "notes[].owner.name",
+      "note": "the author as the source names them, User- and a person's sign-in name or API-App: and an application's display name: the one name the source gives, and no identity the Case can resolve"
     },
     {
       "path": "comments[].createdDateTime",
@@ -748,13 +748,13 @@
     },
     {
       "path": "alerts[].systemTags",
-      "case": "finding_info_list[].tags[].name",
-      "note": "the source's own tags on the alert, one tag each"
+      "case": "finding_info_list[].tags[].values[]",
+      "note": "the source's own tags on the alert, as the values of one tag named systemTags: OCSF gives a tag a key and its values"
     },
     {
       "path": "alerts[].comments",
       "case": "notes[]",
-      "note": "one note for each comment a person wrote on the alert, its title naming the alert. A comment this executor wrote is left out, as on the incident"
+      "note": "one note for each comment on the alert's thread but this executor's own, its title naming the alert"
     },
     {
       "path": "alerts[].comments[].comment",
@@ -762,8 +762,8 @@
     },
     {
       "path": "alerts[].comments[].createdByDisplayName",
-      "case": "notes[].owner.display_name",
-      "note": "as on the incident: a display name, and no identity the Case can resolve"
+      "case": "notes[].owner.name",
+      "note": "as on the incident: the author's display name"
     },
     {
       "path": "alerts[].comments[].createdDateTime",
@@ -781,7 +781,7 @@
     {
       "path": "alerts[].alertPolicyId",
       "case": "finding_info_list[].related_analytics[].uid",
-      "note": "the custom-detection policy behind the alert. detectorId, which every alert carries, is the analytic itself"
+      "note": "the policy that generated the alert, a customer's or a built-in one, as an analytic of type Rule (1). detectorId, which every alert carries, is the analytic itself"
     },
     {
       "path": "alerts[].alertWebUrl",

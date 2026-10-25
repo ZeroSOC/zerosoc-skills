@@ -9,7 +9,8 @@ is used as OCSF defines it, so a source profile may land a field on one the fram
 Written to `tools/ocsf_<version>.json`; the checker reads the release the Case Schema declares as
 its `ocsf_version`. An attribute's type is OCSF's scalar type (`string_t`, ...) or the name of the
 object it holds, with `[]` when it is a list. Profile attributes are included: a Case that declares
-the profile carries them.
+the profile carries them. `constraints` keeps OCSF's own rules on an object's attributes, such as a
+user that needs at least one of `account`, `name` or `uid`.
 
 Standard library only. Reads the OCSF schema server's API.
 
@@ -47,12 +48,16 @@ def extract(version: str) -> dict[str, Any]:
     case = _fetch(version, "classes", CLASS)
     attributes = _types(case)
     objects: dict[str, dict[str, str]] = {}
+    constraints: dict[str, dict[str, list[str]]] = {CLASS: case["constraints"]} if case.get("constraints") else {}
     pending = sorted({t.removesuffix("[]") for t in attributes.values() if not t.endswith("_t") and not t.endswith("_t[]")})
     while pending:
         name = pending.pop()
         if name in objects:
             continue
-        objects[name] = _types(_fetch(version, "objects", name))
+        definition = _fetch(version, "objects", name)
+        objects[name] = _types(definition)
+        if definition.get("constraints"):
+            constraints[name] = definition["constraints"]
         pending += [t.removesuffix("[]") for t in objects[name].values()
                     if not t.removesuffix("[]").endswith("_t") and t.removesuffix("[]") not in objects]
     return {
@@ -60,6 +65,7 @@ def extract(version: str) -> dict[str, Any]:
         "source": API.format(version=version, kind="classes", name=CLASS),
         "class": {CLASS: attributes},
         "objects": dict(sorted(objects.items())),
+        "constraints": dict(sorted(constraints.items())),
     }
 
 
