@@ -1215,6 +1215,20 @@ class ChainKeptAsEvents(unittest.TestCase):
         self.assertEqual(len(process["xattributes"]["cmd_lines"]), 2, "every command line the rows gave it")
         self.assertEqual(process["file"]["hashes"], [{"algorithm_id": 3, "algorithm": "SHA-256", "value": "ab" * 32}])
 
+    def test_the_image_path_is_whole_whether_a_row_gives_its_folder_or_its_full_path(self):
+        # Defender's evidence gives the image's folder, and another source its full path
+        for name, given, folder, sep in (("cmd.exe", "C:\\Windows\\System32", "C:\\Windows\\System32", "\\"),
+                                         ("cmd.exe", "C:\\Windows\\System32\\cmd.exe", "C:\\Windows\\System32", "\\"),
+                                         ("bash", "/usr/bin/bash", "/usr/bin", "/"),
+                                         ("svchost.exe", "C:\\svchost.exe", "C:\\", ""),
+                                         ("init", "/init", "/", "")):
+            rows = [{"type": "process", "name": name, "pid": 10, "created": "2026-09-13T12:00:00Z", "device": "ws-01",
+                     "alert_ids": ["A"], "path": given}]
+            kept = chain.as_ocsf(chain.as_json(chain.build(rows)), PRODUCT)
+            image = next(e for e in kept["events"] if e["type_uid"] == 100701)["process"]["file"]
+            self.assertEqual((image["parent_folder"], image["path"]), (folder, f"{folder}{sep}{name}"), given)
+            self.assertEqual(chain.as_ocsf(chain.from_ocsf(kept), PRODUCT), kept, "read back whole")
+
     def test_an_alert_that_cites_only_an_unplaced_process_has_no_label(self):
         unplaced = self.events["da-3"]
         self.assertEqual([a["process"]["uid"] for a in unplaced["evidences"]], ["unplaced:1"])
