@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **A process image's path is whole whether a row gives its folder or its full path.** Defender's
+  evidence gives the image's folder and other sources its full path; the chain took every `path` for
+  a folder and added the image's name to it again. A `path` that ends on the image's name is now the
+  full path, and its folder what precedes the name; a root folder (`C:\`, `/`) keeps its separator.
 - **Framework pin to `48c2ddd`, and the process chain is kept as OCSF events (framework #118, DD-30).**
   `process_chain.py --ocsf` prints the chain's Observation (`desc` and `related_events`) and, in
   `events`, the OCSF events it cites, each citation's `uid` the event's `metadata.uid`. A process is a

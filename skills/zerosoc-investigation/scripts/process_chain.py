@@ -544,15 +544,23 @@ def _ocsf_process(p, known):
 
 
 def _image(name, attrs):
-    """The process's image as an OCSF file: its name, the folder the rows give as its `path`, the full path, and
-    its hashes. None where the process is unnamed, since OCSF requires a file's name."""
+    """The process's image as an OCSF file: its name, its folder, its full path and its hashes. A row's `path` is
+    the folder for some sources (Defender's evidence) and the full path for others: it is the full path where it
+    ends on the image's name. None where the process is unnamed, since OCSF requires a file's name."""
     if not name:
         return None
-    folder = attrs.get("path")
-    separator = "\\" if "\\" in str(folder or "") else "/"
+    given = str(attrs.get("path") or "")
+    separator = "\\" if "\\" in given else "/"
+    tail = given.rstrip(separator).rpartition(separator)[2]
+    if given and tail.lower() == str(name).lower():
+        prefix = given.rstrip(separator)[: -len(tail)]
+        # a root keeps its separator (`C:\`, `/`); any other folder is named without one
+        root = prefix == separator or prefix.endswith(":" + separator)
+        folder, path = (prefix if root else prefix.rstrip(separator)) or None, given
+    else:
+        folder, path = given or None, f"{given.rstrip(separator)}{separator}{name}" if given else None
     hashes = [{"algorithm_id": aid, "algorithm": label, "value": attrs[key]} for key, aid, label in HASHES if attrs.get(key)]
-    held = {"name": name, "type_id": REGULAR_FILE, "parent_folder": folder,
-            "path": f"{str(folder).rstrip(separator)}{separator}{name}" if folder else None, "hashes": hashes or None}
+    held = {"name": name, "type_id": REGULAR_FILE, "parent_folder": folder, "path": path, "hashes": hashes or None}
     return {k: v for k, v in held.items() if v is not None}
 
 
@@ -751,7 +759,7 @@ def from_ocsf(observation):
                 _add(verdicts, r.get("verdict"))
             out.update(verdicts=verdicts, rows=len(said), evidence=said)
         file, user = proc.get("file") or {}, proc.get("user") or {}
-        attrs = {k: v for k, v in (("path", file.get("parent_folder")), ("account", user.get("name")),
+        attrs = {k: v for k, v in (("path", file.get("path")), ("account", user.get("name")),
                                    ("upn", user.get("email_addr")), ("user_sid", user.get("uid")),
                                    ("mde_device_id", (e.get("device") or {}).get("uid")),
                                    ("elevation_token", extended.get("token_elevation"))) if v}
