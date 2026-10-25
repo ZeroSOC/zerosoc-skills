@@ -4,7 +4,7 @@ description: What Microsoft Defender XDR's records mean in ZeroSOC Framework ter
 license: Apache-2.0
 metadata:
   version: "0.4.1"
-  framework: "zerosoc-framework@e422bde (2026-10-23)"
+  framework: "zerosoc-framework@ecabc93 (2026-10-25)"
   status: draft
   author: ZeroSOC
 ---
@@ -25,9 +25,9 @@ and every script that needs it reads it from there rather than from a copy:
 |---|---|
 | `source` | which technology this is, which API these paths are read from, and when the profile was last true of it |
 | `fields` | where each input of Detection & Analysis §1.1 lives on an incident, an alert and an evidence item |
-| `vocabularies` | the source's own words in the framework's and OCSF's terms: severity, status, its classification as the framework's verdict, the determinations each verdict admits, the OCSF analytic type each detection source is, and what each remediation state says it did |
+| `vocabularies` | the source's own words in the framework's and OCSF's terms: severity, status, its classification as the framework's verdict, the determinations each verdict admits, the OCSF analytic type each detection source is, the ATT&CK tactic each of its categories names, and what each remediation state says it did |
 | `case_map` | every path of a record: where it lands on the Case, or why nothing reads it |
-| `extension` | the object this source keeps on the Case for what it states and the framework has no field for |
+| `extension` | the object this source keeps on the Case, under `unmapped.microsoft`, for what it states and neither OCSF nor the framework carries |
 | `capability_coverage` | which capability classes and required data sources it answers, and where it stops |
 | `queries` | per question kind, the recipe that asks it of this tool |
 
@@ -56,8 +56,11 @@ permissions and the query language belong to the integration, and change when th
 does rather than when the framework does.
 
 **Every key is accounted for.** `case_map` names every path of this source's incident record —
-155 of them, measured against real incidents of a tenant, which are not published — each mapped to a
-Case field, or ignored with the reason nothing reads it. A test walks sample documents that carry
+158 of them: 155 measured against real incidents of a tenant, which are not published, and the
+three keys of a comment on an alert, which those incidents did not carry and the source documents —
+each mapped to a Case field, or ignored with the reason nothing reads it. A Case field is one the
+framework's Case Schema declares or, for an attribute the framework leaves to OCSF, one the OCSF
+release it follows declares. A test walks sample documents that carry
 every one of those paths, with invented values, and fails on a key that is neither, so a field the vendor adds tomorrow arrives with a noise rather than in
 silence. That is the block to extend first when the source starts sending something new.
 
@@ -74,8 +77,9 @@ weighed:
   profile does not list is recorded as reported and treated as **not** neutralized, because a state
   nobody declared is not evidence that anything was stopped. A remediation is an action of the
   Case, never an Observation that explains it (§1.5).
-- **The source's own classification and determination are recorded and not weighed.** They sit on
-  the extension object, visible to a reader, and the Case's verdict stays the executor's.
+- **The source's own classification and determination are recorded and not weighed.** They sit in
+  the source's object (`unmapped.microsoft`), visible to a reader, and the Case's verdict stays the
+  executor's.
 
 ## 4. Which of the framework's questions this source answers
 
@@ -112,10 +116,12 @@ The recipes are in the profile's `queries` block. What they do not say:
 
 - **`detectionSource` is which engine fired, not what kind of detection it is.** The profile's `analytic_types` is what turns one into the other, and a source it does not name is OCSF analytic type Other (99). The difference matters at triage: a signature match and a behavioural model are not the same evidence for the same claim.
 - **An alert's severity stands in for a confidence this source does not state.** It says how bad, and nothing on an alert says how sure. The severity is kept as what it is — the severity of the Detection Finding the Alert Observation cites — and is *also* read as that Observation's confidence (Informational and Low give Low, Medium gives Medium, High and Critical give High). That second reading is a workaround and the profile says so: a High-severity alert from a noisy detector is not a High-confidence one, which is why triage validates it and never takes it at face value.
-- **`classification` and `determination` are the source's verdict, and may be a human's or the product's.** An automated investigation writes them exactly as an analyst does, and the record does not always say which. They are recorded on the extension object and weighed by nobody: the Case's verdict is the executor's. The profile's `verdict` vocabulary says which framework verdict each classification *is*, so that the source's word can be read and the Case's verdict written back in the source's terms; two verdicts have no word here — Insufficient Data is not something this source can say, and a Duplicate is said by merging the incident, not by classifying it.
+- **`classification` and `determination` are the source's verdict, and may be a human's or the product's.** An automated investigation writes them exactly as an analyst does, and the record does not always say which. They are recorded in the source's object (`unmapped.microsoft`) and weighed by nobody: the Case's verdict is the executor's. The profile's `verdict` vocabulary says which framework verdict each classification *is*, so that the source's word can be read and the Case's verdict written back in the source's terms; two verdicts have no word here — Insufficient Data is not something this source can say, and a Duplicate is said by merging the incident, not by classifying it.
 - **`vocabularies.determination` is what an executor closing a Case in the source may say the activity *was*.** Each word names the verdicts it may be written with. A False Positive admits `notMalicious` and Insufficient Data `notEnoughDataToValidate`, both marked `only`: there is nothing to choose, and the classification stays `unknown` for Insufficient Data because the source has no word for a verdict nobody reached. A True Positive and a Benign are each offered several, and whoever closes the Case picks the one that fits what was found. Writing it is the host's, not this skill's: the profile says what may be written, never that it is.
 - **A remediation state says what was done to one entity, not that the Case is explained.** "The file was quarantined" leaves every question of §1.5 open — how it arrived, what ran before it was stopped, whether the same thing is on another device. The profile's `remediation_states` says which states neutralize something; a state it does not name is recorded as reported and treated as **not** neutralized, because a state nobody declared is not evidence that anything was stopped.
 - **An automatic remediation is an action of the Case**, recorded with no side and no confidence, so that Response can see what is already contained without triage having treated it as an explanation.
+- **A comment is what one person wrote, at one time.** Each comment a person wrote on the incident or on one of its alerts is a note of the Case, with its author and time, and the closing remark is its `comment`. The comments this executor wrote are its own Notes written back, which the Case already holds, and are not read again. The source names an author by display name, which may be a person's or an application's.
+- **`priorityScore` is the source's ranking of its queue.** It is the Case's `priority`, with `priority_id` Other (99): the source publishes no thresholds that would place its 0–100 score on OCSF's Low to Critical.
 
 ## 7. The traps
 

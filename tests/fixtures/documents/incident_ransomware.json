@@ -208,7 +208,13 @@
         "Impact"
       ],
       "systemTags": [],
-      "comments": [],
+      "comments": [
+        {
+          "comment": "Sample comment a person wrote on the alert.",
+          "createdByDisplayName": "Sample Analyst",
+          "createdDateTime": "2026-09-01T08:40:00Z"
+        }
+      ],
       "investigationState": "unsupportedAlertType",
       "actorDisplayName": null,
       "alertPolicyId": null,
