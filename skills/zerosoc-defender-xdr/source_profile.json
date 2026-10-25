@@ -573,8 +573,8 @@
     },
     {
       "path": "comments[].createdByDisplayName",
-      "case": "notes[].owner.display_name",
-      "note": "the author as the source shows them: a display name, a person's or an application's, and no identity the Case can resolve"
+      "case": "notes[].owner.name",
+      "note": "the author's display name, a person's or an application's: the one name the source gives them, and no identity the Case can resolve"
     },
     {
       "path": "comments[].createdDateTime",
@@ -748,8 +748,8 @@
     },
     {
       "path": "alerts[].systemTags",
-      "case": "finding_info_list[].tags[].name",
-      "note": "the source's own tags on the alert, one tag each"
+      "case": "finding_info_list[].tags[].values[]",
+      "note": "the source's own tags on the alert, as the values of one tag named systemTags: OCSF gives a tag a key and its values"
     },
     {
       "path": "alerts[].comments",
@@ -762,8 +762,8 @@
     },
     {
       "path": "alerts[].comments[].createdByDisplayName",
-      "case": "notes[].owner.display_name",
-      "note": "as on the incident: a display name, and no identity the Case can resolve"
+      "case": "notes[].owner.name",
+      "note": "as on the incident: the author's display name"
     },
     {
       "path": "alerts[].comments[].createdDateTime",
@@ -781,7 +781,7 @@
     {
       "path": "alerts[].alertPolicyId",
       "case": "finding_info_list[].related_analytics[].uid",
-      "note": "the custom-detection policy behind the alert. detectorId, which every alert carries, is the analytic itself"
+      "note": "the policy that generated the alert, a customer's or a built-in one, as an analytic of type Rule (1). detectorId, which every alert carries, is the analytic itself"
     },
     {
       "path": "alerts[].alertWebUrl",

@@ -313,6 +313,8 @@ def lands(profile: dict[str, Any], case_schema: dict[str, Any], where: str) -> l
         if not any(t in (own + at, own + at + "[]") for t in landed.get(held["from"], [])):
             problems.append(f"{where}: extension property {at!r} is read from {held['from']!r}, whose case_map "
                             f"entry does not land on {own + at!r}")
+    if ocsf is not None:
+        problems += _unmet(landed, ocsf, version, where)
     # a vocabulary turns the source's word into a value of the Case: it has to be one the Case has
     for name, field in (("severity", "severity_id"), ("status", "status_id"), ("verdict", "verdict_id")):
         allowed = (case_schema.get("properties") or {}).get(field, {}).get("enum")
@@ -321,6 +323,38 @@ def lands(profile: dict[str, Any], case_schema: dict[str, Any], where: str) -> l
                 problems.append(f"{where}: vocabularies.{name}.{word} is {held['id']}, which is no {field} "
                                 f"of the Case Schema ({', '.join(map(str, allowed))})")
     problems += _determination(profile, case_schema, where)
+    return problems
+
+
+def _ocsf_kind(path: str, ocsf: dict[str, Any]) -> str | None:
+    """The OCSF object a path of the Case holds, or None where OCSF does not declare the path."""
+    kind = OCSF_CLASS
+    for step in path.split("."):
+        declared = (ocsf["class"].get(kind) or ocsf["objects"].get(kind) or {}).get(step.removesuffix("[]"))
+        if declared is None:
+            return None
+        kind = declared.removesuffix("[]")
+    return kind
+
+
+def _unmet(landed: dict[str, list[str]], ocsf: dict[str, Any], version: Any, where: str) -> list[str]:
+    """OCSF's rules on the objects the profile fills: each one it lands an attribute in needs, of each
+    set OCSF names, at least one attribute some path lands there. A user named only by a display
+    name, or a tag with a key and no value, is no OCSF object. The Case itself is left out: its
+    assignee is the executor's, and no source fills it."""
+    filled: dict[str, set[str]] = {}
+    for targets in landed.values():
+        for target in targets:
+            steps = target.split(".")
+            for n in range(1, len(steps)):
+                filled.setdefault(".".join(steps[:n]), set()).add(steps[n].removesuffix("[]"))
+    problems: list[str] = []
+    for parent, names in sorted(filled.items()):
+        kind = _ocsf_kind(parent, ocsf)
+        group = (ocsf.get("constraints", {}).get(kind) or {}).get("at_least_one") if kind else None
+        if group and not names & set(group):
+            problems.append(f"{where}: {parent!r} is an OCSF {kind} and needs at least one of "
+                            f"{', '.join(group)} (OCSF {version}); the case_map lands only {', '.join(sorted(names))}")
     return problems
 
 
