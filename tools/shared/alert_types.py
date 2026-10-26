@@ -11,7 +11,7 @@ against the framework's alert types and collapses the same type on the same enti
 alert, listing what it merged.
 
 alerts.json: a list of {"id", "title", "entity", "alert_type"?, "no_type_reason"?, "severity"?,
-"confidence"?, "technique"?, "detector_id"?}. "alert_type" is a row of the framework's alert types;
+"confidence"?, "threat_family"?, "technique"?, "detector_id"?}. "alert_type" is a row of the framework's alert types;
 an alert no row fits carries "no_type_reason" in its place, keeps its title as its type, and is
 flagged "unmapped" with that reason: the taxonomy is not bent to cover what it does not describe (a
 source's correlation, attribution or containment record states a conclusion, not a behaviour). An
@@ -54,7 +54,14 @@ def _confidence(alert):
     stated = str(alert.get("confidence") or "").capitalize()
     if stated in W:
         return stated
-    return SEV2CONF.get(str(alert.get("severity") or "Medium").capitalize(), "Medium")
+    mapped = SEV2CONF.get(str(alert.get("severity") or "Medium").capitalize(), "Medium")
+    # §1.5: a detection the source attributes to a malware family is high-fidelity, so a severity the
+    # source lowered — e.g. on a threat it prevented — does not read its confidence below Medium: a
+    # remediation never lowers an Observation's confidence. A High or Critical severity still reads
+    # High; the family never lifts the confidence above what the severity gives.
+    if alert.get("threat_family") and W[mapped] < W["Medium"]:
+        return "Medium"
+    return mapped
 
 
 def typed(alert, known):

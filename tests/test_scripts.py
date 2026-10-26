@@ -406,6 +406,20 @@ class AlertTypeChoice(unittest.TestCase):
         self.assertEqual(alert_types.typed({"id": "x", "title": "t", "severity": "critical", "no_type_reason": "r"},
                                            self.known)["confidence"], "High")
 
+    def test_a_named_malware_family_floors_the_confidence_at_medium(self):
+        # §1.5: a detection the source attributes to a malware family keeps its confidence at a floor
+        # of Medium when the tool gives none, not the Low its (prevention-deflated) severity maps to;
+        # a High or Critical severity still reads High, and an explicit tool confidence is respected.
+        fam = {"id": "x", "title": "t", "no_type_reason": "r", "threat_family": "Powemet"}
+        conf = lambda a: alert_types.typed(a, self.known)["confidence"]
+        self.assertEqual(conf({**fam, "severity": "informational"}), "Medium")
+        self.assertEqual(conf({**fam, "severity": "low"}), "Medium")
+        self.assertEqual(conf({**fam, "severity": "medium"}), "Medium")
+        self.assertEqual(conf({**fam, "severity": "high"}), "High")
+        self.assertEqual(conf({**fam, "severity": "low", "confidence": "low"}), "Low")
+        # without a named family, a low severity still maps to Low
+        self.assertEqual(conf({"id": "x", "title": "t", "no_type_reason": "r", "severity": "low"}), "Low")
+
     def test_the_output_seeds_the_resolution_ledger_and_counts_once_there_too(self):
         alerts = [{"id": "A1", "title": "Sensitive credential memory read", "entity": "ws-04", "severity": "Medium",
                    "alert_type": "Credential dumping"},
