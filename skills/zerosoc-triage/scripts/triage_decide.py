@@ -75,14 +75,7 @@ try:
     from alert_metadata import decision_notes, neutralized, techniques_of
 except ImportError:
     decision_notes = neutralized = techniques_of = None
-
-W = {"Low": 1, "Medium": 2, "High": 3}
-LEVELS = ["Low", "Medium", "High"]
-SEV2CONF = {"Informational": "Low", "Low": "Low", "Medium": "Medium", "High": "High", "Critical": "High"}
-
-
-def alert_confidence(a):
-    return a.get("confidence") or SEV2CONF.get(a.get("severity", "Medium"), "Medium")
+from confidence import LEVELS, W, alert_confidence  # the shared confidence derivation (§1.5)
 
 
 def _key(a):

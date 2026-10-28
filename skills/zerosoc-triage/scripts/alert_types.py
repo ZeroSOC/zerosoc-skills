@@ -27,8 +27,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.normpath(os.path.join(HERE, "..", "references", "framework"))
 TAXONOMY = os.path.join("02-Taxonomy", "alert_types.md")
 
-W = {"Low": 1, "Medium": 2, "High": 3}
-SEV2CONF = {"Informational": "Low", "Low": "Low", "Medium": "Medium", "High": "High", "Critical": "High"}
+sys.path.insert(0, HERE)  # the shared scripts sit beside this one (copied by build_references)
+from confidence import W, alert_confidence  # noqa: E402
 
 
 def framework_alert_types(markdown):
@@ -50,20 +50,6 @@ def known_types(root=ROOT):
         return framework_alert_types(handle.read())
 
 
-def _confidence(alert):
-    stated = str(alert.get("confidence") or "").capitalize()
-    if stated in W:
-        return stated
-    mapped = SEV2CONF.get(str(alert.get("severity") or "Medium").capitalize(), "Medium")
-    # §1.5: a detection the source attributes to a malware family is high-fidelity, so a severity the
-    # source lowered — e.g. on a threat it prevented — does not read its confidence below Medium: a
-    # remediation never lowers an Observation's confidence. A High or Critical severity still reads
-    # High; the family never lifts the confidence above what the severity gives.
-    if alert.get("threat_family") and W[mapped] < W["Medium"]:
-        return "Medium"
-    return mapped
-
-
 def typed(alert, known):
     """The alert as the ledger carries it: {"type", "domain", "unmapped", ...}.
 
@@ -83,7 +69,7 @@ def typed(alert, known):
         raise ValueError(f"alert {alert.get('id')}: neither an alert_type nor a no_type_reason")
     out = {"id": alert.get("id"), "type": chosen or title, "alert_type": chosen or title, "side": "Malicious",
            "domain": domain if chosen else None, "entity": str(alert.get("entity") or ""),
-           "confidence": _confidence(alert), "source_title": title, "unmapped": not chosen}
+           "confidence": alert_confidence(alert), "source_title": title, "unmapped": not chosen}
     if not chosen:
         out["unmapped_reason"] = reason
     for key in ("severity", "technique", "detector_id"):
