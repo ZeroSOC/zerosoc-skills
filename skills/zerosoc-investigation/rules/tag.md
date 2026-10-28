@@ -20,6 +20,10 @@ executor puts that language in its place; read as it is, it means the language o
   prove it, and the absence of such a record proves nothing either way. When an answer shows what
   the activity actually was — the tooling it ran, what launched it, the artifacts it left — tag it
   Benign at the confidence the evidence carries, and say which alerts it explains.
+- A search for a record that approves, authorizes or sanctions the activity (an approval, a change,
+  a role grant, a sanctioned test, an exception) that finds none is no information, whichever source
+  answered it, an empty directory or sign-in search included: list it under `no_information_refs`,
+  never as a Malicious observation.
 - Activity that names itself is evidence, and it is weighed, not taken: an intruder can name
   themselves anything. What corroborates a declared explanation is the fit of the whole picture —
   every alerted action belonging to it, the artifacts and paths being the ones it uses, what
