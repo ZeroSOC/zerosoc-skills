@@ -11,7 +11,7 @@ against the framework's alert types and collapses the same type on the same enti
 alert, listing what it merged.
 
 alerts.json: a list of {"id", "title", "entity", "alert_type"?, "no_type_reason"?, "severity"?,
-"confidence"?, "technique"?, "detector_id"?}. "alert_type" is a row of the framework's alert types;
+"confidence"?, "threat_family"?, "technique"?, "detector_id"?}. "alert_type" is a row of the framework's alert types;
 an alert no row fits carries "no_type_reason" in its place, keeps its title as its type, and is
 flagged "unmapped" with that reason: the taxonomy is not bent to cover what it does not describe (a
 source's correlation, attribution or containment record states a conclusion, not a behaviour). An
@@ -27,8 +27,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.normpath(os.path.join(HERE, "..", "references", "framework"))
 TAXONOMY = os.path.join("02-Taxonomy", "alert_types.md")
 
-W = {"Low": 1, "Medium": 2, "High": 3}
-SEV2CONF = {"Informational": "Low", "Low": "Low", "Medium": "Medium", "High": "High", "Critical": "High"}
+sys.path.insert(0, HERE)  # the shared scripts sit beside this one (copied by build_references)
+from confidence import W, alert_confidence  # noqa: E402
 
 
 def framework_alert_types(markdown):
@@ -50,13 +50,6 @@ def known_types(root=ROOT):
         return framework_alert_types(handle.read())
 
 
-def _confidence(alert):
-    stated = str(alert.get("confidence") or "").capitalize()
-    if stated in W:
-        return stated
-    return SEV2CONF.get(str(alert.get("severity") or "Medium").capitalize(), "Medium")
-
-
 def typed(alert, known):
     """The alert as the ledger carries it: {"type", "domain", "unmapped", ...}.
 
@@ -76,7 +69,7 @@ def typed(alert, known):
         raise ValueError(f"alert {alert.get('id')}: neither an alert_type nor a no_type_reason")
     out = {"id": alert.get("id"), "type": chosen or title, "alert_type": chosen or title, "side": "Malicious",
            "domain": domain if chosen else None, "entity": str(alert.get("entity") or ""),
-           "confidence": _confidence(alert), "source_title": title, "unmapped": not chosen}
+           "confidence": alert_confidence(alert), "source_title": title, "unmapped": not chosen}
     if not chosen:
         out["unmapped_reason"] = reason
     for key in ("severity", "technique", "detector_id"):
