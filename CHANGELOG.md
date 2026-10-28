@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **A search that finds no approval is never Malicious, whichever source answered it.** Framework #95
+  and the ledger's `no_information_refs` (#57) already said it, yet three live Cases weighed "no
+  directory change / no change ticket / no sanctioned role found" as Malicious (Medium): an empty
+  directory-audit or sign-in search read as a scoped negative, and a knowledge-base answer of pages
+  approving nothing as a finding. `rules/tag.md` names the case, and `rules/verify.md` has the
+  executor say which queries ask for an approval.
 - **Framework pin to `03fffc2` (ZeroSOC/zerosoc-framework#120).** At incident confirmation each
   technique is recorded under the tactic its use served in the Incident, judged from the attack path
   and the context the investigation established, and under more than one only where the Incident
