@@ -21,7 +21,7 @@ required_data_sources:
   - Host-application logs for AI features
 status: draft
 ---
-<!-- generated from zerosoc-framework@48c2dddb5519 : 04-Playbooks/02-Investigation-Response/15-ai_ml_system.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@03fffc2d4904 : 04-Playbooks/02-Investigation-Response/15-ai_ml_system.md — do not edit; regenerate with tools/build_references.py -->
 
 # 15-AI/ML System Attack Investigation & Response
 

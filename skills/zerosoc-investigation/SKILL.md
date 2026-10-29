@@ -4,7 +4,7 @@ description: Investigate a promoted Case under the ZeroSOC Framework (Phase 2.b)
 license: Apache-2.0
 metadata:
   version: "0.4.1"
-  framework: "zerosoc-framework@48c2ddd (2026-10-25)"
+  framework: "zerosoc-framework@03fffc2 (2026-10-29)"
   status: draft
   author: ZeroSOC
 ---
@@ -162,7 +162,9 @@ per Case: the playbook the script prints.
     Incident's techniques, assessed from the Observations that stand: the Alerts' mappings are
     provisional, so one no Observation shows is left out and a broad one is narrowed (`resolve.py`
     lists the techniques the standing Malicious observations show and names any recorded that none
-    shows); extend the **Case Timeline** triage compiled with the course of the
+    shows); each goes on the Case's `attacks` under the tactic its use served in this Incident, judged
+    from the attack path and the context the investigation established, and under more than one only
+    where the Incident shows it served each; extend the **Case Timeline** triage compiled with the course of the
     attack (interleaved with the detection and the response actions that ran, each entry timestamped in UTC
     with its event reference; a process is an entry only through an Observation that establishes it, its
     `first_seen` the creation time the `timeline` of `process_chain.py --json` gives). The timeline says what happened and is not a field the Case stores: it is the

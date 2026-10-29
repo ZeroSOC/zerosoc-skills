@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Framework pin to `03fffc2` (ZeroSOC/zerosoc-framework#120).** At incident confirmation each
+  technique is recorded under the tactic its use served in the Incident, judged from the attack path
+  and the context the investigation established, and under more than one only where the Incident
+  shows it served each. Investigation step 11 says so, and the references are regenerated.
 - **`resolve.py` says how each observation entered its side's score (#99).** `scoring` lists the
   standing observations in ledger order: a counted one with its `weight` and the `confidence` it was
   weighed at (`capped_by_alert` where the alert it restates capped it, `counts_for` the observations
