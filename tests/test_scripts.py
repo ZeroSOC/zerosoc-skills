@@ -291,6 +291,57 @@ class ResolutionRule(unittest.TestCase):
         self.assertEqual(inv.resolve({"observations": f})["malicious_score"], 2)
 
 
+class Scoring(unittest.TestCase):
+    """resolve.py's "scoring": how each standing observation entered its side's score (#99)."""
+
+    def by_id(self, r):
+        return {x["id"]: x for x in r["scoring"]}
+
+    def test_the_weights_of_a_side_add_up_to_its_score(self):
+        ledgers = [
+            {"observations": [{"id": "a", "side": "Malicious", "confidence": "Medium"}, {"id": "feed", "side": "Malicious", "confidence": "High"},
+                              {"id": "l1", "side": "Malicious", "confidence": "Low"}, {"id": "b", "side": "Benign", "confidence": "Medium"}]},
+            {"observations": [{"id": "t", "side": "Malicious", "confidence": "Medium", "artifact": "hash:1"},
+                              {"id": "i", "side": "Malicious", "confidence": "High", "artifact": "hash:1"},
+                              {"id": "x", "side": "Benign", "confidence": "High", "retracted": True}]},
+            {"alerts": [{"id": "a1", "confidence": "Medium"}],
+             "observations": [{"id": "O1", "side": "Malicious", "confidence": "High", "event_refs": ["a1"]},
+                              {"id": "O2", "side": "Malicious", "confidence": "Medium", "event_refs": ["a1"]},
+                              {"id": "O3", "side": "Benign", "confidence": "High", "event_refs": ["e9"]}]},
+        ]
+        for ledger in ledgers:
+            r = inv.resolve(ledger)
+            for side, score in (("Malicious", r["malicious_score"]), ("Benign", r["benign_score"])):
+                self.assertEqual(sum(x["weight"] for x in r["scoring"] if x["side"] == side), score)
+
+    def test_a_retracted_observation_is_not_in_it(self):
+        r = inv.resolve({"observations": [{"id": "m", "side": "Malicious", "confidence": "High", "retracted": True},
+                                          {"id": "b", "side": "Benign", "confidence": "Low"}]})
+        self.assertEqual([x["id"] for x in r["scoring"]], ["b"])
+
+    def test_one_artifact_counts_once_at_the_highest_confidence_of_its_observations(self):
+        r = inv.resolve({"observations": [{"id": "t", "side": "Malicious", "confidence": "Medium", "artifact": "hash:1"},
+                                          {"id": "i", "side": "Malicious", "confidence": "High", "artifact": "hash:1"}]})
+        held = self.by_id(r)
+        self.assertEqual(held["t"], {"id": "t", "side": "Malicious", "weight": 3, "counted": True, "confidence": "High", "counts_for": ["i"]})
+        self.assertEqual(held["i"], {"id": "i", "side": "Malicious", "weight": 0, "counted": False, "same_as": "t", "reason": "same-evidence"})
+
+    def test_a_restatement_counts_as_its_alert_never_above_the_alert(self):
+        r = inv.resolve({"alerts": [{"id": "a1", "confidence": "Medium"}],
+                         "observations": [{"id": "O1", "side": "Malicious", "confidence": "High", "event_refs": ["a1"]},
+                                          {"id": "O2", "side": "Malicious", "confidence": "Medium", "event_refs": ["a1"]}]})
+        held = self.by_id(r)
+        self.assertEqual((held["O1"]["weight"], held["O1"]["capped_by_alert"], held["O1"]["counts_for"]), (2, "a1", ["O2"]))
+        self.assertEqual((held["O2"]["reason"], held["O2"]["same_as"], held["O2"]["alert"]), ("restates-alert", "O1", "a1"))
+
+    def test_one_resting_on_results_that_carried_nothing_weighs_nothing(self):
+        r = inv.resolve({"no_information_refs": ["e1"], "scoped_negative_refs": [],
+                         "observations": [{"id": "b", "side": "Benign", "confidence": "High", "event_refs": ["e1"]},
+                                          {"id": "m", "side": "Malicious", "confidence": "Low"}]})
+        self.assertEqual(self.by_id(r)["b"], {"id": "b", "side": "Benign", "weight": 0, "counted": False, "reason": "no-information"})
+        self.assertEqual(r["benign_score"], 0)
+
+
 class TimeboxFromLedger(unittest.TestCase):
     # Guardrails §5: 10 minutes at High or Critical severity, 20 otherwise; an organization may tighten them
     F = [{"id": "m", "side": "Malicious", "confidence": "Medium", "at": "2026-09-14T15:04:00Z"},

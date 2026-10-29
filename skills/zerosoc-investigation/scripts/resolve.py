@@ -54,7 +54,11 @@ self-reported "timebox_expired" and says so. Prints the score
 of each side, which side is proven, the verdict and confidence to record, the residual observations, the
 timebox, and the next step; with --json also "counted": per side, the ids of the observations standing (not
 retracted) and of those the score counts, once the ones that carry no information are set aside and one alert
-type on one entity, or one artifact, counts once; a Note quotes it rather than recounting.
+type on one entity, or one artifact, counts once; a Note quotes it rather than recounting. "scoring" says how
+each standing observation entered its side's score, in ledger order: "weight" and "confidence" where it is
+counted (the weights of a side add up to its score; "capped_by_alert" where the alert it restates capped it,
+"counts_for" the observations counted as this one), else "reason": "no-information", "same-evidence" or
+"restates-alert", with "same_as" the observation it counts as and, for a restatement, its "alert".
 "attacks" on an observation are the techniques it shows, as identifiers (`T1003.001`, or `T1003.001 (Name)`):
 an alert's are the ones its detection asserted, and a Malicious observation's the ones it establishes. The
 ledger's own "attacks" are the Incident's, recorded at confirmation from the observations that stand (§2.5).
@@ -122,13 +126,17 @@ def _once_key(f):
     return None
 
 
-def dedupe(observations):
+def dedupe(observations, folded=None):
+    """One observation per once-key, at the highest confidence of those it stands for; `folded`, when
+    given, is filled with each observation set aside and the one it counts as."""
     seen, out = {}, []
     for f in observations:
         key = _once_key(f)
         if key and key in seen:
             if W[f["confidence"]] > W[seen[key]["confidence"]]:
                 seen[key].update(confidence=f["confidence"])
+            if folded is not None:
+                folded[f["id"]] = seen[key]["id"]
             continue
         g = dict(f); out.append(g)
         if key: seen[key] = g
@@ -224,7 +232,8 @@ def as_alerts(observations, ledger, empty):
         if alert not in own or f.get("alert_type"):
             out.append(f); continue
         cap = own[alert] if own[alert] in W else f["confidence"]
-        g = dict(f, confidence=min(f["confidence"], cap, key=W.__getitem__))
+        # "_alert" names the alert it counts as, for the scoring record; nothing else reads it
+        g = dict(f, confidence=min(f["confidence"], cap, key=W.__getitem__), _alert=alert)
         if alert in typed:
             g.update(alert_type=typed[alert]["alert_type"], entity=typed[alert]["entity"])
         else:
@@ -250,6 +259,37 @@ def proof_beyond(mal, ledger):
             " (Detection & Analysis §2.4)")
 
 
+def scoring(standing, weightless, aligned, active, folded):
+    """How each standing observation entered its side's score, in ledger order: its weight where it is
+    counted, else why not. The weights of one side add up to its score. A counted one carries the
+    confidence it was weighed at, which an alert it restates can cap and an observation counted as
+    the same one can raise; one set aside names the observation it counts as, or the alert."""
+    by_id = {g["id"]: g for g in aligned}
+    kept = {g["id"]: g for g in active}
+    aside = {f["id"] for f in weightless}
+    out = []
+    for f in standing:
+        rec = {"id": f["id"], "side": f["side"]}
+        g = by_id.get(f["id"])
+        if f["id"] in aside or g is None:
+            rec.update(weight=0, counted=False, reason="no-information")
+        elif f["id"] in folded:
+            rec.update(weight=0, counted=False, same_as=folded[f["id"]],
+                       reason="restates-alert" if g.get("_alert") else "same-evidence")
+            if g.get("_alert"):
+                rec["alert"] = g["_alert"]
+        else:
+            held = kept[f["id"]]
+            rec.update(weight=W[held["confidence"]], counted=True, confidence=held["confidence"])
+            if W[g["confidence"]] < W[f["confidence"]]:
+                rec["capped_by_alert"] = g["_alert"]
+            others = [x for x, into in folded.items() if into == f["id"]]
+            if others:
+                rec["counts_for"] = others
+        out.append(rec)
+    return out
+
+
 def resolve(ledger, now=None):
     standing = [f for f in ledger.get("observations", []) if not f.get("retracted") and f.get("side") in ("Malicious", "Benign")]
     attacks = techniques(ledger, standing)
@@ -257,7 +297,9 @@ def resolve(ledger, now=None):
     # an observation resting on nothing but results that carried no information is none (§2.4); it is set
     # aside before the count-once rule, so it can neither stand in for a real observation nor lend it weight
     weightless = [f for f in standing if no_information.carries_nothing(f, empty)]
-    active = dedupe(as_alerts([f for f in standing if f not in weightless], ledger, empty))
+    aligned = as_alerts([f for f in standing if f not in weightless], ledger, empty)
+    folded = {}
+    active = dedupe(aligned, folded)
     mal = [f for f in active if f["side"] == "Malicious"]
     ben = [f for f in active if f["side"] == "Benign"]
     mal_score = sum(W[f["confidence"]] for f in mal)
@@ -272,7 +314,8 @@ def resolve(ledger, now=None):
          "retracted": [f["id"] for f in ledger.get("observations", []) if f.get("retracted")],
          "uncovered_medium_high_malicious": [f["id"] for f in uncovered_mh], "residual_low_malicious": [f["id"] for f in residual_low],
          "counted": {side: {"standing": [f["id"] for f in standing if f["side"] == side], "counted": [f["id"] for f in kept]}
-                     for side, kept in (("Malicious", mal), ("Benign", ben))}}
+                     for side, kept in (("Malicious", mal), ("Benign", ben))},
+         "scoring": scoring(standing, weightless, aligned, active, folded)}
     if unproven:
         r["malicious_not_proven"] = unproven
     if weightless:
@@ -351,6 +394,13 @@ def main():
     box = r["timebox"]
     print(f"Timebox: {box['minutes']} min, elapsed {box['elapsed_minutes'] if box['elapsed_minutes'] is not None else '?'} min, {'EXPIRED' if box['expired'] else 'running'} ({box['source']})")
     if r.get("no_information"): print("Carry no information (not counted): " + ", ".join(r["no_information"]))
+    for side in ("Malicious", "Benign"):
+        held = [x for x in r["scoring"] if x["side"] == side]
+        if held:
+            print(f"{side} {r['malicious_score' if side == 'Malicious' else 'benign_score']} = "
+                  + " + ".join(f"{x['id']} {x['weight']}" for x in held if x["counted"])
+                  + "".join(f"; {x['id']} counts as {x['same_as']}" for x in held if x.get("same_as"))
+                  + "".join(f"; {x['id']} carries no information" for x in held if x.get("reason") == "no-information"))
     for key in ("timebox_note", "evidence_inventory_note", "no_information_note", "attacks_note"):
         if r.get(key): print("Note: " + r[key])
     for note in r.get("detection_notes", []): print("Note: " + note)
