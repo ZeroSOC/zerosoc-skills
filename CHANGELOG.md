@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **`resolve.py` says how each observation entered its side's score (#99).** `scoring` lists the
+  standing observations in ledger order: a counted one with its `weight` and the `confidence` it was
+  weighed at (`capped_by_alert` where the alert it restates capped it, `counts_for` the observations
+  counted as this one), any other with its `reason`: `no-information`, `same-evidence` or
+  `restates-alert`, and `same_as`, the observation it counts as. The weights of a side add up to its
+  score, and a test holds it. The text output prints each sum. The rule itself is unchanged.
 - **A process image's path is whole whether a row gives its folder or its full path.** Defender's
   evidence gives the image's folder and other sources its full path; the chain took every `path` for
   a folder and added the image's name to it again. A `path` that ends on the image's name is now the
