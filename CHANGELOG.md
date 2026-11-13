@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **The reach rule asks what reached the environment.** `rules/reach.md` of the investigation skill
+  is shorter. An answer that the activity reached the environment says what landed on a device, ran,
+  persisted, was delivered to a person or was gained, and names the observation that shows it. An
+  answer that nothing reached it still rests on an observation beyond the alerts, which `resolve.py`
+  checks as before. Four sentences are removed: that the observations must show that nothing else in
+  the same activity succeeded, what a block leaves open, the instruction to name the observations
+  the answer rests on, and the default for what the observations do not settle. Investigation step 11
+  loses the first of them too. Replayed on a small executor model, a password spray whose sign-ins
+  all failed was answered as a near miss in most runs, where it had been answered as an Incident.
 - **Framework pin to `555e891`, and the skills follow it (framework #136).** The references are
   regenerated and the archives rebuilt at the pin. The approval payload is specified in Incident
   Response §2.1 and the later sections of Agentic Guardrails moved up one number: the skills cite the
