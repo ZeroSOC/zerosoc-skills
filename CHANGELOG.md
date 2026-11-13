@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+- **An undecided Case is held On Hold, and no clock closes it (framework #133, DD-34).**
+  - ***`resolve.py` loses the investigation timebox.*** The ledger fields `started_at`,
+    `resolved_at`, `timebox_minutes` and `timebox_expired` are read by nothing, the argument `--now`
+    is removed (the script exits 2 on it), and the output has no `timebox` and no `timebox_note`.
+    The outcome `Neither proven at timebox/budget expiry` no longer exists.
+  - *The rule in its place.* Neither side proven and a query still to run: `Neither proven`, as
+    before. With the ledger's new `no_query_left`, or with `budget_exhausted`, the outcome is
+    `On Hold`: `verdict_id` 0 (Unknown), `status_id` 3, and `questions`, the open questions of the
+    ledger's new `questions` list, each `to ask`, `waiting` or `unobtainable`. A question records who
+    was asked and when (`asked_of`, `asked_at`) and its `answer`: `observation`, naming in
+    `observation` the Observation the answer produced, which is scored like any check; or
+    `does not exist` or `cannot be reached`, with a `reason`. The outcome is `Insufficient Data`
+    (7, at `severity_id` 1, with `watch`) only when every question no Observation answered was
+    answered that the evidence does not exist or cannot be reached, and there is at least one.
+    Budget exhaustion leads to the same rule on the evidence at hand.
+  - *The procedure follows.* Investigation step 1 notes no start time, step 8 holds an undecided
+    Case and asks its questions, and `rules/verify.md` has the executor name a question no query
+    can answer, with who can answer it.
+  - *`tools/check_run.py`.* The timebox check is replaced by `hold: no clock closed the Case`: the
+    outcome is recomputed from the ledger's questions, a run that recorded Insufficient Data while a
+    question still waits fails, and so does a held Case that names no question.
+  - Two ledgers join the fixtures: a Case held On Hold while the audit records it could not reach
+    are asked for, and the same Case closed as Insufficient Data once both answers say the evidence
+    cannot be obtained.
 - **The containment autonomy matrix, and the handover removed (framework #134, DD-35, DD-36).**
   - *`autonomy.py` is the matrix of Incident Response §2.1.* It reads the Case confidence, the
     Incident's Impact and the action's own impact, and severity only sets the timing. The matrix is

@@ -17,8 +17,8 @@ A run is a directory holding what the executor produced, one file per artifact:
 
 The checks are the ones a human cannot do by reading a transcript: every figure the run reported is
 recomputed from the artifacts it produced, so a ledger that states an inventory it never extracted, a
-score built from observations that should have collapsed, or a timebox that was declared instead of measured,
-all fail here. What the checks cannot see — whether the executor followed the procedure, whether a
+score built from observations that should have collapsed, or a Case closed as Insufficient Data while a
+question still waits for its answer, all fail here. What the checks cannot see — whether the executor followed the procedure, whether a
 observation is true — stays a human judgement, and the run's notes are where that is read.
 
 Each check prints `ok` or `FAIL` with what was expected and what the run holds. Exit 1 on any failure,
@@ -327,25 +327,32 @@ def check_detection_metadata(report, run, ledger, label, note_name, profile_path
                      else f"all {len(neutralized)} named")
 
 
-def check_timebox(report, ledger):
-    """The timebox is measured from the ledger's own timestamps, never self-reported."""
+def check_hold(report, ledger):
+    """No clock closes a Case (Detection & Analysis §2.4): one that proves neither side is held with its
+    questions asked, and closes as Insufficient Data only when every open question was answered that the
+    evidence does not exist or cannot be reached. The outcome is recomputed from the ledger's questions."""
+    name = "hold: no clock closed the Case"
     if not ledger:
-        return report.skip("timebox: measured, not declared", "no investigation ledger in the run")
-    if not ledger.get("started_at"):
-        return report.fail("timebox: measured, not declared", "started_at in the ledger",
-                           "absent: the script falls back to the self-reported timebox_expired")
+        return report.skip(name, "no investigation ledger in the run")
     try:
         result = resolve_rule.resolve(ledger)
     except ValueError as exc:
-        return report.fail("timebox: measured, not declared", "a ledger resolve.py can read", f"invalid ledger: {exc}")
-    box = result.get("timebox", {})
-    report.check(box.get("source") != "self-reported", "timebox: measured from the ledger's timestamps",
-                 "source measured from started_at", f"source={box.get('source')}")
-    report.ok("timebox: elapsed against the reference",
-              f"{box.get('elapsed_minutes')} min elapsed of {box.get('minutes')} (expired={box.get('expired')})")
-    dated = [f for f in ledger.get("observations", []) if f.get("at")]
-    report.check(len(dated) == len(ledger.get("observations", [])), "timebox: observations carry their own timestamps",
-                 "every observation with an 'at'", f"{len(dated)} of {len(ledger.get('observations', []))} dated")
+        return report.fail(name, "a ledger resolve.py can read", f"invalid ledger: {exc}")
+    outcome, recorded = result.get("outcome"), str(ledger.get("recorded_verdict") or "").lower()
+    asked = result.get("questions") or []
+    if outcome == "On Hold":
+        report.check("insufficient" not in recorded, name,
+                     "a Case held On Hold while a question waits: Insufficient Data needs every open question answered "
+                     "that the evidence does not exist or cannot be reached",
+                     f"the run recorded {ledger.get('recorded_verdict')!r}" if "insufficient" in recorded
+                     else f"held, {len(asked)} question(s) open")
+        report.check(bool(asked), "hold: the questions of a held Case are named",
+                     "the questions whose answers could prove a side, each with who can answer it",
+                     "; ".join(f"{q['id']} ({q['state']})" for q in asked) or "none named")
+    elif outcome == "Insufficient Data":
+        report.ok(name, f"closed on {len(asked)} question(s), each answered that the evidence cannot be obtained")
+    else:
+        report.ok(name, f"decided on its evidence: {outcome}")
     return result
 
 
@@ -359,8 +366,9 @@ def check_decision(report, ledger, result, label, decide):
         return report.fail(f"{label}: verdict reproduced from the ledger", "a ledger the rule can read", f"invalid ledger: {exc}")
     recorded = ledger.get("recorded_verdict")
     printed = fresh.get("verdict") or fresh.get("decision")
-    if fresh.get("incident") is False:
-        printed = f"{printed}, a near miss"  # a True Positive that did not reach the environment (§2.5)
+    if fresh.get("outcome") and str(fresh["outcome"]).lower() not in str(printed).lower():
+        # the resolution's outcome beside its verdict: a near miss is a True Positive, a held Case is Unknown
+        printed = f"{printed} ({fresh['outcome']})"
     if recorded is None:
         report.skip(f"{label}: verdict reproduced from the ledger",
                     f"the rule gives {printed!r}; add \"recorded_verdict\" to compare it with the Note")
@@ -462,7 +470,7 @@ def _run(run, profile):
         report, run, investigation, "investigation", "investigation_note.md", profile
     )
     check_visibility_gaps(report, run, investigation, "investigation")
-    result = check_timebox(report, investigation)
+    result = check_hold(report, investigation)
     check_decision(report, investigation, result, "investigation", resolve_rule.resolve)
     check_sweep(report, run)
 

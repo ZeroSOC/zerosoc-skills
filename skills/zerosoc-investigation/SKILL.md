@@ -15,7 +15,8 @@ Object: the **hypothesis**. Two sides, always: the Malicious hypothesis (an atta
 action against the organization's assets) and the Benign hypothesis (activity that is authorized,
 expected or acceptable: administration, testing, scheduled work). Outcome: exactly one of a **Closed
 Case**, a near miss included, or a **Confirmed Incident**: Malicious activity that reached the
-environment. Verdicts are computed from tagged observations, not argued. Paths are relative to this
+environment. A Case that proves neither side is held On Hold, its questions asked, until an answer
+decides it. Verdicts are computed from tagged observations, not argued. Paths are relative to this
 skill's directory.
 
 Read once per session: [Detection & Analysis §2–§3](references/framework/03-Processes/02-detection_and_analysis.md)
@@ -39,22 +40,19 @@ per Case: the playbook the script prints.
 - The capability binding `zerosoc.capabilities.json`; the telemetry classes (`telemetry.endpoint`,
   `telemetry.identity`, `telemetry.network`, `telemetry.email`, `telemetry.cloud`, `siem.search`), the
   enrichment classes and `cases.store`.
-- The investigation **timebox** (10 minutes at High or Critical severity, 20 otherwise, reference values)
-  and the Case **token budget**; both are organization settings. `scripts/resolve.py` measures the
-  timebox from the ledger's timestamps: it runs from `started_at`, the moment the Case was assigned to
-  you in Investigation (Guardrails §5), which is noted at step 1, not when the ledger file is
-  created, so reading the Triage Note, the extraction and the playbook selection count against it.
+- The Case **token budget** and the organization's response-time targets by severity; both are
+  organization settings. No clock closes a Case: one that misses its target is escalated to the SOC
+  Manager, and an exhausted budget leaves the resolution rule to be applied to the evidence at hand
+  (Guardrails §5).
 
 ## Procedure
 
-1. **Start the ledger from the Triage Note.** First note the UTC time you take the Case: it is the
-   ledger's `started_at`, and the timebox runs from it. Read what triage did before anything else: the
+1. **Start the ledger from the Triage Note.** Read what triage did before anything else: the
    conflict that promoted the Case (the Malicious observations beyond the alerts and the Benign
    observations they were weighed against), the alert type it gave each alert, and the candidate Incident
    Categories it proposed. Create `ledger.json` (format in `scripts/resolve.py`) with every tagged
    Observation of the Note, its side, confidence, source artifact and event reference, the Case
-   `severity`, `started_at` as noted here (never the time this file is created) and `at` on every
-   observation as it is added: the timebox is computed from these, not declared. Alert observations carry
+   `severity`, and `at` on every observation as it is added. Alert observations carry
    their `alert_type` and `entity`, so the same type on the same entity counts once in the score. Carry
    the ledger's `source_profile` object across and refresh it with
    `python3 scripts/source_profile.py --bindings zerosoc.capabilities.json --json`: a local override of the
@@ -135,16 +133,24 @@ per Case: the playbook the script prints.
    investigated here and never sent back to triage. Type it and add it as in step 2, extend the queries to
    what it adds, and judge whether it changes the verdict: a repeat of an alert type or technique the Case
    already holds adds little, a new technique shows the attacker progressing along the attack path, and a
-   new targeted entity may be lateral movement. Then set `resolved_at` (UTC) in the ledger, with `alerts` (each alert's id and own confidence), and run
+   new targeted entity may be lateral movement. Then give the ledger its `alerts` (each alert's id and own confidence) and run
    `python3 scripts/resolve.py ledger.json`. Malicious is proven at a score of 3 or more when an alert is at High
    confidence or an observation stands beyond the alerts (one that only restates an alert counts as it);
    Benign at 3 or more *and* every Medium or High Malicious observation retracted or covered; the verdict and
    confidence follow the §2.4 table (confidence is the strongest carrying observation, never an average; on
    a proven Malicious side step 11 applies this rule again at confirmation). If neither side is proven, run the remaining discriminating
-   queries. The script measures the timebox from `started_at` to `resolved_at` (the current time when absent)
-   against the severity-scaled reference value, which `timebox_minutes` may tighten, never extend; when it has expired, or the
-   budget is exhausted (`budget_exhausted`), it closes as **Insufficient Data** (7) with a monitoring watch (`watch_until`; re-open on recurrence of the
-   entities) and emit a visibility or tuning ticket. Never stop for doubt; never "escalate".
+   queries, listed or added. **No clock closes a Case.** When no query is left that you can run
+   (`no_query_left`), or the budget allows none (`budget_exhausted`), name in the ledger's `questions`
+   the questions whose answers could prove a side, each with who can answer it (`asked_of`,
+   `asked_at`), and run the script again: the outcome is **On Hold**, verdict Unknown (0), and the
+   Case's `status_id` is On Hold (3) while the questions are asked. Each answer is an Observation,
+   tagged with a side and a confidence like any check and named on its question (`answer`:
+   `observation`); the Case returns to In Progress and is resolved again. The wait is HITL dwell
+   time. The Case closes as **Insufficient Data** (7) only when no evidence that could prove either
+   side can be obtained: every open question has been answered that the evidence `does not exist` or
+   `cannot be reached`, with the reason, an answer that adds no Observation. It closes with a
+   monitoring watch (`watch_until`: re-open on recurrence of the entities; active monitoring for the retention window at High or Critical
+   severity) and a visibility or tuning ticket. Never stop for doubt; never "escalate".
 9. **Re-classify on evidence drift** (§2.2.5). If the objective differs from or exceeds the candidate
    category, change `incident_category`, re-run step 3 for the new playbook, carry every observation
    forward, and record the pivot and its reason in the Note. The classification stays provisional until
@@ -278,6 +284,7 @@ but apply nothing.
 ## Completion criteria and critical failures
 
 Complete when the Case is resolved per §2.4, reach is assessed where Malicious was proven, the
-Investigation Note is produced and the contract or the closure verdict, at `severity_id` 1, is emitted, plus the playbook's category-specific criteria. The playbook's **Critical
+Investigation Note is produced and the contract or the closure verdict, at `severity_id` 1, is emitted
+(a Case On Hold is not complete: it waits for its answers), plus the playbook's category-specific criteria. The playbook's **Critical
 Failures** void the run regardless of anything else; so does a verdict reached without a required query,
 a closure that leaves a confirmed foothold, or a Note whose material observations lack event references.

@@ -1,0 +1,74 @@
+{
+ "case_uid": "CASE-2201",
+ "severity": "Medium",
+ "playbook": "04-Playbooks/02-Investigation-Response/00-generic.md",
+ "playbook_version": "2026-11-13",
+ "incident_category": "IC-06",
+ "alerts": [
+  {
+   "id": "DF-2201-1",
+   "confidence": "Medium"
+  },
+  {
+   "id": "DF-2201-2",
+   "confidence": "Medium"
+  }
+ ],
+ "observations": [
+  {
+   "id": "O1",
+   "desc": "Custom audit alert: a conditional access policy of the tenant was changed to exclude one group.",
+   "side": "Malicious",
+   "confidence": "Medium",
+   "alert_type": "Suspicious IAM policy / role change",
+   "entity": "tenant:contoso",
+   "event_refs": [
+    "DF-2201-1"
+   ],
+   "first_seen": "2026-11-09T21:40:12Z",
+   "timeline": true
+  },
+  {
+   "id": "O2",
+   "desc": "Custom audit alert: the excluded group gained a member four minutes before the policy change.",
+   "side": "Malicious",
+   "confidence": "Medium",
+   "alert_type": "Privileged role / group grant",
+   "entity": "group:helpdesk-temp",
+   "event_refs": [
+    "DF-2201-2"
+   ],
+   "first_seen": "2026-11-09T21:36:03Z",
+   "timeline": true
+  }
+ ],
+ "no_information_refs": [],
+ "scoped_negative_refs": [],
+ "visibility_gaps": [
+  {
+   "data_source": "Cloud audit logs",
+   "check_prevented": "who changed the policy, and from which session"
+  },
+  {
+   "data_source": "Identity provider sign-in logs",
+   "check_prevented": "whether the account that changed it signed in as it usually does"
+  }
+ ],
+ "no_query_left": true,
+ "questions": [
+  {
+   "id": "Q1",
+   "question": "Which account changed the conditional access policy on 9 November at 21:40 UTC, and from which session?",
+   "asked_of": "the tenant's identity administrator",
+   "asked_at": "2026-11-10T08:05:00Z",
+   "answer": null
+  },
+  {
+   "id": "Q2",
+   "question": "Was the change to the helpdesk-temp group requested, and by whom?",
+   "asked_of": "the owner of the helpdesk service",
+   "asked_at": "2026-11-10T08:05:00Z",
+   "answer": null
+  }
+ ]
+}

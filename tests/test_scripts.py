@@ -281,10 +281,14 @@ class ResolutionRule(unittest.TestCase):
         r = inv.resolve({"observations": f})
         self.assertEqual(r["outcome"], "Benign proven"); self.assertEqual(r["confidence"], "Medium"); self.assertEqual(r["residual_low_malicious"], ["m"])
 
-    def test_insufficient_data_at_timebox(self):
+    def test_neither_proven_runs_the_remaining_queries_and_no_clock_closes_it(self):
         f = [{"id": "m", "side": "Malicious", "confidence": "Medium"}, {"id": "b", "side": "Benign", "confidence": "Low"}]
-        self.assertIsNone(inv.resolve({"observations": f})["verdict_id"])
-        self.assertEqual(inv.resolve({"observations": f, "timebox_expired": True})["verdict_id"], 7)
+        r = inv.resolve({"observations": f})
+        self.assertEqual((r["outcome"], r["verdict_id"]), ("Neither proven", None))
+        # the fields of the removed investigation clock are read by nothing
+        late = inv.resolve({"observations": f, "timebox_expired": True, "started_at": "2020-01-01T00:00:00Z", "timebox_minutes": 1})
+        self.assertEqual((late["outcome"], late["verdict_id"]), ("Neither proven", None))
+        self.assertNotIn("timebox", late)
 
     def test_same_artifact_counts_once(self):
         f = [{"id": "t", "side": "Malicious", "confidence": "Medium", "artifact": "hash:1"}, {"id": "i", "side": "Malicious", "confidence": "Medium", "artifact": "hash:1"}]
@@ -342,53 +346,99 @@ class Scoring(unittest.TestCase):
         self.assertEqual(r["benign_score"], 0)
 
 
-class TimeboxFromLedger(unittest.TestCase):
-    # Guardrails §5: 10 minutes at High or Critical severity, 20 otherwise; an organization may tighten them
-    F = [{"id": "m", "side": "Malicious", "confidence": "Medium", "at": "2026-09-14T15:04:00Z"},
-         {"id": "b", "side": "Benign", "confidence": "Low", "at": "2026-09-14T15:09:00Z"}]
-    START, AT_12 = "2026-09-14T15:00:00Z", "2026-09-14T15:12:00Z"
+class HeldNeverClosedByAClock(unittest.TestCase):
+    """DD-34, Detection & Analysis §2.4: an undecided Case goes On Hold with its questions asked once no
+    query is left, and closes as Insufficient Data only when no evidence that could prove a side can be
+    obtained."""
 
-    def test_high_severity_expires_after_ten_minutes(self):
-        r = inv.resolve({"observations": self.F, "started_at": self.START, "severity": "High"}, now=self.AT_12)
-        self.assertEqual(r["timebox"], {"minutes": 10, "elapsed_minutes": 12.0, "expired": True, "source": "computed"})
-        self.assertEqual(r["verdict_id"], 7)
+    F = [{"id": "m", "side": "Malicious", "confidence": "Medium", "event_refs": ["E1"]},
+         {"id": "b", "side": "Benign", "confidence": "Low", "event_refs": ["E2"]}]
+    ASKED = {"id": "Q1", "question": "who approved the change?", "asked_of": "the service owner", "asked_at": "2026-09-14T15:20:00Z"}
 
-    def test_medium_severity_has_twenty_minutes(self):
-        r = inv.resolve({"observations": self.F, "started_at": self.START, "severity_id": 3}, now=self.AT_12)
-        self.assertFalse(r["timebox"]["expired"]); self.assertEqual(r["timebox"]["minutes"], 20)
-        self.assertIsNone(r["verdict_id"])
+    def fixture(self, name):
+        with open(os.path.join(FIXTURES, name), encoding="utf-8") as f:
+            return json.load(f)
 
-    def test_the_end_is_now_then_resolved_at_then_the_clock_never_the_last_observation(self):
-        ledger = {"observations": self.F, "started_at": self.START, "severity": "Low", "resolved_at": "2026-09-14T15:25:00Z"}
-        self.assertTrue(inv.resolve(ledger)["timebox"]["expired"])
-        self.assertFalse(inv.resolve(ledger, now="2026-09-14T15:05:00Z")["timebox"]["expired"])
-        del ledger["resolved_at"]  # a stalled run: the last observation is at +9 minutes, the clock is years later
-        self.assertTrue(inv.resolve(ledger)["timebox"]["expired"])
+    def ledger(self, *questions, **extra):
+        return dict({"observations": self.F, "no_query_left": True, "questions": list(questions)}, **extra)
 
-    def test_computed_value_overrides_a_self_reported_flag(self):
-        r = inv.resolve({"observations": self.F, "started_at": self.START, "severity": "Critical", "timebox_expired": False}, now=self.AT_12)
-        self.assertTrue(r["timebox"]["expired"]); self.assertIn("self-reported", r["timebox_note"])
+    def test_with_no_query_left_the_case_is_held_and_asks_its_questions(self):
+        r = inv.resolve(self.fixture("ledger_on_hold_audit_records_asked.json"))
+        self.assertEqual((r["outcome"], r["verdict_id"], r["verdict"], r["status_id"]), ("On Hold", 0, "Unknown", 3))
+        self.assertEqual([(q["id"], q["state"]) for q in r["questions"]], [("Q1", "waiting"), ("Q2", "waiting")])
+        self.assertNotIn("severity_id", r, "a held Case is open and keeps its severity")
+        self.assertIn("No clock closes the Case", r["next"])
 
-    def test_without_a_start_the_flag_is_used_and_marked_self_reported(self):
-        r = inv.resolve({"observations": self.F, "timebox_expired": True})
-        self.assertEqual(r["timebox"]["source"], "self-reported"); self.assertEqual(r["verdict_id"], 7)
+    def test_every_open_question_unobtainable_closes_as_insufficient_data_with_its_watch(self):
+        r = inv.resolve(self.fixture("ledger_insufficient_data_evidence_unobtainable.json"))
+        self.assertEqual((r["outcome"], r["verdict_id"], r["severity_id"]), ("Insufficient Data", 7, 1))
+        self.assertEqual([(q["id"], q["answer"]) for q in r["questions"]], [("Q1", "does not exist"), ("Q2", "cannot be reached")])
+        self.assertEqual(r["watch"], "re-open on recurrence of the entities")
+        self.assertIn("visibility or tuning ticket", r["next"])
+        high = dict(self.fixture("ledger_insufficient_data_evidence_unobtainable.json"), severity="High")
+        self.assertIn("active monitoring", inv.resolve(high)["watch"])
 
-    def test_an_organization_may_tighten_the_reference_value_not_extend_it(self):
-        base = {"observations": self.F, "started_at": self.START, "severity": "High"}
-        tight = inv.resolve(dict(base, timebox_minutes=5), now="2026-09-14T15:06:00Z")
-        self.assertEqual(tight["timebox"]["minutes"], 5); self.assertTrue(tight["timebox"]["expired"])
-        loose = inv.resolve(dict(base, timebox_minutes=30), now=self.AT_12)
-        self.assertEqual(loose["timebox"]["minutes"], 10); self.assertTrue(loose["timebox"]["expired"])
-        self.assertIn("ignored", loose["timebox_note"])
+    def test_one_question_still_waiting_keeps_the_case_held(self):
+        ledger = self.fixture("ledger_insufficient_data_evidence_unobtainable.json")
+        ledger["questions"][1].update(answer=None, reason=None)
+        r = inv.resolve(ledger)
+        self.assertEqual((r["outcome"], r["verdict_id"]), ("On Hold", 0))
+        self.assertEqual([q["state"] for q in r["questions"]], ["unobtainable", "waiting"])
 
-    def test_timestamps_out_of_order_are_reported(self):
-        r = inv.resolve({"observations": self.F, "started_at": "2026-09-14T15:05:00Z", "severity": "High"}, now="2026-09-14T15:00:00Z")
-        self.assertEqual(r["timebox"]["elapsed_minutes"], 0.0)
-        self.assertIn("precedes started_at", r["timebox_note"]); self.assertIn("m", r["timebox_note"])
+    def test_while_a_query_is_left_nothing_is_held_whatever_the_questions_say(self):
+        ledger = self.fixture("ledger_insufficient_data_evidence_unobtainable.json"); ledger["no_query_left"] = False
+        r = inv.resolve(ledger)
+        self.assertEqual((r["outcome"], r["verdict_id"]), ("Neither proven", None)); self.assertNotIn("questions", r)
 
-    def test_a_malformed_timestamp_is_a_value_error(self):
+    def test_budget_exhaustion_leads_to_the_same_rule_on_the_evidence_at_hand(self):
+        held = inv.resolve({"observations": self.F, "budget_exhausted": True, "questions": [self.ASKED]})
+        self.assertEqual((held["outcome"], held["verdict_id"]), ("On Hold", 0))
+        closed = inv.resolve({"observations": self.F, "budget_exhausted": True,
+                              "questions": [dict(self.ASKED, answer="cannot be reached", reason="the owner left no record")]})
+        self.assertEqual(closed["verdict_id"], 7)
+        proven = inv.resolve({"observations": [{"id": "m", "side": "Malicious", "confidence": "High", "event_refs": ["E"]}],
+                              "budget_exhausted": True, "questions": [self.ASKED]})
+        self.assertEqual(proven["outcome"], "Malicious proven", "a side the evidence proves is not held")
+
+    def test_a_held_case_with_no_question_named_says_so_and_is_never_closed(self):
+        r = inv.resolve(self.ledger())
+        self.assertEqual((r["outcome"], r["verdict_id"], r["questions"]), ("On Hold", 0, []))
+        self.assertIn("no open question is named", r["questions_note"])
+
+    def test_a_question_is_to_ask_until_somebody_is_named_to_answer_it(self):
+        r = inv.resolve(self.ledger({"id": "Q1", "question": "who approved the change?"}))
+        self.assertEqual(r["questions"][0]["state"], "to ask")
+
+    def test_an_answer_that_is_an_observation_closes_its_question_and_is_scored(self):
+        answered = dict(self.ASKED, answer="observation", observation="a1")
+        still = inv.resolve(self.ledger(answered, observations=self.F + [{"id": "a1", "side": "Benign", "confidence": "Low", "event_refs": ["E3"]}]))
+        self.assertEqual((still["outcome"], still["questions"]), ("On Hold", []), "answered, and neither side proven yet")
+        self.assertIn("no open question is named", still["questions_note"])
+        decided = inv.resolve(self.ledger(answered, observations=[self.F[1], {"id": "m", "side": "Malicious", "confidence": "Medium", "event_refs": ["E1"], "covered": True},
+                                                                   {"id": "a1", "side": "Benign", "confidence": "High", "condition": "benign", "event_refs": ["E3"]}]))
+        self.assertEqual((decided["outcome"], decided["verdict_id"]), ("Benign proven", 5), "the answer is an Observation and the Case is resolved again")
+        missing = inv.resolve(self.ledger(dict(self.ASKED, answer="observation", observation="a9")))
+        self.assertEqual(missing["questions"][0]["state"], "waiting"); self.assertIn("no observation of the ledger", missing["questions_note"])
+
+    def test_unobtainable_without_a_reason_is_not_an_answer(self):
+        r = inv.resolve(self.ledger(dict(self.ASKED, answer="does not exist")))
+        self.assertEqual((r["outcome"], r["questions"][0]["state"]), ("On Hold", "waiting"))
+        self.assertIn("gives no reason", r["questions_note"])
+
+    def test_an_answer_the_rule_does_not_know_is_an_invalid_ledger(self):
         with self.assertRaises(ValueError):
-            inv.resolve({"observations": [], "started_at": "yesterday"})
+            inv.resolve(self.ledger(dict(self.ASKED, answer="probably fine")))
+        with self.assertRaises(ValueError):
+            inv.resolve(self.ledger(questions="ask the owner"))
+
+    def test_the_script_no_longer_takes_a_clock(self):
+        import subprocess, sys
+        script = os.path.join(ROOT, "skills", "zerosoc-investigation", "scripts", "resolve.py")
+        path = os.path.join(FIXTURES, "ledger_on_hold_audit_records_asked.json")
+        self.assertEqual(subprocess.run([sys.executable, script, path, "--now=2026-09-14T15:12:00Z"], capture_output=True).returncode, 2)
+        done = subprocess.run([sys.executable, script, path, "--json"], capture_output=True, text=True)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(json.loads(done.stdout)["outcome"], "On Hold")
 
 
 class LedgerDedup(unittest.TestCase):
@@ -1322,8 +1372,7 @@ class RunCheck(unittest.TestCase):
         rows = [{"type": "device", "name": "ws-01", "alert_ids": ["A1"]},
                 {"type": "process", "name": "cmd.exe", "pid": 5120, "created": "2026-09-14T14:55:41Z",
                  "device": "ws-01", "alert_ids": ["A1"]}]
-        ledger = {"case_uid": "CASE-1", "severity": "High", "started_at": "2026-09-14T15:00:00Z",
-                  "resolved_at": "2026-09-14T15:06:00Z",
+        ledger = {"case_uid": "CASE-1", "severity": "High",
                   "evidence_inventory": {"extracted": 2, "source_count": 2, "complete": True},
                   "detection_metadata": {
                       "alerts": [{"id": "A1", "techniques": [{"id": "T1003", "rendered": "T1003 (OS Credential Dumping)"}],
@@ -1451,17 +1500,34 @@ class RunCheck(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("FAIL  triage: extracted count matches the evidence", out)
 
-    def test_a_declared_timebox_fails(self):
+    def held(self, recorded, *questions):
+        """A run whose investigation proved neither side, with no query left."""
         base = self.run_dir()
-        with open(os.path.join(base, "ledger.investigation.json"), encoding="utf-8") as f:
+        path = os.path.join(base, "ledger.investigation.json")
+        with open(path, encoding="utf-8") as f:
             ledger = json.load(f)
-        del ledger["started_at"]
-        ledger["timebox_expired"] = False
-        with open(os.path.join(base, "ledger.investigation.json"), "w", encoding="utf-8") as f:
+        ledger["observations"][0]["confidence"] = "Medium"
+        ledger.update(no_query_left=True, questions=list(questions), recorded_verdict=recorded)
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(ledger, f)
-        code, out = self.check(base)
+        return self.check(base)
+
+    def test_a_case_closed_while_a_question_waits_fails(self):
+        asked = {"id": "Q1", "question": "who ran the tool?", "asked_of": "the device's owner"}
+        code, out = self.held("Insufficient Data", asked)
         self.assertEqual(code, 1)
-        self.assertIn("FAIL  timebox: measured, not declared", out)
+        self.assertIn("FAIL  hold: no clock closed the Case", out)
+        code, out = self.held("On Hold", asked)
+        self.assertEqual(code, 0, out)
+        self.assertIn("ok    hold: the questions of a held Case are named", out)
+        code, out = self.held("Insufficient Data", dict(asked, answer="does not exist", reason="the device was re-imaged"))
+        self.assertEqual(code, 0, out)
+        self.assertIn("each answered that the evidence cannot be obtained", out)
+
+    def test_a_held_case_that_names_no_question_fails(self):
+        code, out = self.held("On Hold")
+        self.assertEqual(code, 1)
+        self.assertIn("FAIL  hold: the questions of a held Case are named", out)
 
     def test_a_gap_the_binding_implies_but_the_run_does_not_record_fails(self):
         base = self.run_dir(domain="Endpoint", visibility_gaps=[
@@ -1580,17 +1646,15 @@ class Procedures(unittest.TestCase):
         sweep = text[text.index("retrospective"):]
         self.assertIn("`cases.store`", sweep[:700])
 
-    def test_the_timebox_runs_from_when_the_case_is_taken_not_from_when_the_ledger_is_started(self):
-        # Guardrails §5 gives an executor assigned a Case in Investigation ten or twenty minutes: the clock
-        # starts at the assignment, so the procedure names `started_at` at its first step, before reading
-        # the Triage Note, the extraction and the playbook selection, and the ledger carries that time
-        text = self.read("zerosoc-investigation")
-        procedure = text[text.index("## Procedure"):]
-        first = procedure.index("`started_at`")
-        self.assertLess(first, procedure.index("Read what triage did"))
-        self.assertLess(first, procedure.index("2. **Extract the evidence inventory**"))
-        step = procedure[procedure.index("1. **Start the ledger"):procedure.index("2. **Extract")]
-        self.assertIn("`started_at` as noted here (never the time this file is created)", step)
+    def test_an_undecided_case_is_held_and_no_step_names_a_clock(self):
+        # DD-34: the investigation has no clock to start, and step 8 holds an undecided Case with its questions
+        text = " ".join(self.read("zerosoc-investigation").split())
+        step = text[text.index("8. **Resolve**"):text.index("9. **Re-classify on evidence drift**")]
+        self.assertIn("**No clock closes a Case.**", step)
+        self.assertLess(step.index("`questions`"), step.index("**On Hold**"))
+        self.assertLess(step.index("**On Hold**"), step.index("**Insufficient Data** (7) only when"))
+        for gone in ("`started_at`", "`resolved_at`", "`timebox_minutes`"):
+            self.assertNotIn(gone, text)
 
 
 class AutonomyMatrix(unittest.TestCase):
@@ -1771,7 +1835,7 @@ class RetiredWording(unittest.TestCase):
     its removal is still applied by whoever reads it."""
 
     RETIRED = ("pre-authori", "preauthori", "approval tier", "handover", "crown jewel", "crown-jewel",
-               "requires human review",
+               "requires human review", "timebox", "started_at", "resolved_at",
                # "at Low confidence every containment action requires approval": the matrix says what Low allows
                r"low\W{0,3}confidence[^.]{0,80}every containment action", r"confidence is low")
 
@@ -1875,9 +1939,14 @@ class AlertsAloneDoNotProve(unittest.TestCase):
         f = [{"id": "O1", "side": "Malicious", "confidence": "High", "event_refs": ["x1"]}]
         self.assertEqual(inv.resolve({"alerts": alerts, "observations": f})["outcome"], "Malicious proven")
 
-    def test_at_the_timebox_the_unchecked_alerts_close_as_insufficient_data(self):
-        r = inv.resolve({"alerts": self.ALERTS, "observations": self._obs(), "timebox_expired": True})
-        self.assertEqual((r["verdict_id"], r["outcome"]), (7, "Neither proven at timebox/budget expiry"))
+    def test_with_no_query_left_the_unchecked_alerts_are_held_and_ask_for_what_they_could_not_reach(self):
+        # §2.4, "the alerts alone do not prove it": On Hold, then Insufficient Data if the records cannot be obtained
+        asked = {"id": "Q1", "question": "the audit records of the change", "asked_of": "the tenant's administrator"}
+        r = inv.resolve({"alerts": self.ALERTS, "observations": self._obs(), "no_query_left": True, "questions": [asked]})
+        self.assertEqual((r["verdict_id"], r["outcome"]), (0, "On Hold"))
+        r = inv.resolve({"alerts": self.ALERTS, "observations": self._obs(), "no_query_left": True,
+                         "questions": [dict(asked, answer="does not exist", reason="auditing was off")]})
+        self.assertEqual((r["verdict_id"], r["outcome"]), (7, "Insufficient Data"))
 
     def test_a_ledger_that_names_no_alerts_is_resolved_as_before_and_says_so(self):
         r = inv.resolve({"observations": self._obs()})

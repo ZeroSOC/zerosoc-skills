@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Apply the hypothesis resolution rule of Detection & Analysis §2.4 to an observations ledger. Standard library only.
 
-  resolve.py ledger.json [--benign-kind fp|benign] [--now 2026-09-14T15:12:00Z] [--json]
+  resolve.py ledger.json [--benign-kind fp|benign] [--json]
 
 Ledger (JSON):
 {
-  "case_uid": "CASE-1", "severity": "High" (or "severity_id": 4), "started_at": "2026-09-14T15:00:00Z",
+  "case_uid": "CASE-1", "severity": "High" (or "severity_id": 4),
   "playbook": "04-Playbooks/02-Investigation-Response/02-malware.md", "playbook_version": "2026-09-16",
   "incident_category": "IC-02",
   "alerts": [{"id": "<alert id>", "confidence": "Low|Medium|High", "ids": ["<merged source alert ids>"]}],
@@ -23,8 +23,11 @@ Ledger (JSON):
                                 this gate: the remediation state as it now stands, and the disposition of
                                 the source's recommended actions,
   "no_information_refs": ["<event id>"], "scoped_negative_refs": ["<event id>"],
-  "visibility_gaps": [], "duplicate_of": null, "budget_exhausted": false,
-  "timebox_minutes": null, "resolved_at": null, "timebox_expired": false
+  "visibility_gaps": [], "duplicate_of": null,
+  "no_query_left": false, "budget_exhausted": false,
+  "questions": [{"id": "Q1", "question": "...", "asked_of": "<who can answer>", "asked_at": "2026-09-14T15:20:00Z",
+                 "answer": null | "observation" | "does not exist" | "cannot be reached",
+                 "observation": "O7", "reason": "...", "answered_by": "...", "answered_at": "..."}]
 }
 "at" is when the observation was made; "first_seen" is when the thing it reports happened, "event_refs" the
 events it rests on and "timeline" whether the Case Timeline shows it; note_elements.py and timeline.py read
@@ -48,13 +51,25 @@ Detection & Analysis §1.5, which §2.4 applies to the same two verdicts. --beni
 ledger whose observations carry no "condition" key, written before it existed.
 "covered" on a Malicious observation means the Benign explanation accounts for it (§2.4 coverage). Observations
 that share an "artifact" on the same side count once, and so do alert observations of the same "alert_type"
-on the same "entity" (§1.1). The timebox is measured, not declared: elapsed time runs from "started_at"
-to --now, else "resolved_at", else the current time, against 10 minutes at High or Critical severity and
-20 otherwise ("timebox_minutes" may tighten the reference value, never extend it). Observation and step
-timestamps ("at") are checked against "started_at". Without "started_at" the script falls back to the
-self-reported "timebox_expired" and says so. Prints the score
+on the same "entity" (§1.1).
+No clock closes a Case (§2.4). When neither side is proven, the outcome is "Neither proven" while the
+executor still has a discriminating query it can run. "no_query_left" says it has none, and
+"budget_exhausted" that the Case's budget allows none: the rule is then applied to the evidence at hand,
+and an undecided Case is held. "questions" are the questions whose answers could prove a side, each asked
+of whoever can answer it ("asked_of", "asked_at"). An "answer" of "observation" names in "observation"
+the Observation the answer produced, which is in "observations" with its side and confidence and is
+scored like any check; the question is then closed. An "answer" of "does not exist" or "cannot be
+reached" says the evidence cannot be obtained, with the "reason" and who said so ("answered_by"); it adds
+no Observation, and one without a reason is read as not answered. A question with no answer is open.
+With no query left the outcome is "On Hold", verdict Unknown (0) and "status_id" 3, while a question
+waits for its answer, or while none that is still open is named; "questions" in the output lists the open
+ones, each "to ask" (nobody is named to answer it) or "waiting". The outcome is "Insufficient Data" (7),
+closed at "severity_id" 1 with a monitoring watch ("watch"), only when every question no Observation
+answered has been answered that the evidence does not exist or cannot be reached, and there is at least
+one such question.
+Prints the score
 of each side, which side is proven, the verdict and confidence to record, the residual observations, the
-timebox, and the next step; with --json also "counted": per side, the ids of the observations standing (not
+questions of a held Case, and the next step; with --json also "counted": per side, the ids of the observations standing (not
 retracted) and of those the score counts, once the ones that carry no information are set aside and one alert
 type on one entity, or one artifact, counts once; a Note quotes it rather than recounting. "scoring" says how
 each standing observation entered its side's score, in ledger order: "weight" and "confidence" where it is
@@ -87,7 +102,6 @@ show, each with the observations showing it, and names the recorded ones no stan
 observation shows nothing, so a retraction takes its techniques with it.
 """
 import argparse, json, os, re, sys
-from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import no_information  # copied next to this script by tools/build_references.py
@@ -162,39 +176,36 @@ def dedupe(observations, folded=None):
     return out
 
 
-def _utc(stamp):
-    t = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
-    return t if t.tzinfo else t.replace(tzinfo=timezone.utc)
+UNOBTAINABLE = ("does not exist", "cannot be reached")
+"""The answers that say the evidence a question asks for cannot be obtained (§2.4)."""
 
 
-def timebox(ledger, now=None):
-    """The investigation timebox measured from the ledger's timestamps; (record, notes)."""
-    severity = ledger.get("severity") or SEVERITY.get(ledger.get("severity_id"), "Medium")
-    reference = 10 if str(severity).capitalize() in ("High", "Critical") else 20
-    minutes, notes = reference, []
-    override = ledger.get("timebox_minutes")
-    if override:
-        if override < reference:
-            minutes = override
-        elif override > reference:
-            notes.append(f"timebox_minutes={override} ignored: an organization may tighten the reference value ({reference}), not extend it")
-    reported = ledger.get("timebox_expired")
-    if not ledger.get("started_at"):
-        notes.append("timebox self-reported: the ledger has no started_at, so elapsed time cannot be checked")
-        return {"minutes": minutes, "elapsed_minutes": None, "expired": bool(reported), "source": "self-reported"}, notes
-    start = _utc(ledger["started_at"])
-    end = _utc(now or ledger.get("resolved_at") or datetime.now(timezone.utc).isoformat())
-    early = [x.get("id", "?") for x in ledger.get("observations", []) + ledger.get("steps", []) if x.get("at") and _utc(x["at"]) < start]
-    if early:
-        notes.append("timestamps precede started_at: " + ", ".join(map(str, early)))
-    elapsed = round((end - start).total_seconds() / 60, 1)
-    if elapsed < 0:
-        notes.append("the end time precedes started_at: elapsed time counted as 0")
-        elapsed = 0.0
-    record = {"minutes": minutes, "elapsed_minutes": elapsed, "expired": elapsed >= minutes, "source": "computed"}
-    if reported is not None and bool(reported) != record["expired"]:
-        notes.append(f"timebox computed from the ledger timestamps; the self-reported timebox_expired={str(bool(reported)).lower()} was ignored")
-    return record, notes
+def questions(ledger):
+    """§2.4: the questions whose answers could prove a side, as the ledger records them: (the open ones,
+    each "to ask", "waiting" or "unobtainable"; notes). A question an Observation answered is closed."""
+    held = {str(f.get("id")) for f in ledger.get("observations", [])}
+    out, notes = [], []
+    listed = ledger.get("questions") or []
+    if not isinstance(listed, list) or any(not isinstance(q, dict) for q in listed):
+        raise ValueError('"questions" is a list of objects')
+    for n, q in enumerate(listed, 1):
+        label = str(q.get("id") or f"Q{n}")
+        answer = str(q.get("answer") or "").strip().lower()
+        if answer == "observation" and str(q.get("observation")) in held:
+            continue
+        state = "waiting" if q.get("asked_of") else "to ask"
+        if answer == "observation":
+            notes.append(f"{label} is answered by {q.get('observation')!r}, which is no observation of the ledger: it is read as not answered")
+        elif answer in UNOBTAINABLE:
+            if str(q.get("reason") or "").strip():
+                state = "unobtainable"
+            else:
+                notes.append(f"{label} says the evidence {answer} and gives no reason: it is read as not answered")
+        elif answer:
+            raise ValueError(f'question {label}: "answer" is "observation", "does not exist" or "cannot be reached"')
+        out.append({"id": label, "question": q.get("question"), "asked_of": q.get("asked_of"), "state": state,
+                    **({"answer": answer, "reason": q.get("reason")} if state == "unobtainable" else {})})
+    return out, notes
 
 
 CLOSED = 1
@@ -355,7 +366,7 @@ def scoring(standing, weightless, aligned, active, folded):
     return out
 
 
-def resolve(ledger, now=None):
+def resolve(ledger):
     standing = [f for f in ledger.get("observations", []) if not f.get("retracted") and f.get("side") in ("Malicious", "Benign")]
     attacks = techniques(ledger, standing)
     empty, empty_note = no_information.refs(ledger)
@@ -389,9 +400,6 @@ def resolve(ledger, now=None):
         r["no_information_note"] = empty_note
     if not ledger.get("alerts"):
         r["alerts_note"] = "the ledger names no alerts: Malicious is resolved by the score alone, without the §2.4 test of what stands beyond the alerts"
-    box, box_notes = timebox(ledger, now)
-    r["timebox"] = box
-    if box_notes: r["timebox_note"] = "; ".join(box_notes)
     inventory = inventory_note(ledger.get("evidence_inventory")) if inventory_note else None
     if inventory: r["evidence_inventory_note"] = inventory
     record = ledger.get("detection_metadata")
@@ -426,13 +434,22 @@ def resolve(ledger, now=None):
                      "not shown": "show that nothing in the activity reached the environment, or take it that something did; then "}[state]
             r.update(outcome="Malicious proven", attacks=attacks,
                      next=first + "confirm the Incident (§2.5): re-assess severity (Low to Critical) and category, keep the confidence this rule prints on the observations that stand, estimate the impact, plan the initial response actions; then the definitive category, the Incident's techniques in \"attacks\" from the observations that stand, start_time carrying T0, the retrospective entity sweep (§3.1) and the Investigation → Response contract")
+    elif not (ledger.get("no_query_left") or ledger.get("budget_exhausted")):
+        r.update(outcome="Neither proven", verdict_id=None, next="run the remaining discriminating queries (listed or added); seek evidence against the favoured side. When none is left that you can run, record \"no_query_left\" and the questions whose answers could prove a side")
     else:
-        if box["expired"] or ledger.get("budget_exhausted"):
-            r.update(outcome="Neither proven at timebox/budget expiry", verdict_id=7, verdict="Insufficient Data", confidence_id=None,
-                     severity_id=CLOSED,
-                     next="close as Insufficient Data with a monitoring watch (re-open on recurrence of the entities); emit a visibility or tuning ticket; record the state reached")
+        open_questions, notes = questions(ledger)
+        if notes: r["questions_note"] = "; ".join(notes)
+        r["questions"] = open_questions
+        if open_questions and all(q["state"] == "unobtainable" for q in open_questions):
+            active = severity_of(ledger) in ("High", "Critical")
+            r.update(outcome="Insufficient Data", verdict_id=7, verdict="Insufficient Data", confidence_id=None, severity_id=CLOSED,
+                     watch="active monitoring of the entities for the retention window" if active else "re-open on recurrence of the entities",
+                     next="close as Insufficient Data: no evidence that could prove either side can be obtained. Set the monitoring watch (watch_until), emit a visibility or tuning ticket, and name in the Note each question and why its evidence does not exist or cannot be reached")
         else:
-            r.update(outcome="Neither proven", verdict_id=None, next="run the remaining discriminating queries (listed or added); seek evidence against the favoured side")
+            if not open_questions:
+                r["questions_note"] = "; ".join(notes + ["no open question is named: name the questions whose answers could prove a side, and who can answer each"])
+            r.update(outcome="On Hold", verdict_id=0, verdict="Unknown", confidence_id=None, status_id=3,
+                     next="hold the Case (status_id 3, On Hold) with verdict Unknown: ask each question of whoever can answer it. Each answer is an Observation, tagged with a side and a confidence like any check, and the Case returns to In Progress to be resolved again; an answer that the evidence does not exist or cannot be reached is recorded on the question. No clock closes the Case: one that misses the organization's response-time target for its severity is escalated to the SOC Manager")
     if attacks["recorded"] and not r.get("incident"):
         r["attacks_note"] = "the ledger records the Incident's techniques, but no Incident is confirmed: the Case's \"attacks\" stay empty"
     return r
@@ -442,11 +459,10 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("ledger")
     ap.add_argument("--benign-kind", choices=["fp", "benign"], type=str.lower)
-    ap.add_argument("--now", help="UTC time to measure the timebox against (default: resolved_at, else the current time)")
     ap.add_argument("--json", action="store_true")
     a = ap.parse_args()
     try:
-        r = resolve(json.load(open(a.ledger, encoding="utf-8")), now=a.now)
+        r = resolve(json.load(open(a.ledger, encoding="utf-8")))
     except ValueError as exc:
         sys.exit(f"invalid ledger: {exc}")
     if a.benign_kind and r.get("outcome") == "Benign proven" and r.get("verdict_id") is None:
@@ -471,8 +487,10 @@ def main():
         if r["attacks"]["untraced"]:
             print("Shown by no standing observation (record it on the observation that shows it, or leave it out): "
                   + ", ".join(r["attacks"]["untraced"]))
-    box = r["timebox"]
-    print(f"Timebox: {box['minutes']} min, elapsed {box['elapsed_minutes'] if box['elapsed_minutes'] is not None else '?'} min, {'EXPIRED' if box['expired'] else 'running'} ({box['source']})")
+    for q in r.get("questions", []):
+        print(f"Question {q['id']} ({q['state']}" + (f", {q['asked_of']}" if q.get("asked_of") else "") + f"): {q.get('question') or ''}"
+              + (f" — the evidence {q['answer']}: {q['reason']}" if q["state"] == "unobtainable" else ""))
+    if r.get("watch"): print("Watch: " + r["watch"])
     if r.get("no_information"): print("Carry no information (not counted): " + ", ".join(r["no_information"]))
     for side in ("Malicious", "Benign"):
         held = [x for x in r["scoring"] if x["side"] == side]
@@ -481,7 +499,7 @@ def main():
                   + " + ".join(f"{x['id']} {x['weight']}" for x in held if x["counted"])
                   + "".join(f"; {x['id']} counts as {x['same_as']}" for x in held if x.get("same_as"))
                   + "".join(f"; {x['id']} carries no information" for x in held if x.get("reason") == "no-information"))
-    for key in ("reach_note", "severity_note", "timebox_note", "evidence_inventory_note", "no_information_note", "attacks_note"):
+    for key in ("reach_note", "severity_note", "questions_note", "evidence_inventory_note", "no_information_note", "attacks_note"):
         if r.get(key): print("Note: " + r[key])
     for note in r.get("detection_notes", []): print("Note: " + note)
     print("Next: " + r["next"])

@@ -37,7 +37,8 @@ executor puts that language in its place; read as it is, it means the language o
 - A question may be about an entity no alert cited, where the Case's own evidence names it: the
   host a command copied to, the address a script reached for. Scope stays inside the Case: an
   entity nothing in the Case mentions is not asked about.
-- Ask only what the Case needs: the investigation's timebox and the Case's budget are finite, and
-  both are the organization's settings.
+- Ask only what the Case needs: the Case's budget is finite, and it is the organization's setting.
+  A question no query you can run answers is named with who can answer it, and asked once no query
+  is left: no clock closes the Case.
 - The kind of question decides which capability answers it; name the class the kind belongs to.
 - Write in $language. Technique codes are always `ID (Name)`.

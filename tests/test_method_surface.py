@@ -694,7 +694,7 @@ class FromTheCommandLine(unittest.TestCase):
         return subprocess.run([sys.executable, script, *args], cwd=base, capture_output=True, text=True)
 
     def investigation(self):
-        note = ledger_note(kind="investigation", started_at="2026-09-14T15:00:00Z", severity="High",
+        note = ledger_note(kind="investigation", severity="High",
                            incident_category="IC-02", now="2026-09-14T15:12:00Z")
         note["observations"][0]["at"] = "2026-09-14T15:03:10Z"
         del note["timeline"]  # what timeline.py builds from this same ledger, not something the ledger holds
@@ -702,7 +702,7 @@ class FromTheCommandLine(unittest.TestCase):
 
     def test_one_ledger_serves_the_rule_the_note_check_and_the_timeline(self):
         document = self.investigation()
-        resolved = self.run_script("resolve.py", "ledger.json", "--now", "2026-09-14T15:12:00Z", "--json", document=document)
+        resolved = self.run_script("resolve.py", "ledger.json", "--json", document=document)
         self.assertEqual(resolved.returncode, 0, resolved.stderr)
         built = self.run_script("timeline.py", "ledger.json", "--json", document=document)
         self.assertEqual(built.returncode, 0, built.stderr)
