@@ -206,8 +206,8 @@ def build(ledger):
     return {
         "t0": t0[0] if t0 else None, "t0_utc": _utc(t0[0]) if t0 else None,
         "t0_entry": (anchor.get("desc") or anchor.get("id")) if anchor else None,
-        # the same moment under the name the Case Schema gives it: it is T0, and anchors the metrics,
-        # only once the Malicious hypothesis is proven
+        # the same moment under the name the Case Schema gives it: it is T0, the anchor of MTTD,
+        # only on a confirmed Incident
         "start_time": t0[0] if t0 else None, "start_time_utc": _utc(t0[0]) if t0 else None,
         "confirmed_incident": confirmed, **({"confirmed_incident_note": unsure} if unsure else {}),
         "stated_t0": stated[0] if stated else None, "derived_t0": derived[0] if derived else None,

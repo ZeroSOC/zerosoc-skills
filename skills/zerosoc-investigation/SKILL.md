@@ -201,7 +201,7 @@ per Case: the playbook the script prints.
     acceptable when whoever is accountable for the asset, data or policy says so, and the observation
     cites that statement. Every close of this skill (False Positive, Benign, Duplicate, Insufficient
     Data, near miss) sets `severity_id` to 1 (Informational), as `resolve.py` prints: the source's own
-    severity stays in `vendor_attributes`. Which of the two is the rule's, and
+    severity stays in `vendor_attributes`. Every close also sets `status_id` to Closed (5), at gate G3. Which of the two is the rule's, and
     `resolve.py` prints it: a Benign observation carries in the ledger the kind of the triage playbook
     condition it named, read off the list the condition is in — `"condition": "false_positive"` or
     `"benign"` — and the Case closes as Benign when the Benign observation of the highest confidence
@@ -246,7 +246,9 @@ per Case: the playbook the script prints.
     category changed, `impact_id`, `significant`, `cross_border`, `is_suspected_breach`,
     `handover_reason` when a handover occurred, `attacks` (the Incident's techniques), the planned
     response actions (step 11), and `notes` carrying the Investigation Note. `start_time` is already on
-    the Case and carries T0. Then invoke the `zerosoc-response` skill. Stakeholder notification (§3.2) is the SOC
+    the Case and carries T0. A confirmed Incident stays In Progress: its status follows the gates of
+    the response, Resolved at recovery complete (G6) and Closed when Phase 4 completes (G7). Then
+    invoke the `zerosoc-response` skill. Stakeholder notification (§3.2) is the SOC
     Manager's responsibility and starts after confirmation.
 
 ## Governance

@@ -20,8 +20,17 @@ still happened. Paths are relative to this
 skill's directory.
 
 Read once per session: [Incident Response](references/framework/03-Processes/03-response.md) (the method
-and the autonomy matrix, §2.1) and [Guardrails §2–§3](references/framework/07-Governance/agentic_guardrails.md)
-(approval payload, human assignee). Read per Incident: the playbook's Incident Response section.
+and the autonomy matrix, §2.1), [Guardrails §2–§3](references/framework/07-Governance/agentic_guardrails.md)
+(approval payload, human assignee) and [Operational Metrics §2 and §4](references/framework/05-Metrics/operational_metrics.md)
+(the gates G1 to G7 and the metrics measured between them). Read per Incident: the playbook's Incident
+Response section.
+
+The response passes four gates, and the Case's status follows them. The Incident stays In Progress
+through **G4**, containment completed (the initial containment actions, planned at confirmation,
+applied and confirmed), and **G5**, eradication verified. At **G6**, recovery complete, its
+`status_id` is set to Resolved (4). It is Closed (5) at **G7**, when Phase 4 completes. A record of
+the Case kept outside it, such as the source's incident or a ticket, never states a status the Case
+does not carry.
 
 ## When to use
 
@@ -103,19 +112,27 @@ and the autonomy matrix, §2.1) and [Guardrails §2–§3](references/framework/
    applied it. Verify from
    telemetry that contained activity has stopped before eradicating (no lateral movement from isolated
    hosts, no traffic to blocked infrastructure, no successful authentication by disabled identities);
-   correct containment that has not held.
+   correct containment that has not held. Containment is completed (**G4**) when the initial
+   containment actions are applied and confirmed: record when.
 7. **Eradicate** (§3): remove artifacts and the persistence the timeline identified (tasks, services,
    registry entries, web shells, mailbox rules, added credentials or consent grants); close the entry
    point (patch or configuration); rotate the credentials of identities the timeline confirms as
    compromised or exposed and of the secrets they could reach. A reset broader than the confirmed scope
    requires approval. A foothold not identified by the investigation expands the scope (step 1).
+   Eradication is verified (**G5**) when every action is confirmed and no foothold is left: record when.
 8. **Recover** (§4): monitor the affected entities for the verification window (24 hours of normal
    operation, reference value) before lifting containment; restore from known-good images or backups
    taken before T0 and check restored data for the eradicated artifacts; lift egress blocks, isolation
    and suspensions gradually, each removal recorded, with the Incident's detections kept active.
-9. **Transition** (§5). When containment is lifted and services are restored, hand the Case, its
-   timeline, Notes and metrics (T0, MTTD, MTTC, MTTR) to Phase 4 post-incident activity; feed indicators
-   and lure patterns to Phase 1 as tuning signals.
+9. **Transition** (§5). When containment is lifted and services are restored, recovery is complete
+   (**G6**): set the Case's `status_id` to Resolved (4) and hand the Case, its timeline, Notes and
+   metrics to Phase 4 post-incident activity; feed indicators and lure patterns to Phase 1 as tuning
+   signals. The metrics are those of Operational Metrics §4: T0, the Incident's `start_time`, anchors
+   MTTD; MTTC runs from the originating Alert received (G1) to containment completed (G4), HITL dwell
+   excluded; MTTR is Mean Time To Respond and starts at G1. Where MTTR stops is not yet settled in the
+   framework, containment completed (G4) or eradication verified (G5): record the time of each gate
+   and choose no stop of your own. Phase 4 closes the Case (**G7**, `status_id` Closed) when its
+   review has been held and its action items recorded, or when no review is required.
 
 ## Governance
 
@@ -125,6 +142,7 @@ critical failure of the run, as is any playbook-specific critical failure.
 
 ## Completion criteria
 
-Containment verified, eradication complete, recovery verified and containment lifted; every action and
-approval an `action` entry on the Case with its rollback; regulatory notifications recorded when the Incident is
-significant; the transition to Phase 4 made.
+Containment completed (G4), eradication verified (G5), recovery complete and containment lifted (G6)
+with the Case Resolved; every action and approval an `action` entry on the Case with its rollback;
+regulatory notifications recorded when the Incident is significant; the transition to Phase 4, which
+closes the Case (G7), made.

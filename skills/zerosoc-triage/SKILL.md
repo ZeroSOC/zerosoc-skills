@@ -220,7 +220,8 @@ Read per alert: the playbook section the script prints.
     `exception` ticket — the Knowledge Base entry you propose and a person confirms — unless the Knowledge
     Base already holds it) or 10 (Duplicate, with `master_case_uid`), and `severity_id` 1 (Informational),
     which every Close sets and `triage_decide.py` prints: the source's own severity stays in
-    `vendor_attributes`. Which of
+    `vendor_attributes`. A Close sets `status_id` to Closed (5): the triage disposition is gate G2,
+    and a Case closed there passes no further gate. Which of
     1 and 5 is the rule's, and `triage_decide.py` prints it: each covering Benign observation carries in the
     ledger the kind of the condition it named, read off the list the condition is in — `"condition":
     "false_positive"` or `"benign"` — and the Case closes as Benign when the covering observation of the
@@ -228,7 +229,7 @@ Read per alert: the playbook section the script prints.
     ([Detection & Analysis §1.5](references/framework/03-Processes/02-detection_and_analysis.md)). A
     Malicious observation resting on the alert records alone is set aside as a restatement of the alerts
     (`restated_alerts`) and never promotes by itself. On
-    Promote: `verdict_id` stays 0 and the Case carries the **Triage → Investigation contract** of
+    Promote: `verdict_id` stays 0, `status_id` stays In Progress and the Case carries the **Triage → Investigation contract** of
     [Playbook Architecture §5](references/framework/04-Playbooks/playbook_architecture.md): `uid`,
     `status_id`, `severity_id`, `confidence_id`, `impact_id` when known, `start_time`, `observables`,
     `finding_info_list` (the Alerts, each with its `alert_type`, and every triage Observation, each with

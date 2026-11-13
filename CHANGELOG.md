@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **The response names its gates, and the Case's status follows them (framework #132, DD-33).** The
+  response skill names G4, containment completed (the initial containment actions, planned at
+  confirmation, applied and confirmed), G5, eradication verified, G6, recovery complete, where the
+  Case's `status_id` becomes Resolved, and G7, when Phase 4 completes and the Case is Closed. A
+  triage Close and an investigation close set `status_id` to Closed (G2, G3); a confirmed Incident
+  stays In Progress through the response. MTTC runs from the originating Alert received (G1) to G4.
+  MTTR is Mean Time To Respond and starts at G1; the framework has not settled where it stops, so
+  the skill records the gates and chooses no stop. T0 anchors MTTD only.
 - **An Incident is Malicious activity that reached the environment, and a near miss did not
   (framework #129 and #135, DD-32).**
   - *Reach is assessed first at confirmation.* Investigation step 11 asks, once Malicious is proven,

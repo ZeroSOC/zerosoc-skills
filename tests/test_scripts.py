@@ -2071,3 +2071,43 @@ class ReachTellsAnIncidentFromANearMiss(unittest.TestCase):
         with open(os.path.join(ROOT, "skills", "zerosoc-investigation", "rules", "reach.md"), encoding="utf-8") as f:
             rule = f.read()
         self.assertIn("A control's action on one alert does not make a Case a", rule)
+
+
+class GatesAndStatus(unittest.TestCase):
+    """DD-33: seven gates from the Alert to the closed Case, and the Case's status follows them."""
+
+    def read(self, *rel):
+        with open(os.path.join(ROOT, *rel), encoding="utf-8") as f:
+            return f.read()
+
+    def gates(self):
+        """The gates as the response skill's own reference copy of Operational Metrics §2 names them."""
+        import re
+        metrics = self.read("skills", "zerosoc-response", "references", "framework", "05-Metrics", "operational_metrics.md")
+        return dict(re.findall(r"^\| \*\*(G\d) — ([^*]+)\*\* \|", metrics, re.M))
+
+    def test_the_response_skill_names_the_gates_as_the_framework_does(self):
+        gates = self.gates()
+        self.assertEqual(sorted(gates), ["G1", "G2", "G3", "G4", "G5", "G6", "G7"])
+        skill = " ".join(self.read("skills", "zerosoc-response", "SKILL.md").split()).lower()
+        for gate in ("G4", "G5", "G6"):  # the skill says "containment is completed (G4)" for "Containment completed"
+            self.assertIn(f"{gates[gate].lower()} (**{gate.lower()}**)", skill.replace(" is ", " ").replace(" are ", " "), gate)
+        self.assertIn("(**g7**, `status_id` closed)", skill)
+        self.assertIn("`status_id` to resolved (4)", skill)
+
+    def test_the_metrics_are_the_ones_the_framework_defines(self):
+        metrics = self.read("skills", "zerosoc-response", "references", "framework", "05-Metrics", "operational_metrics.md")
+        self.assertIn("### Mean Time To Respond (MTTR)", metrics)
+        self.assertIn("**Start:** the originating Alert received (G1). **Stop:** containment completed (G4).", metrics)
+        skill = " ".join(self.read("skills", "zerosoc-response", "SKILL.md").split())
+        self.assertIn("MTTC runs from the originating Alert received (G1) to containment completed (G4)", skill)
+        self.assertIn("MTTR is Mean Time To Respond and starts at G1", skill)
+        self.assertIn("not yet settled", skill, "where MTTR stops is open in the framework, and the skill chooses nothing")
+        self.assertNotIn("Recover (MTTR)", skill); self.assertNotIn("Time To Recover", skill)
+
+    def test_a_close_is_closed_and_an_incident_stays_in_progress(self):
+        triage_text = " ".join(self.read("skills", "zerosoc-triage", "SKILL.md").split())
+        self.assertIn("A Close sets `status_id` to Closed (5): the triage disposition is gate G2", triage_text)
+        investigation = " ".join(self.read("skills", "zerosoc-investigation", "SKILL.md").split())
+        self.assertIn("Every close also sets `status_id` to Closed (5), at gate G3", investigation)
+        self.assertIn("A confirmed Incident stays In Progress", investigation)
