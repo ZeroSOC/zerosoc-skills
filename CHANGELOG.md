@@ -2,15 +2,27 @@
 
 ## Unreleased
 
-- **The reach rule asks what reached the environment.** `rules/reach.md` of the investigation skill
-  is shorter. An answer that the activity reached the environment says what landed on a device, ran,
-  persisted, was delivered to a person or was gained, and names the observation that shows it. An
-  answer that nothing reached it still rests on an observation beyond the alerts, which `resolve.py`
-  checks as before. Four sentences are removed: that the observations must show that nothing else in
-  the same activity succeeded, what a block leaves open, the instruction to name the observations
-  the answer rests on, and the default for what the observations do not settle. Investigation step 11
-  loses the first of them too. Replayed on a small executor model, a password spray whose sign-ins
-  all failed was answered as a near miss in most runs, where it had been answered as an Incident.
+- **Reach is assessed observation by observation, and `resolve.py` computes the answer.** A near
+  miss is a Case where none of the observations shows that something reached the environment, and
+  the ledger now records exactly that.
+  - ***The ledger's `reach` changes shape.*** It was `reached` (true or false) with the `observations`
+    the answer rested on. It is now `observations`, one entry for each observation of the ledger:
+    its `id`, what it `shows` (`landed on a device`, `ran`, `persisted`, `delivered to a person`,
+    `gained` or `none of these`) and `what` the thing is; `desc` stays. A ledger in the old shape is
+    an invalid ledger. A host that writes `reach` changes with this release.
+  - *The rule.* One observation that stands and shows one of the five makes the Incident. The outcome
+    is a near miss only when every observation that stands is marked, none shows any of the five,
+    and one stands beyond the alerts on a result that carried information. Otherwise `reach` is
+    `not shown`, `reach_note` says what is missing, and the Case is taken as an Incident. A mark on
+    a retracted observation is not read.
+  - *The output.* `reach_observations` are the observations that show what reached the environment
+    or, on a near miss, those that stand beyond the alerts.
+  - *`rules/reach.md` and Investigation step 11.* The executor says, for each observation, whether
+    it shows that something landed on a device, ran, persisted, was delivered to a person or was
+    gained, and what that thing is. Four sentences of the rule are removed: that the observations
+    must show that nothing else in the same activity succeeded, what a block leaves open, the
+    instruction to name the observations the answer rests on, and the default for what the
+    observations do not settle. Step 11 loses the first of them too.
 - **Framework pin to `555e891`, and the skills follow it (framework #136).** The references are
   regenerated and the archives rebuilt at the pin. The approval payload is specified in Incident
   Response §2.1 and the later sections of Agentic Guardrails moved up one number: the skills cite the

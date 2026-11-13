@@ -74,10 +74,27 @@
  "no_information_refs": [],
  "scoped_negative_refs": [],
  "reach": {
-  "reached": true,
   "observations": [
-   "O3",
-   "O4"
+   {
+    "id": "O1",
+    "shows": "none of these",
+    "what": ""
+   },
+   {
+    "id": "O2",
+    "shows": "none of these",
+    "what": ""
+   },
+   {
+    "id": "O3",
+    "shows": "delivered to a person",
+    "what": "a copy of the message, in the inbox of m.bianchi@contoso.example"
+   },
+   {
+    "id": "O4",
+    "shows": "gained",
+    "what": "what m.bianchi typed into the form the page posts to the attacker's host"
+   }
   ],
   "desc": "The gateway held the alerted copy, and another copy of the same message was delivered to a person who opened the link."
  }

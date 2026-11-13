@@ -63,11 +63,27 @@
   "EVT-2101-4"
  ],
  "reach": {
-  "reached": false,
   "observations": [
-   "O1",
-   "O3",
-   "O4"
+   {
+    "id": "O1",
+    "shows": "none of these",
+    "what": ""
+   },
+   {
+    "id": "O2",
+    "shows": "none of these",
+    "what": ""
+   },
+   {
+    "id": "O3",
+    "shows": "none of these",
+    "what": ""
+   },
+   {
+    "id": "O4",
+    "shows": "none of these",
+    "what": ""
+   }
   ],
   "desc": "Every copy of the message was held in the gateway's quarantine and nobody reached the page: nothing was delivered to a person."
  }

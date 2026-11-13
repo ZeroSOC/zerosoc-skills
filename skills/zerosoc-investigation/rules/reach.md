@@ -13,8 +13,9 @@ executor puts that language in its place; read as it is, it means the language o
   a sandbox or a decoy has not reached the environment.
 - Answer for the whole activity of the Case. A control's action on one alert does not make a Case a
   near miss.
-- An answer that the activity reached the environment says what landed on a device, ran, persisted,
-  was delivered to a person or was gained, and names the observation that shows it.
+- For each observation, say whether it shows that something landed on a device, ran, persisted,
+  was delivered to a person or was gained, and what that thing is. The activity reached the
+  environment when one of them does.
 - An answer that nothing reached the environment rests on at least one observation beyond the alerts:
   a query that covered the rest of the activity and found nothing, or a record that shows where the
   activity was held. A query that was not run, or that the source could not answer, shows nothing.

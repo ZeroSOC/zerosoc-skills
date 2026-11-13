@@ -168,11 +168,11 @@ per Case: the playbook the script prints.
     activity reach the environment? It did when something landed on a device, ran, persisted, was
     delivered to a person, or was gained; activity held in a gateway's quarantine, a sandbox or a decoy
     did not. Answer for the whole activity: a control's action on one alert does not make a Case a near
-    miss. Record the answer in the ledger's `reach` (`reached`, the `observations` it rests on, `desc`) and run
-    `python3 scripts/resolve.py ledger.json` again. With `reached` false and shown, the outcome is a
-    **near miss**: `verdict_id` 2 at `severity_id` 1, the Investigation Note written (step 13) and the
-    Case closed without response; the rest of this step is skipped. The script takes a near miss only
-    when an observation beyond the alerts shows it, and says what is missing otherwise. In every other
+    miss. Record in the ledger's `reach` what each observation shows (`observations`: its `id`, `shows`
+    and `what`; and `desc`, the answer in words) and run `python3 scripts/resolve.py ledger.json` again:
+    the script computes the answer. Where no observation shows any of these and one stands beyond the
+    alerts, the outcome is a **near miss**: `verdict_id` 2 at `severity_id` 1, the Investigation Note
+    written (step 13) and the Case closed without response; the rest of this step is skipped. In every other
     case the activity reached the environment and you **confirm the Incident**, before writing the
     Note. **Re-assess** the severity, which stays Low to Critical on an Incident, and the Incident
     Category from your understanding of the Incident (§1.4). The **confidence** is the resolution rule
