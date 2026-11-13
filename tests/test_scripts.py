@@ -1594,42 +1594,211 @@ class Procedures(unittest.TestCase):
 
 
 class AutonomyMatrix(unittest.TestCase):
+    """Incident Response §2.1 (DD-35): the matrix reads the Case confidence, the Incident's Impact and the
+    action's own impact, and severity only sets the timing."""
+
+    WITHOUT, APPROVAL = "applied without approval", "requires approval"
+
+    def published(self):
+        """The matrix as the skill's own copy of Incident Response §2.1 prints it:
+        {action impact: {Incident Impact: cell}}."""
+        with open(os.path.join(ROOT, "skills", "zerosoc-response", "references", "framework", "03-Processes",
+                               "03-response.md"), encoding="utf-8") as f:
+            text = f.read()
+        rows = text[text.index("| The action's impact ↓ / the Incident's Impact →"):].split("\n\n")[0].splitlines()
+        cells = [[c.strip().strip("*") for c in row.strip().strip("|").split("|")] for row in rows]
+        self.assertEqual(cells[0][1:], auto.IMPACTS, "the columns are the Incident's Impact, Low to Critical")
+        return {row[0]: dict(zip(cells[0][1:], row[1:])) for row in cells[2:]}
+
+    def test_the_derived_matrix_is_the_published_table_cell_by_cell(self):
+        published = self.published()
+        self.assertEqual(list(published), auto.ACTION_IMPACTS, "one row per class of action impact, None to Critical")
+        derived = auto.matrix()
+        for action_impact in auto.ACTION_IMPACTS:
+            for impact in auto.IMPACTS:
+                self.assertEqual(derived[action_impact][impact], published[action_impact][impact], (action_impact, impact))
+
+    def test_a_cell_allows_every_confidence_above_the_one_it_names(self):
+        for action_impact in auto.ACTION_IMPACTS:
+            for impact in auto.IMPACTS:
+                lowest = auto.lowest_confidence(action_impact, impact)
+                for confidence in auto.CONFIDENCES:
+                    allowed = auto.proportionate(action_impact, impact) and auto.waiting_outweighs_acting(confidence, impact, action_impact)
+                    expected = lowest is not None and auto.CONFIDENCES.index(confidence) >= auto.CONFIDENCES.index(lowest)
+                    self.assertEqual(allowed, expected, (action_impact, impact, confidence))
+                    r = auto.classify("x", confidence, "High", impact=impact, action_impact=action_impact)
+                    self.assertEqual(r["tier"], self.WITHOUT if expected else self.APPROVAL, (action_impact, impact, confidence))
+
+    def test_proportionality_alone_decides_two_cells(self):
+        # DD-35: an action of High impact at Medium Impact, and one of Critical impact at High Impact
+        alone = [(a, i) for a in auto.ACTION_IMPACTS for i in auto.IMPACTS
+                 if not auto.proportionate(a, i) and auto.waiting_outweighs_acting("High", i, a)]
+        self.assertEqual(alone, [("High", "Medium"), ("Critical", "High")])
+        r = auto.classify("isolate the file server", "High", "High", impact="Medium", action_impact="High")
+        self.assertEqual([x["kind"] for x in r["approval_reasons"]], ["proportionality"])
+
+    def test_the_frameworks_examples(self):
+        # an administrator's account and a domain controller: High confidence, High Impact
+        disable = auto.classify("disable the administrator's account", "High", "High", impact="High",
+                                preset="disable-user-identity", target="admin.rossi", target_kind="person")
+        self.assertEqual((disable["tier"], disable["action_impact"], disable["cell"]), (self.WITHOUT, "Low", "Medium or above"))
+        isolate = auto.classify("isolate DC01", "High", "High", impact="High", preset="isolate-domain-controller")
+        self.assertEqual((isolate["tier"], isolate["action_impact"], isolate["cell"]), (self.APPROVAL, "Critical", "requires approval"))
+        # Low confidence: a developer's own access key, Medium Impact
+        revoke = dict(impact="Medium", preset="revoke-credential", target_kind="person")
+        low = auto.classify("revoke the key", "Low", "Medium", **revoke)
+        self.assertEqual((low["tier"], low["cell"], low["approval_reasons"][0]["kind"]), (self.APPROVAL, "Medium or above", "matrix"))
+        self.assertEqual(auto.classify("revoke the key", "Medium", "Medium", **revoke)["tier"], self.WITHOUT)
+        # ransomware on an availability-critical file server: High confidence, High Impact
+        server = dict(impact="High", preset="isolate-server", availability="High")
+        at_once = auto.classify("isolate FS01", "High", "High", **server)
+        self.assertEqual((at_once["tier"], at_once["action_impact"], at_once["cell"]), (self.WITHOUT, "High", "High"))
+        self.assertIn("immediately", at_once["timing"])
+        limited = auto.classify("isolate FS01", "High", "High", grant_up_to="Low", **server)
+        self.assertEqual((limited["tier"], limited["approval_reasons"][0]["kind"]), (self.APPROVAL, "grant-limit"))
+
+    def test_an_impact_that_is_not_assessed_requires_approval(self):
+        r = auto.classify("isolate WS-07", "High", "High", preset="isolate-workstation")
+        self.assertEqual((r["tier"], r["cell"], r["incident_impact"]), (self.APPROVAL, None, None))
+        self.assertEqual([x["kind"] for x in r["approval_reasons"]], ["impact-not-assessed"])
+        self.assertIn("presentation_payload", r)
+
+    def test_the_actions_impact_is_derived_from_what_the_records_show_of_its_target(self):
+        def rated(**given):
+            return auto.action_impact_of(**given)[0]
+        self.assertEqual(rated(preset="isolate-workstation"), "Low")
+        self.assertEqual(rated(preset="disable-user-identity"), "Low")
+        self.assertEqual(rated(preset="suspend-sessions", kind="person"), "Low")
+        self.assertEqual(rated(preset="egress-block", kind="end-user-device"), "Low")
+        # not shown to be an end-user device or a person's account, no availability requirement recorded: High
+        for preset in ("isolate-server", "suspend-sessions", "revoke-credential", "disable-service-identity",
+                       "blocklist-partner-network", None):
+            self.assertEqual(rated(preset=preset), "High", preset)
+        # a recorded requirement below High is a non-critical service; High stops an availability-critical entity
+        self.assertEqual(rated(preset="isolate-server", availability="Medium"), "Medium")
+        self.assertEqual(rated(preset="disable-service-identity", availability="Low"), "Medium")
+        self.assertEqual(rated(preset="disable-user-identity", availability="High"), "High")
+        self.assertEqual(rated(preset="isolate-workstation", availability="High"), "High")
+        # the classes a preset fixes
+        self.assertEqual([rated(preset=p) for p in ("block-indicator", "remove-threat-actor-artifact", "quarantine-file",
+                                                    "quarantine-email", "isolate-domain-controller", "isolate-subnet",
+                                                    "disable-many-identities")],
+                         ["None", "None", "Low", "Low", "Critical", "Critical", "Critical"])
+        self.assertEqual(rated(preset="isolate-domain-controller", stated="High"), "High", "a stated impact wins")
+
+    def test_severity_sets_the_timing_and_nothing_else(self):
+        given = dict(impact="High", preset="isolate-workstation")
+        results = {severity: auto.classify("isolate WS-07", "High", severity, **given) for severity in ("Low", "Medium", "High", "Critical")}
+        self.assertEqual({r["tier"] for r in results.values()}, {self.WITHOUT})
+        self.assertEqual({r["cell"] for r in results.values()}, {"Medium or above"})
+        self.assertIn("immediately", results["Critical"]["timing"]); self.assertIn("scheduled", results["Low"]["timing"])
+
+    def test_an_organization_adds_approvals_and_removes_none(self):
+        allowed = dict(impact="High", preset="isolate-workstation")
+        self.assertEqual(auto.classify("isolate WS-07", "High", "High", **allowed)["tier"], self.WITHOUT)
+        reserved = auto.classify("isolate WS-07", "High", "High", reserved_class="VIPs", **allowed)
+        self.assertEqual((reserved["tier"], reserved["approval_reasons"][0]["kind"]), (self.APPROVAL, "reserved-class"))
+        self.assertIn("VIPs", reserved["presentation_payload"]["3_action_and_matrix_entry"])
+        self.assertEqual(auto.classify("isolate WS-07", "High", "High", no_grant=True, **allowed)["approval_reasons"][0]["kind"], "grant-limit")
+        self.assertEqual(auto.classify("block c2.example", "Low", "High", impact="Low", preset="block-indicator", grant_up_to="None")["tier"],
+                         self.WITHOUT, "a grant up to no impact still covers an action of no impact")
+        # a stricter cell is read only where it asks for more than the matrix
+        self.assertEqual(auto.classify("isolate WS-07", "Medium", "High", stricter_cell="High", **allowed)["tier"], self.APPROVAL)
+        self.assertEqual(auto.classify("isolate WS-07", "High", "High", stricter_cell="High", **allowed)["tier"], self.WITHOUT)
+        self.assertEqual(auto.classify("isolate WS-07", "High", "High", stricter_cell="approval", **allowed)["tier"], self.APPROVAL)
+        held_back = auto.classify("isolate DC01", "High", "High", impact="High", preset="isolate-domain-controller", stricter_cell="Medium")
+        self.assertEqual(held_back["tier"], self.APPROVAL, "a looser cell removes no approval")
+        looser = auto.classify("isolate WS-07", "Medium", "High", stricter_cell="Medium", **allowed)
+        self.assertEqual(looser["tier"], self.WITHOUT); self.assertIn("adds nothing", " ".join(looser["matrix_entry"]))
+
+    def test_a_safety_function_is_never_stopped_without_approval(self):
+        r = auto.classify("stop the safety controller", "High", "Critical", impact="Critical", action_impact="Low", safety_function=True)
+        self.assertEqual((r["tier"], r["approval_reasons"][0]["kind"]), (self.APPROVAL, "safety-function"))
+
+    def test_eradication_and_recovery_actions_that_destroy_are_outside_the_matrix(self):
+        for preset in ("purge-email", "wipe-reimage-delete", "mass-credential-reset"):
+            r = auto.classify(preset, "High", "Critical", impact="Critical", preset=preset, action_impact="None")
+            self.assertEqual((r["tier"], r["cell"], r["action_impact"]), (self.APPROVAL, None, None), preset)
+            self.assertEqual([x["kind"] for x in r["approval_reasons"]], ["eradication-or-recovery"])
+            self.assertIn("matrix covers containment only", r["matrix_entry"][0])
+
     def test_an_identity_action_on_a_hosts_own_identity_is_not_selected(self):
         # live: a confirmed Incident named the computer account a scheduled task ran under, and an executor
         # asked a person to approve disabling it (Incident Response §1, §2.1)
         for target in ("VWIN01$", "SYSTEM", "NT AUTHORITY\\NETWORK SERVICE", "Administrators"):
             for preset in auto.IDENTITY_ACTIONS:
-                r = auto.classify(f"{preset} {target}", "High", "High", preset=preset, target=target)
+                r = auto.classify(f"{preset} {target}", "High", "High", impact="High", preset=preset, target=target)
                 self.assertEqual(r["tier"], "not selected", (preset, target))
                 self.assertIn("isolate", r["instead"])
                 self.assertNotIn("presentation_payload", r, "never sent for approval")
 
     def test_a_stated_kind_wins_over_what_the_name_states(self):
-        r = auto.classify("disable svc$", "High", "High", preset="disable-service-identity", target="svc$", target_kind="service")
-        self.assertEqual(r["tier"], "requires approval")
-        self.assertEqual(auto.classify("disable app01", "High", "High", preset="disable-user-identity", target="app01", target_kind="host")["tier"], "not selected")
+        r = auto.classify("disable svc$", "High", "High", impact="Medium", preset="disable-service-identity", target="svc$", target_kind="service")
+        self.assertEqual((r["tier"], r["action_impact"]), (self.APPROVAL, "High"))
+        self.assertEqual(auto.classify("disable app01", "High", "High", impact="High", preset="disable-user-identity", target="app01",
+                                       target_kind="host")["tier"], "not selected")
+        service = auto.classify("disable app01", "High", "High", impact="High", preset="disable-user-identity", target="app01",
+                                target_kind="service", availability="Medium")
+        self.assertEqual(service["action_impact"], "Medium", "a service identity no critical service runs under")
 
     def test_a_persons_account_follows_the_matrix_and_the_payload_names_it(self):
-        r = auto.classify("disable elena", "Low", "High", preset="disable-user-identity", target="elena@contoso.example", target_kind="person")
-        self.assertEqual(r["tier"], "requires approval")
+        r = auto.classify("disable elena", "Low", "High", impact="High", preset="disable-user-identity", target="elena@contoso.example", target_kind="person")
+        self.assertEqual(r["tier"], self.APPROVAL)
         self.assertIn("on elena@contoso.example (person)", r["presentation_payload"]["3_action_and_matrix_entry"])
-        self.assertEqual(auto.classify("isolate VWIN01", "High", "High", preset="isolate-workstation", target="VWIN01$")["tier"], "pre-authorized",
-                         "a host action on the host is unaffected")
+        self.assertIn("the Incident's Impact", r["presentation_payload"]["1_context"])
+        self.assertEqual(auto.classify("isolate VWIN01", "High", "High", impact="High", preset="isolate-workstation", target="VWIN01$")["tier"],
+                         self.WITHOUT, "a host action on the host is unaffected")
 
-    def test_workstation_isolation_preauthorized_immediate(self):
-        r = auto.classify("isolate WS-07", "High", "High", preset="isolate-workstation")
-        self.assertEqual(r["tier"], "pre-authorized"); self.assertIn("immediately", r["timing"])
+    def test_the_script_answers_from_the_command_line(self):
+        import subprocess, sys
+        script = os.path.join(ROOT, "skills", "zerosoc-response", "scripts", "autonomy.py")
+        def run(*arguments):
+            return subprocess.run([sys.executable, script, *arguments], capture_output=True, text=True)
+        done = run("--action", "isolate WS-07", "--preset", "isolate-workstation", "--confidence", "High", "--severity", "High",
+                   "--impact", "High", "--json")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        held = json.loads(done.stdout)
+        self.assertEqual((held["tier"], held["cell"], held["action_impact"], held["incident_impact"], held["confidence"]),
+                         (self.WITHOUT, "Medium or above", "Low", "High", "High"))
+        self.assertEqual(run("--action", "disable", "--preset", "suspend-sessions", "--target", "SYSTEM", "--confidence", "High",
+                             "--severity", "High", "--json").returncode, 1, "not selected exits 1")
+        retired = run("--action", "x", "--confidence", "High", "--severity", "High", "--reversible", "yes")
+        self.assertEqual(retired.returncode, 2, "the attributes of the earlier matrix are no longer arguments")
 
-    def test_low_confidence_requires_approval(self):
-        r = auto.classify("revoke key", "Low", "Medium", preset="revoke-credential")
-        self.assertEqual(r["tier"], "requires approval"); self.assertIn("presentation_payload", r)
 
-    def test_domain_controller_isolation_requires_approval(self):
-        self.assertEqual(auto.classify("isolate DC01", "High", "Critical", preset="isolate-domain-controller")["tier"], "requires approval")
+class RetiredWording(unittest.TestCase):
+    """What the framework removed is in no text an executor or a host reads verbatim: a rule that outlives
+    its removal is still applied by whoever reads it."""
 
-    def test_disable_user_identity_on_crown_jewel_case_is_preauthorized(self):
-        # §2.1 example: a personal admin account on a domain controller Incident
-        self.assertEqual(auto.classify("disable admin account", "High", "High", preset="disable-user-identity")["tier"], "pre-authorized")
+    RETIRED = ("pre-authori", "preauthori", "approval tier", "handover", "crown jewel", "crown-jewel",
+               "requires human review",
+               # "at Low confidence every containment action requires approval": the matrix says what Low allows
+               r"low\W{0,3}confidence[^.]{0,80}every containment action", r"confidence is low")
+
+    def texts(self):
+        import glob
+        patterns = ("skills/*/SKILL.md", "skills/*/rules/*.md", "skills/*/scripts/*.py", "skills/*/source_profile.json",
+                    "tools/*.py", "tools/shared/*.py", "capabilities/*.md", "capabilities/*.json", "README.md",
+                    "CONTRIBUTING.md", "tests/fixtures/ledger_*.json")
+        for pattern in patterns:
+            for path in sorted(glob.glob(os.path.join(ROOT, pattern))):
+                with open(path, encoding="utf-8") as f:
+                    yield os.path.relpath(path, ROOT), f.read().lower()
+
+    def test_no_text_states_a_rule_the_framework_removed(self):
+        import re
+        found = [f"{rel}: {word}" for rel, text in self.texts() for word in self.RETIRED if re.search(word, text)]
+        self.assertEqual(found, [])
+
+    def test_the_closes_state_the_scope_of_the_grant_as_a_should(self):
+        with open(os.path.join(ROOT, "skills", "zerosoc-response", "references", "framework", "07-Governance",
+                               "agentic_supervision.md"), encoding="utf-8") as f:
+            self.assertIn("The grant to close Cases **SHOULD** cover a Case whose scope includes a [critical entity]", f.read())
+        for skill in ("zerosoc-triage", "zerosoc-investigation"):
+            with open(os.path.join(ROOT, "skills", skill, "SKILL.md"), encoding="utf-8") as f:
+                text = " ".join(f.read().split())
+            self.assertIn("The grant SHOULD cover a Case whose scope includes a [critical entity]", text, skill)
+            self.assertIn("you propose the closure: a person decides on the Case's Note, and the Case is On Hold until then", text, skill)
 
 
 if __name__ == "__main__":

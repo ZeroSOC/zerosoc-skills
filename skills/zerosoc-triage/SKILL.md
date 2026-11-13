@@ -179,6 +179,15 @@ Read per alert: the playbook section the script prints.
    merged), set `duplicate_of` in the ledger, and never treat the same alert on a different entity as a
    duplicate. Checklist before promoting or closing: can you say in one sentence, with evidence, why
    the activity is or is not suspicious? If not, gather more.
+   **Before a Close, read the scope of your grant** ([Supervision §4](references/framework/07-Governance/agentic_supervision.md)).
+   Automation and agents close Cases only under an autonomy grant. The grant SHOULD cover a Case whose
+   scope includes a [critical entity](references/framework/01-Foundation/definitions.md) (an asset or an
+   identity with a High requirement on confidentiality, integrity or availability in the SOC Knowledge
+   Base; a privileged identity is one by definition) only when its closing verdict is at High
+   confidence. Outside the grant, which is where a closing verdict below High confidence or one that
+   carries no confidence (a Duplicate) falls, you propose the closure: a person decides on the Case's
+   Note, and the Case is On Hold until then. An organization may narrow the grant further, by entity
+   class as by alert type.
 10. **Write the Triage Note.** The Note renders the Case and holds no state of its own: everything it shows is already
    on the Case, sampled at this gate. `python3 scripts/note_elements.py --kind triage` prints the elements in order
    and what each must contain, and `--note note.json` — the ledger with one field per element beside it — checks the
@@ -243,8 +252,8 @@ Read per alert: the playbook section the script prints.
 
 - Request permissions just in time for each query and let them expire when it completes; attribute every
   call to the Case id ([Guardrails §1](references/framework/07-Governance/agentic_guardrails.md)).
-- A Crown Jewel asset or a privileged identity in scope makes a **human** the assignee from that moment
-  (Guardrails §3, `handover_reason`); keep enriching and proposing, the human decides.
+- Any executor may take a Case over; the change of assignee is a lifecycle event of the Case and is
+  recorded on it. Nothing in this procedure makes the assignee a person.
 - Record token use per model invocation with the Case id; a budget exhaustion is not a failure: apply
   the coverage rule to the evidence at hand (Guardrails §5).
 - Never close because similar Cases were closed before; never promote out of fear; never close to clear

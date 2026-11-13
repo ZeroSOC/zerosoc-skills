@@ -17,7 +17,7 @@ playbook questions into tool queries, writing the Notes.
 |---|---|---|---|
 | [`zerosoc-triage`](skills/zerosoc-triage/SKILL.md) | 2.a Triage | Close (False Positive, Benign, Duplicate) or Promote, by the coverage rule | Triage Note, Triage → Investigation contract |
 | [`zerosoc-investigation`](skills/zerosoc-investigation/SKILL.md) | 2.b Investigation | the verdict by score and coverage (True Positive, False Positive, Benign, Duplicate, Insufficient Data), and whether a True Positive is an Incident or a near miss | Investigation Note, Investigation → Response contract |
-| [`zerosoc-response`](skills/zerosoc-response/SKILL.md) | 3 Incident Response | pre-authorized vs requires approval per action, under the autonomy matrix | contained, eradicated, recovered environment; Case timeline; notifications |
+| [`zerosoc-response`](skills/zerosoc-response/SKILL.md) | 3 Incident Response | applied without approval or requires approval, per containment action, under the autonomy matrix | contained, eradicated, recovered environment; Case timeline; notifications |
 
 Those three are the **method skills**, and they know no source. Beside them sits one **tool skill** per
 technology: [`zerosoc-defender-xdr`](skills/zerosoc-defender-xdr/SKILL.md) holds the expertise that makes

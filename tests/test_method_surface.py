@@ -65,11 +65,11 @@ class TheMethodSurface(unittest.TestCase):
     def test_the_work_on_the_case_is_not_on_its_timeline(self):
         """The timeline says what happened (Case Schema §3): the Alerts, the actions the Observations
         establish and the response actions that ran. A check or a query is the Observation it produced,
-        and a handover is a lifecycle event: offered as entries, they are refused, and not placed."""
+        and a change of assignee is a lifecycle event: offered as entries, they are refused, and not placed."""
         built = timeline.build({"t0": None, "now": T + 500, "entries": [
             {"time": T + 100, "kind": "detection", "desc": "ransomware behaviour"},
             {"kind": "investigation", "desc": "Q1: what ran before it?"},
-            {"kind": "handover", "desc": "a human"},
+            {"kind": "assignee", "desc": "another executor takes the Case"},
             {"kind": "note", "desc": "the Triage Note was written"}]})
 
         self.assertEqual([e["kind"] for e in built["entries"]], ["detection"])
@@ -535,9 +535,9 @@ class TheCaseTimeline(unittest.TestCase):
             built = timeline.build(self.ledger(other, self.observation("M1", at)))
             with self.subTest(sharing=label):
                 self.assertEqual([e["id"] for e in built["entries"] if e["is_t0"]], ["M1"])
-        handover = timeline.build(self.ledger(self.observation("M1", "2026-09-14T15:12:00Z"),
-                                              entries=[{"kind": "handover", "desc": "a human takes it"}]))
-        self.assertEqual([e.get("id") for e in handover["entries"] if e["is_t0"]], ["M1"])
+        taken_over = timeline.build(self.ledger(self.observation("M1", "2026-09-14T15:12:00Z"),
+                                                entries=[{"kind": "assignee", "desc": "another executor takes it"}]))
+        self.assertEqual([e.get("id") for e in taken_over["entries"] if e["is_t0"]], ["M1"])
 
     def test_a_benign_entry_at_t0_does_not_hide_that_the_malicious_one_is_off_the_timeline(self):
         at = "2026-09-14T14:55:41Z"

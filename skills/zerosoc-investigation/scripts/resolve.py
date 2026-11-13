@@ -425,7 +425,7 @@ def resolve(ledger, now=None):
                      "not recorded": "assess first whether the activity reached the environment and record it in \"reach\" (§2.5); where it did, ",
                      "not shown": "show that nothing in the activity reached the environment, or take it that something did; then "}[state]
             r.update(outcome="Malicious proven", attacks=attacks,
-                     next=first + "confirm the Incident (§2.5): re-assess severity (Low to Critical), confidence and category, estimate the impact, plan the initial response actions; then the definitive category, the Incident's techniques in \"attacks\" from the observations that stand, start_time carrying T0, the retrospective entity sweep (§3.1) and the Investigation → Response contract" + ("; at Low confidence every containment action requires approval" if conf == 1 else ""))
+                     next=first + "confirm the Incident (§2.5): re-assess severity (Low to Critical) and category, keep the confidence this rule prints on the observations that stand, estimate the impact, plan the initial response actions; then the definitive category, the Incident's techniques in \"attacks\" from the observations that stand, start_time carrying T0, the retrospective entity sweep (§3.1) and the Investigation → Response contract")
     else:
         if box["expired"] or ledger.get("budget_exhausted"):
             r.update(outcome="Neither proven at timebox/budget expiry", verdict_id=7, verdict="Insufficient Data", confidence_id=None,

@@ -7,8 +7,8 @@ The timeline says **what happened**, and is a reconstruction rather than a listi
 §5): the Alerts, the actions the Observations establish (the adversary's, where there is one) and
 the response actions that ran, a remediation the source performed included, ordered by **when the
 thing happened** rather than when it was recorded. The work on the Case is not on it: a check or a
-query is the Observation it produced, and an acknowledgment, a promotion or a handover is a lifecycle
-event. Triage compiles the timeline and investigation extends it, so both gates run this script on
+query is the Observation it produced, and an acknowledgment, a promotion or a change of assignee is a
+lifecycle event. Triage compiles the timeline and investigation extends it, so both gates run this script on
 their own ledger, and a Case closed at triage keeps the timeline triage built. T0 is the earliest Malicious event of the Case — its `start_time`, which only a
 Malicious Observation moves: a benign precursor or a piece of context earlier than it is part of the
 account and moves nothing. Exactly one entry carries T0: two detections of the same activity share
@@ -167,7 +167,7 @@ def build(ledger):
             problems.append(f"entry {entry.get('desc', '?')!r} of kind {entry.get('kind')!r} is not what happened: "
                             "the timeline holds the Alerts, the actions the Observations establish and the response "
                             "actions that ran; a check or a query is the Observation it produced, and an "
-                            "acknowledgment, a promotion or a handover is a lifecycle event")
+                            "acknowledgment, a promotion or a change of assignee is a lifecycle event")
             continue
         when = parse_time(entry.get("time"))
         if entry.get("time") not in (None, "") and when is None:

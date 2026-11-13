@@ -2,6 +2,45 @@
 
 ## Unreleased
 
+- **The containment autonomy matrix, and the handover removed (framework #134, DD-35, DD-36).**
+  - *`autonomy.py` is the matrix of Incident Response §2.1.* It reads the Case confidence, the
+    Incident's Impact and the action's own impact, and severity only sets the timing. The matrix is
+    derived in code from the likelihood and impact lookup of DD-35, and a test compares it cell by
+    cell with the table in the skill's own copy of `03-response.md`.
+  - ***The interface of `autonomy.py` changes.***
+    - `tier`: `pre-authorized` is now `applied without approval`; `requires approval` and
+      `not selected` are unchanged.
+    - New argument `--impact Low|Medium|High|Critical`, the Incident's Impact. Without it the
+      action requires approval, since an Impact that is not assessed gives the matrix no cell.
+    - New arguments for the action's impact: `--action-impact None|Low|Medium|High|Critical`, or
+      the preset with `--target-kind` (now also `end-user-device`) and `--availability
+      Low|Medium|High`, the target's recorded availability requirement.
+    - New arguments for what an organization adds: `--grant-up-to`, `--no-grant`,
+      `--reserved-class`, `--stricter-cell`; and `--safety-function yes`.
+    - Removed arguments: `--reversible`, `--irreversible`, `--stops-critical-service` and `--mass`.
+      State `--action-impact High` for an action that stops a critical service and `--action-impact
+      Critical` for one on many entities at once. Reversibility is no longer a key of the matrix.
+    - New output keys: `confidence`, `incident_impact`, `action_impact`, `action_impact_basis`,
+      `cell` and `approval_reasons` (each a `kind` and a `reason`). `matrix_entry`, `timing`,
+      `record` and `presentation_payload` keep their names; the payload's context names the
+      Incident's Impact, and its third part gives the reason the matrix gives.
+    - Presets: `purge-email`, `wipe-reimage-delete` and `mass-credential-reset` are eradication or
+      recovery actions and are outside the matrix: they require approval and get no cell. New
+      presets `remove-threat-actor-artifact` (no impact) and `disable-many-identities` (Critical).
+      `block-indicator` is the block of an address or domain no entity of the organization uses.
+    - A changed result: an action on a target the records do not show to be an end-user device or a
+      person's account, with no availability requirement recorded, is rated High. `suspend-sessions`
+      and `revoke-credential` therefore need `--target-kind person` to be rated Low.
+  - *No handover.* No step makes the Case's assignee a person, and `handover_reason` is gone from
+    the contracts: a change of assignee is a lifecycle event of the Case. In its place, triage step 9
+    and investigation step 10 state the scope of the autonomy grant as the framework does: it SHOULD
+    cover a Case whose scope includes a critical entity only when its closing verdict is at High
+    confidence, and outside it the executor proposes the closure and a person decides, the Case On
+    Hold until then.
+  - *Confidence and Impact at confirmation.* The confidence is the resolution rule applied again to
+    the Observations that stand, never set by judgment. The Impact is assessed at confirmation as an
+    input of the matrix, and an entity nobody rated counts as Medium. No text says any longer that
+    at Low confidence every containment action requires approval: the matrix says what Low allows.
 - **The response names its gates, and the Case's status follows them (framework #132, DD-33).** The
   response skill names G4, containment completed (the initial containment actions, planned at
   confirmation, applied and confirmed), G5, eradication verified, G6, recovery complete, where the
