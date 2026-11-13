@@ -26,6 +26,8 @@ executor puts that language in its place; read as it is, it means the language o
   the detection's claim again, and the alert already counts for it.
 - A query asks; it never takes for granted what it is meant to test, such as that a file ran or was
   staged.
+- Say which queries ask for a record that approves, authorizes or sanctions the activity: finding
+  none is no information, however the source answered.
 - Every query is discriminating and states both readings, so a negative result is evidence too (a
   clean hash is a Benign observation, not silence). A query whose negative result says nothing is not
   worth asking.
