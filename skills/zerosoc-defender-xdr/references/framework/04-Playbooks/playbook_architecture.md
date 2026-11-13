@@ -5,7 +5,7 @@ status: draft
 last_updated: 2026-11-12
 license: Apache-2.0
 ---
-<!-- generated from zerosoc-framework@678a9dda7d73 : 04-Playbooks/playbook_architecture.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@555e891337c8 : 04-Playbooks/playbook_architecture.md — do not edit; regenerate with tools/build_references.py -->
 
 # Playbook Architecture
 

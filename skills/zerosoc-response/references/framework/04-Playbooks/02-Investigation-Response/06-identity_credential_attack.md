@@ -20,7 +20,7 @@ required_data_sources:
   - Mailbox audit logs (pivot)
 status: draft
 ---
-<!-- generated from zerosoc-framework@678a9dda7d73 : 04-Playbooks/02-Investigation-Response/06-identity_credential_attack.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@555e891337c8 : 04-Playbooks/02-Investigation-Response/06-identity_credential_attack.md — do not edit; regenerate with tools/build_references.py -->
 
 # 06-Identity & Credential Attack Investigation & Response
 

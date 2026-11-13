@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Decide a response action under the autonomy matrix of Incident Response §2.1. Standard library only.
 
-  autonomy.py --action "isolate workstation WS-07" --confidence High --severity High [--impact High] \
+  autonomy.py --action "isolate workstation WS-07" --confidence High [--impact High] \
               [--preset isolate-workstation] [--action-impact None|Low|Medium|High|Critical] \
               [--target NAME] [--target-kind person|service|host|end-user-device] [--availability Low|Medium|High] \
               [--safety-function yes|no] [--reserved-class NAME] [--grant-up-to None|Low|Medium|High|Critical] \
@@ -10,8 +10,7 @@
 The matrix reads three inputs, and none is the executor's own estimate: the Case **confidence**, as the
 resolution rule produced it (--confidence); the Incident's **Impact**, as assessed at confirmation
 (--impact); and the **impact of the action**, what the organization cannot use while the action holds.
-Severity (--severity) only sets the timing of an action the matrix allows. When the Impact is not
-assessed (no --impact), the action requires approval.
+When the Impact is not assessed (no --impact), the action requires approval.
 
 The action's impact is one of five classes: None (nothing is lost, even if the Incident proves false),
 Low (the service of one person or of one end-user device), Medium (a non-critical service, or the
@@ -66,8 +65,8 @@ matrix cell for the action's impact and the Incident's Impact ("Low or above", "
 `matrix_entry`, the sentences that decide it; `approval_reasons`, each with a `kind` (`matrix`: the
 action's impact, the Incident's Impact and the confidence; `proportionality`; `grant-limit`;
 `reserved-class`; `impact-not-assessed`; `safety-function`; `eradication-or-recovery`) and its `reason`;
-the `timing` rule from severity; and, when approval is required, the five-part presentation payload of
-Agentic Guardrails §2 to fill in, whose third part states those reasons.
+and, when approval is required, the five-part presentation payload of Incident Response §2.1 to fill in,
+whose third part states those reasons.
 """
 import argparse, json, sys
 
@@ -201,7 +200,7 @@ def action_impact_of(preset=None, kind=None, availability=None, stated=None):
                     "availability requirement is not recorded: rated High")
 
 
-def classify(action, confidence, severity, impact=None, preset=None, action_impact=None, target=None, target_kind=None,
+def classify(action, confidence, *, impact=None, preset=None, action_impact=None, target=None, target_kind=None,
              availability=None, safety_function=None, reserved_class=None, grant_up_to=None, no_grant=False,
              stricter_cell=None):
     kind = identity_kind(target, target_kind)
@@ -256,14 +255,9 @@ def classify(action, confidence, severity, impact=None, preset=None, action_impa
             reasons.append(("grant-limit", f"the executor's grant covers actions up to {'no' if grant_up_to == 'None' else grant_up_to} "
                                            f"impact, and this action's impact is {rated}"))
     tier = "requires approval" if reasons else "applied without approval"
-    if severity in ("High", "Critical"):
-        timing = "apply immediately, before the internal notification completes; the notified stakeholders confirm it afterwards or request its rollback"
-    else:
-        timing = "may be scheduled with the owner of the affected entity; record the schedule on the action entry"
     r = {**named, "tier": tier, "confidence": confidence, "incident_impact": impact, "action_impact": rated,
          "action_impact_basis": basis, "cell": cell, "matrix_entry": [text for _, text in reasons] or entry,
          "approval_reasons": [{"kind": k, "reason": text} for k, text in reasons],
-         "timing": timing if tier == "applied without approval" else "after approval; while pending, apply what the matrix allows and continue the investigation",
          "record": "an `action` entry on the Case: the action, entity, timestamp and rollback, and whether it was applied without approval or approved, and by whom"}
     if tier == "requires approval":
         r["presentation_payload"] = {
@@ -274,7 +268,7 @@ def classify(action, confidence, severity, impact=None, preset=None, action_impa
             + " — requires approval because: " + "; ".join(text for _, text in reasons),
             "4_blast_radius": "expected effect on operations",
             "5_rollback": "the exact call, script or procedure that reverses it, or the statement that it cannot be reversed",
-            "decision_recorded_in": "the action entry (approved / modified / rejected); HITL dwell time measured, never counted as containment time",
+            "decision_recorded_in": "the action entry (approved / modified / rejected); HITL dwell time measured",
         }
     return r
 
@@ -283,8 +277,6 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--action", required=True)
     ap.add_argument("--confidence", required=True, choices=CONFIDENCES, help="the Case confidence, as the resolution rule produced it")
-    ap.add_argument("--severity", required=True, choices=["Informational", "Low", "Medium", "High", "Critical"],
-                    help="the Case severity: it sets the timing only")
     ap.add_argument("--impact", choices=IMPACTS, help="the Incident's Impact, as assessed at confirmation; absent when not assessed")
     ap.add_argument("--preset", choices=sorted(PRESETS))
     ap.add_argument("--action-impact", choices=ACTION_IMPACTS, help="the action's impact, where it is rated directly from the classes")
@@ -301,7 +293,7 @@ def main():
     ap.add_argument("--stricter-cell", choices=["Medium", "High", "approval"], help="the organization's own, stricter value for this cell")
     ap.add_argument("--json", action="store_true")
     a = ap.parse_args()
-    r = classify(a.action, a.confidence, a.severity, impact=a.impact, preset=a.preset, action_impact=a.action_impact,
+    r = classify(a.action, a.confidence, impact=a.impact, preset=a.preset, action_impact=a.action_impact,
                  target=a.target, target_kind=a.target_kind, availability=a.availability,
                  safety_function=yn(a.safety_function), reserved_class=a.reserved_class, grant_up_to=a.grant_up_to,
                  no_grant=a.no_grant, stricter_cell=a.stricter_cell)
@@ -315,10 +307,9 @@ def main():
     if r["action_impact"]:
         print(f"Action impact: {r['action_impact']} ({r['action_impact_basis']})  Incident Impact: {r['incident_impact'] or 'not assessed'}"
               f"  Confidence: {r['confidence']}  Cell: {r['cell'] or '-'}")
-    print("Timing: " + r["timing"])
     print("Record: " + r["record"])
     if "presentation_payload" in r:
-        print("Presentation payload to fill in (Guardrails §2):")
+        print("Presentation payload to fill in (Incident Response §2.1):")
         for k, v in r["presentation_payload"].items():
             print(f"  {k}: {v}")
 

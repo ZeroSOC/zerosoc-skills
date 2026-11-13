@@ -449,7 +449,7 @@ def resolve(ledger):
             if not open_questions:
                 r["questions_note"] = "; ".join(notes + ["no open question is named: name the questions whose answers could prove a side, and who can answer each"])
             r.update(outcome="On Hold", verdict_id=0, verdict="Unknown", confidence_id=None, status_id=3,
-                     next="hold the Case (status_id 3, On Hold) with verdict Unknown: ask each question of whoever can answer it. Each answer is an Observation, tagged with a side and a confidence like any check, and the Case returns to In Progress to be resolved again; an answer that the evidence does not exist or cannot be reached is recorded on the question. No clock closes the Case: one that misses the organization's response-time target for its severity is escalated to the SOC Manager")
+                     next="hold the Case (status_id 3, On Hold) with verdict Unknown: ask each question of whoever can answer it. Each answer is an Observation, tagged with a side and a confidence like any check, and the Case returns to In Progress to be resolved again; an answer that the evidence does not exist or cannot be reached is recorded on the question. No clock closes the Case")
     if attacks["recorded"] and not r.get("incident"):
         r["attacks_note"] = "the ledger records the Incident's techniques, but no Incident is confirmed: the Case's \"attacks\" stay empty"
     return r

@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- **Framework pin to `555e891`, and the skills follow it (framework #136).** The references are
+  regenerated and the archives rebuilt at the pin. The approval payload is specified in Incident
+  Response §2.1 and the later sections of Agentic Guardrails moved up one number: the skills cite the
+  payload there, the autonomy grant as Guardrails §2 and metering as Guardrails §4.
+  - ***`autonomy.py` loses the timing and `--severity`.*** The output has no `timing` key, and the
+    text output no `Timing:` line. The argument `--severity` is removed (the script exits 2 on it).
+    `classify()` takes no `severity`, and its arguments after `confidence` are keyword-only, so a
+    severity passed by position raises a `TypeError`. A host that passes `--severity` or reads
+    `timing` changes with this release. The payload's `decision_recorded_in` reads "HITL dwell time
+    measured" and no longer says the wait is kept out of containment time.
+  - *The response procedure.* Steps 1 and 4 state no timing by severity. Step 5 names no default
+    approver and gives the owner of the service and the crisis authority as examples. Steps 5 and 9
+    no longer keep the wait for approval out of MTTC, which runs from G1 to G4.
+  - *The investigation procedure.* The inputs name no response-time targets, and neither they nor
+    the `next` of an On Hold outcome of `resolve.py` say that a Case is escalated. Step 8 loses
+    "Never stop for doubt".
+  - *The test for retired wording* also fails on the wording removed here.
 - **An undecided Case is held On Hold, and no clock closes it (framework #133, DD-34).**
   - ***`resolve.py` loses the investigation timebox.*** The ledger fields `started_at`,
     `resolved_at`, `timebox_minutes` and `timebox_expired` are read by nothing, the argument `--now`

@@ -4,7 +4,7 @@ description: Investigate a promoted Case under the ZeroSOC Framework (Phase 2.b)
 license: Apache-2.0
 metadata:
   version: "0.4.1"
-  framework: "zerosoc-framework@678a9dd (2026-11-13)"
+  framework: "zerosoc-framework@555e891 (2026-11-13)"
   status: draft
   author: ZeroSOC
 ---
@@ -40,10 +40,8 @@ per Case: the playbook the script prints.
 - The capability binding `zerosoc.capabilities.json`; the telemetry classes (`telemetry.endpoint`,
   `telemetry.identity`, `telemetry.network`, `telemetry.email`, `telemetry.cloud`, `siem.search`), the
   enrichment classes and `cases.store`.
-- The Case **token budget** and the organization's response-time targets by severity; both are
-  organization settings. No clock closes a Case: one that misses its target is escalated to the SOC
-  Manager, and an exhausted budget leaves the resolution rule to be applied to the evidence at hand
-  (Guardrails §5).
+- The Case **token budget**, an organization setting. No clock closes a Case, and an exhausted
+  budget leaves the resolution rule to be applied to the evidence at hand (Guardrails §4).
 
 ## Procedure
 
@@ -150,7 +148,7 @@ per Case: the playbook the script prints.
    side can be obtained: every open question has been answered that the evidence `does not exist` or
    `cannot be reached`, with the reason, an answer that adds no Observation. It closes with a
    monitoring watch (`watch_until`: re-open on recurrence of the entities; active monitoring for the retention window at High or Critical
-   severity) and a visibility or tuning ticket. Never stop for doubt; never "escalate".
+   severity) and a visibility or tuning ticket. Never "escalate".
 9. **Re-classify on evidence drift** (§2.2.5). If the objective differs from or exceeds the candidate
    category, change `incident_category`, re-run step 3 for the new playbook, carry every observation
    forward, and record the pivot and its reason in the Note. The classification stays provisional until
@@ -276,7 +274,7 @@ per Case: the playbook the script prints.
 ## Governance
 
 Just-in-time scope per query, Case-attributed calls, token metering per invocation
-([Guardrails §1, §5](references/framework/07-Governance/agentic_guardrails.md)). The Note is what QA
+([Guardrails §1, §4](references/framework/07-Governance/agentic_guardrails.md)). The Note is what QA
 sampling reviews ([Supervision §2](references/framework/07-Governance/agentic_supervision.md)): observations,
 tags and resolution, not transcripts. In **shadow mode** (Supervision §4) compute and record the verdict
 but apply nothing.

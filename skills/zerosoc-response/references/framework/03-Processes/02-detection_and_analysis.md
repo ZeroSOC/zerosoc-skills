@@ -5,7 +5,7 @@ status: development
 last_updated: 2026-11-13
 license: Apache-2.0
 ---
-<!-- generated from zerosoc-framework@678a9dda7d73 : 03-Processes/02-detection_and_analysis.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@555e891337c8 : 03-Processes/02-detection_and_analysis.md — do not edit; regenerate with tools/build_references.py -->
 
 # Phase 2: Detection & Analysis
 
@@ -264,8 +264,6 @@ Every observation — an alert, a tagged Triage Note Observation (§1.6) or a qu
 | Malicious proven (and Benign not) | True Positive (`2`) | the highest confidence on the Malicious side, resolved again in §2.5 | Assess reach (§2.5): confirm the Incident, or close the Case as a near miss; containment autonomy keys on its confidence ([Incident Response §2.1](03-response.md#21-risk-based-autonomy-matrix-for-containment)) |
 | The activity is already handled by an open master Case (§1.5 duplicate criteria met) | Duplicate (`10`) | — | Close; evidence merged into the master Case |
 | Neither proven | none — **insufficient data** | — | Run the remaining discriminating queries, listed or added. When none is left that the executor can run, the Case goes **On Hold** with verdict Unknown (`0`): the questions whose answers could prove a side are named and asked of whoever can answer them. Each answer is an Observation, tagged with a side and a confidence like any check, and the Case returns to In Progress to be resolved again. The Case closes as Insufficient Data (`7`) when no evidence that could prove either side can be obtained: every open question has been answered that the evidence does not exist or cannot be reached, an answer that adds no Observation. It closes with a monitoring watch (re-open on recurrence of the entities; active monitoring for the retention window at High/Critical severity) and a visibility or tuning ticket |
-
-**No clock closes a Case.** Urgency comes from response-time targets by severity, which the organization sets: a Case that misses its target is escalated to the [SOC Manager](../01-Foundation/definitions.md#6-executors-and-functions).
 
 Because Benign proof requires coverage, the two sides cannot both be proven: an explanation that leaves a Medium or High Malicious observation standing is incomplete, and the Malicious verdict holds until a query retracts that observation or the explanation grows to cover it.
 
