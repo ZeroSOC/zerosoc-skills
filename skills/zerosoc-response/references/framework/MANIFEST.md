@@ -1,6 +1,6 @@
 # Generated framework references
 
-Source: zerosoc-framework@03fffc2d4904115507ac64f18b4420a070de3ba6 (Apache-2.0).
+Source: zerosoc-framework@678a9dda7d73973d6ed88357d5ddee0346a902e9 (Apache-2.0).
 
 Do not edit these files; regenerate with `python3 tools/build_references.py`.
 
@@ -29,5 +29,6 @@ Do not edit these files; regenerate with `python3 tools/build_references.py`.
 - `references/framework/04-Playbooks/02-Investigation-Response/15-ai_ml_system.md`
 - `references/framework/04-Playbooks/README.md`
 - `references/framework/04-Playbooks/playbook_architecture.md`
+- `references/framework/05-Metrics/operational_metrics.md`
 - `references/framework/07-Governance/agentic_guardrails.md`
 - `references/framework/07-Governance/agentic_supervision.md`

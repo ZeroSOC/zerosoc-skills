@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Framework pin to `678a9dd` (framework #129, #131, #132, #133, #134, #135).** The references are
+  regenerated and the archives rebuilt at the pin; the entries above this one say what each change
+  of the framework changes in the skills. The response skill now carries
+  `05-Metrics/operational_metrics.md`, which defines the gates G1 to G7 its procedure names.
 - **A search that finds no approval is never Malicious, whichever source answered it.** Framework #95
   and the ledger's `no_information_refs` (#57) already said it, yet three live Cases weighed "no
   directory change / no change ticket / no sanctioned role found" as Malicious (Medium): an empty
