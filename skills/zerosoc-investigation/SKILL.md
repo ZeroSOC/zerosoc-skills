@@ -1,20 +1,23 @@
 ---
 name: zerosoc-investigation
-description: Investigate a promoted Case under the ZeroSOC Framework (Phase 2.b). Selects the Investigation and Response playbook by candidate Incident Category, verifies or retracts the triage observations, runs discriminating validation queries tagged Malicious or Benign with a confidence, resolves the verdict by score and coverage, and produces the Investigation Note plus the Investigation to Response contract or the closure verdict. Use for a Case promoted at triage or opened by threat hunting.
+description: Investigate a promoted Case under the ZeroSOC Framework (Phase 2.b). Selects the Investigation and Response playbook by candidate Incident Category, verifies or retracts the triage observations, runs discriminating validation queries tagged Malicious or Benign with a confidence, resolves the verdict by score and coverage, tells an Incident from a near miss by whether the activity reached the environment, and produces the Investigation Note plus the Investigation to Response contract or the closure verdict. Use for a Case promoted at triage or opened by threat hunting.
 license: Apache-2.0
 metadata:
   version: "0.4.1"
-  framework: "zerosoc-framework@03fffc2 (2026-10-29)"
+  framework: "zerosoc-framework@678a9dd (2026-11-13)"
   status: draft
   author: ZeroSOC
 ---
 
 # ZeroSOC Investigation (Phase 2.b)
 
-Object: the **hypothesis**. Two sides, always: the Malicious hypothesis (a threat actor) and the Benign
-hypothesis (administration, testing, scheduled or expected activity). Outcome: exactly one of a **Closed
-Case** or a **Confirmed Incident**. Verdicts are computed from tagged observations, not argued. Paths are
-relative to this skill's directory.
+Object: the **hypothesis**. Two sides, always: the Malicious hypothesis (an attack, or an unauthorized
+action against the organization's assets) and the Benign hypothesis (activity that is authorized,
+expected or acceptable: administration, testing, scheduled work). Outcome: exactly one of a **Closed
+Case**, a near miss included, or a **Confirmed Incident**: Malicious activity that reached the
+environment. A Case that proves neither side is held On Hold, its questions asked, until an answer
+decides it. Verdicts are computed from tagged observations, not argued. Paths are relative to this
+skill's directory.
 
 Read once per session: [Detection & Analysis §2–§3](references/framework/03-Processes/02-detection_and_analysis.md)
 and the confidence table in [Definitions §7](references/framework/01-Foundation/definitions.md). Read
@@ -37,22 +40,19 @@ per Case: the playbook the script prints.
 - The capability binding `zerosoc.capabilities.json`; the telemetry classes (`telemetry.endpoint`,
   `telemetry.identity`, `telemetry.network`, `telemetry.email`, `telemetry.cloud`, `siem.search`), the
   enrichment classes and `cases.store`.
-- The investigation **timebox** (10 minutes at High or Critical severity, 20 otherwise, reference values)
-  and the Case **token budget**; both are organization settings. `scripts/resolve.py` measures the
-  timebox from the ledger's timestamps: it runs from `started_at`, the moment the Case was assigned to
-  you in Investigation (Guardrails §5), which is noted at step 1, not when the ledger file is
-  created, so reading the Triage Note, the extraction and the playbook selection count against it.
+- The Case **token budget** and the organization's response-time targets by severity; both are
+  organization settings. No clock closes a Case: one that misses its target is escalated to the SOC
+  Manager, and an exhausted budget leaves the resolution rule to be applied to the evidence at hand
+  (Guardrails §5).
 
 ## Procedure
 
-1. **Start the ledger from the Triage Note.** First note the UTC time you take the Case: it is the
-   ledger's `started_at`, and the timebox runs from it. Read what triage did before anything else: the
+1. **Start the ledger from the Triage Note.** Read what triage did before anything else: the
    conflict that promoted the Case (the Malicious observations beyond the alerts and the Benign
    observations they were weighed against), the alert type it gave each alert, and the candidate Incident
    Categories it proposed. Create `ledger.json` (format in `scripts/resolve.py`) with every tagged
    Observation of the Note, its side, confidence, source artifact and event reference, the Case
-   `severity`, `started_at` as noted here (never the time this file is created) and `at` on every
-   observation as it is added: the timebox is computed from these, not declared. Alert observations carry
+   `severity`, and `at` on every observation as it is added. Alert observations carry
    their `alert_type` and `entity`, so the same type on the same entity counts once in the score. Carry
    the ledger's `source_profile` object across and refresh it with
    `python3 scripts/source_profile.py --bindings zerosoc.capabilities.json --json`: a local override of the
@@ -133,32 +133,66 @@ per Case: the playbook the script prints.
    investigated here and never sent back to triage. Type it and add it as in step 2, extend the queries to
    what it adds, and judge whether it changes the verdict: a repeat of an alert type or technique the Case
    already holds adds little, a new technique shows the attacker progressing along the attack path, and a
-   new targeted entity may be lateral movement. Then set `resolved_at` (UTC) in the ledger, with `alerts` (each alert's id and own confidence), and run
+   new targeted entity may be lateral movement. Then give the ledger its `alerts` (each alert's id and own confidence) and run
    `python3 scripts/resolve.py ledger.json`. Malicious is proven at a score of 3 or more when an alert is at High
    confidence or an observation stands beyond the alerts (one that only restates an alert counts as it);
    Benign at 3 or more *and* every Medium or High Malicious observation retracted or covered; the verdict and
    confidence follow the §2.4 table (confidence is the strongest carrying observation, never an average; on
-   a proven Malicious side it is the starting value step 11 re-assesses). If neither side is proven, run the remaining discriminating
-   queries. The script measures the timebox from `started_at` to `resolved_at` (the current time when absent)
-   against the severity-scaled reference value, which `timebox_minutes` may tighten, never extend; when it has expired, or the
-   budget is exhausted (`budget_exhausted`), it closes as **Insufficient Data** (7) with a monitoring watch (`watch_until`; re-open on recurrence of the
-   entities) and emit a visibility or tuning ticket. Never stop for doubt; never "escalate".
+   a proven Malicious side step 11 applies this rule again at confirmation). If neither side is proven, run the remaining discriminating
+   queries, listed or added. **No clock closes a Case.** When no query is left that you can run
+   (`no_query_left`), or the budget allows none (`budget_exhausted`), name in the ledger's `questions`
+   the questions whose answers could prove a side, each with who can answer it (`asked_of`,
+   `asked_at`), and run the script again: the outcome is **On Hold**, verdict Unknown (0), and the
+   Case's `status_id` is On Hold (3) while the questions are asked. Each answer is an Observation,
+   tagged with a side and a confidence like any check and named on its question (`answer`:
+   `observation`); the Case returns to In Progress and is resolved again. The wait is HITL dwell
+   time. The Case closes as **Insufficient Data** (7) only when no evidence that could prove either
+   side can be obtained: every open question has been answered that the evidence `does not exist` or
+   `cannot be reached`, with the reason, an answer that adds no Observation. It closes with a
+   monitoring watch (`watch_until`: re-open on recurrence of the entities; active monitoring for the retention window at High or Critical
+   severity) and a visibility or tuning ticket. Never stop for doubt; never "escalate".
 9. **Re-classify on evidence drift** (§2.2.5). If the objective differs from or exceeds the candidate
    category, change `incident_category`, re-run step 3 for the new playbook, carry every observation
    forward, and record the pivot and its reason in the Note. The classification stays provisional until
    the Incident is confirmed (step 11).
-10. **Assign correctly.** The moment a Crown Jewel asset or a privileged identity enters the scope, the
-   assignee becomes a human (`handover_reason`); keep running queries and proposing, the human decides.
-11. **On Malicious proven, confirm the Incident** (§2.5), before writing the Note. **Re-assess** the severity,
-    the confidence and the Incident Category from your understanding of the Incident (§1.4): record a value
+10. **Before a close, read the scope of your grant** ([Supervision §4](references/framework/07-Governance/agentic_supervision.md)).
+   Automation and agents close Cases only under an autonomy grant. The grant SHOULD cover a Case whose
+   scope includes a [critical entity](references/framework/01-Foundation/definitions.md) (an asset or an
+   identity with a High requirement on confidentiality, integrity or availability in the SOC Knowledge
+   Base; a privileged identity is one by definition) only when its closing verdict, a near miss
+   included, is at High confidence. Outside the grant, which is where a closing verdict below High
+   confidence or one that carries no confidence (a Duplicate, Insufficient Data) falls, you propose the
+   closure: a person decides on the Case's Note, and the Case is On Hold until then. An organization
+   may narrow the grant further, by entity class as by alert type. Any executor may take a Case over:
+   the change of assignee is a lifecycle event of the Case, and the same resolution rule applies
+   whoever the assignee is (§2.3).
+11. **On Malicious proven, assess reach first** (§2.5), held to [rules/reach.md](rules/reach.md): did the
+    activity reach the environment? It did when something landed on a device, ran, persisted, was
+    delivered to a person, or was gained; activity held in a gateway's quarantine, a sandbox or a decoy
+    did not. Answer for the whole activity: a control's action on one alert does not make a Case a near
+    miss, and the observations must show that nothing else in the same activity succeeded. Record the
+    answer in the ledger's `reach` (`reached`, the `observations` it rests on, `desc`) and run
+    `python3 scripts/resolve.py ledger.json` again. With `reached` false and shown, the outcome is a
+    **near miss**: `verdict_id` 2 at `severity_id` 1, the Investigation Note written (step 13) and the
+    Case closed without response; the rest of this step is skipped. The script takes a near miss only
+    when an observation beyond the alerts shows it, and says what is missing otherwise. In every other
+    case the activity reached the environment and you **confirm the Incident**, before writing the
+    Note. **Re-assess** the severity, which stays Low to Critical on an Incident, and the Incident
+    Category from your understanding of the Incident (§1.4). The **confidence** is the resolution rule
+    applied again to the Observations that stand: it is what `resolve.py` prints on the ledger as it now
+    is, and you never set it by judgment. Record a value
     that changes, with its reason, in the Note's Rationale, and treat a change of category as a
-    re-classification (step 9). **Estimate** `impact_id` from what is known. **Plan the initial response
+    re-classification (step 9). **Estimate** `impact_id` from what is known: with the confidence it is
+    an input of the containment autonomy matrix (Incident Response §2.1), so it is assessed here and
+    never left for Response to guess. The confidentiality and integrity requirements the SOC Knowledge
+    Base records for the affected entities bear on its informational effect and the availability
+    requirements on its functional effect; an entity nobody rated counts as Medium. **Plan the initial response
     actions** from three inputs: the actions the source recommends, carried by the alerts; the actions the
     category's playbook describes; and your own judgment of the Case. Prioritize them, drop the unnecessary
     or redundant ones (disabling a local, non-domain account on a host already isolated is redundant), and
     add the ones the Incident, its context, its severity and the impact estimate call for; each planned
     action is a ticket the Case raises, of its kind (`containment`, `eradication`, `recovery`). Then set
-    `verdict_id = 2`; record the definitive Incident Category and, in the ledger's `attacks`, the
+    `verdict_id = 2`, with `severity_id` 2 to 5; record the definitive Incident Category and, in the ledger's `attacks`, the
     Incident's techniques, assessed from the Observations that stand: the Alerts' mappings are
     provisional, so one no Observation shows is left out and a broad one is narrowed (`resolve.py`
     lists the techniques the standing Malicious observations show and names any recorded that none
@@ -170,7 +204,7 @@ per Case: the playbook the script prints.
     `first_seen` the creation time the `timeline` of `process_chain.py --json` gives). The timeline says what happened and is not a field the Case stores: it is the
     Observations flagged `zerosoc:timeline`, rendered in `first_seen_time` order, with a `detection` entry per
     Alert and an `action` entry per response action that ran. Your validation queries are not entries: each is
-    the Observation it produced, and a handover is a lifecycle event. Give each observation its `first_seen` (when the thing happened, never when the
+    the Observation it produced, and a change of assignee is a lifecycle event. Give each observation its `first_seen` (when the thing happened, never when the
     observation was made) and `"timeline": true` where it establishes something that happened; `python3 scripts/timeline.py ledger.json --json`
     orders them, **derives T0** — the earliest Malicious `first_seen`; context may come before it — flags the one
     entry that carries it, and fails a T0 no entry carries or a Malicious entry earlier than the T0 the Case states. The Case's `start_time` opens at the earliest Alert and moves earlier
@@ -181,10 +215,15 @@ per Case: the playbook the script prints.
     in the last 90 days sharing the Incident's entities; never through `telemetry.*`, whose retention is
     shorter than the window; an unbound `cases.store` is a visibility gap; every match is flagged for QA
     review, never dismissed); pass the scope and the planned actions to response. At Low
-    confidence the Incident is still declared; every containment action then requires approval.
+    confidence the Incident is still declared; what is applied without approval is the matrix's to
+    say, from the confidence, the Impact and each action's own impact.
 12. **On Benign proven**: `verdict_id` 1 (False Positive, plus a `tuning` ticket to Phase 1) or 5 (Benign,
     plus an `exception` ticket — the Knowledge Base entry you propose and a person confirms — unless the
-    Knowledge Base already holds it). Which of the two is the rule's, and
+    Knowledge Base already holds it). Benign activity is authorized, expected or acceptable; it is
+    acceptable when whoever is accountable for the asset, data or policy says so, and the observation
+    cites that statement. Every close of this skill (False Positive, Benign, Duplicate, Insufficient
+    Data, near miss) sets `severity_id` to 1 (Informational), as `resolve.py` prints: the source's own
+    severity stays in `vendor_attributes`. Every close also sets `status_id` to Closed (5), at gate G3. Which of the two is the rule's, and
     `resolve.py` prints it: a Benign observation carries in the ledger the kind of the triage playbook
     condition it named, read off the list the condition is in — `"condition": "false_positive"` or
     `"benign"` — and the Case closes as Benign when the Benign observation of the highest confidence
@@ -197,8 +236,9 @@ per Case: the playbook the script prints.
     order: **Summary** (as the Triage Note, at this gate); **Classification** (confirmed or last
     candidate category, severity, confidence, impact, and on a confirmed Incident its tactics and
     techniques, significance and cross-border, and the decision: the `verdict_id` the resolution produced, with the master Case id on a
-    Duplicate); **Rationale** (the score of each side, the Observations that carry the verdict, the
-    retractions and why — how the confidence was reached, not a restatement of it); **Observations** (the
+    Duplicate; a near miss is `verdict_id` 2 at `severity_id` 1, and the Classification says so in words); **Rationale** (the score of each side, the Observations that carry the verdict, the
+    retractions and why — how the confidence was reached, not a restatement of it; on a near miss, the
+    Observations that show nothing reached the environment); **Observations** (the
     Alerts; the triage Observations, each now verified or **retracted** with the reason; and the result of
     each validation query — every one rendered with its tag, with what produced it, and with the events
     it rests on by OCSF identifier; a Malicious Observation renders the techniques it shows; the Alerts
@@ -219,15 +259,18 @@ per Case: the playbook the script prints.
     checks; the content and the prose are yours ([rules/note-prose.md](rules/note-prose.md)). The rules
     binding the two judgment steps are [rules/verify.md](rules/verify.md) (the hypotheses and the choice
     of queries) and [rules/tag.md](rules/tag.md) (what the answers mean), given to any executor as they
-    stand (`$language` in them is the language the deployment writes in).
+    stand, as is [rules/reach.md](rules/reach.md) for the reach assessment of step 11 (`$language` in
+    them is the language the deployment writes in).
     Preserve evidence per §3.3.
 14. **Emit.** On a Confirmed Incident, the **Investigation → Response contract** of
     [Playbook Architecture §5](references/framework/04-Playbooks/playbook_architecture.md): the triage
-    contract fields refined, plus `verdict_id`, `incident_category`, `reclassification_pivots` when the
+    contract fields refined, plus `verdict_id` (2, at `severity_id` 2 to 5), `incident_category`, `reclassification_pivots` when the
     category changed, `impact_id`, `significant`, `cross_border`, `is_suspected_breach`,
-    `handover_reason` when a handover occurred, `attacks` (the Incident's techniques), the planned
+    `attacks` (the Incident's techniques), the planned
     response actions (step 11), and `notes` carrying the Investigation Note. `start_time` is already on
-    the Case and carries T0. Then invoke the `zerosoc-response` skill. Stakeholder notification (§3.2) is the SOC
+    the Case and carries T0. A confirmed Incident stays In Progress: its status follows the gates of
+    the response, Resolved at recovery complete (G6) and Closed when Phase 4 completes (G7). Then
+    invoke the `zerosoc-response` skill. Stakeholder notification (§3.2) is the SOC
     Manager's responsibility and starts after confirmation.
 
 ## Governance
@@ -240,7 +283,8 @@ but apply nothing.
 
 ## Completion criteria and critical failures
 
-Complete when the Case is resolved per §2.4, the Investigation Note is produced and the contract or the
-closure verdict is emitted, plus the playbook's category-specific criteria. The playbook's **Critical
+Complete when the Case is resolved per §2.4, reach is assessed where Malicious was proven, the
+Investigation Note is produced and the contract or the closure verdict, at `severity_id` 1, is emitted
+(a Case On Hold is not complete: it waits for its answers), plus the playbook's category-specific criteria. The playbook's **Critical
 Failures** void the run regardless of anything else; so does a verdict reached without a required query,
 a closure that leaves a confirmed foothold, or a Note whose material observations lack event references.

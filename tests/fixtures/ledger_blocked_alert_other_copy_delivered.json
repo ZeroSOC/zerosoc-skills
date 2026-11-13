@@ -1,0 +1,84 @@
+{
+ "case_uid": "CASE-2102",
+ "severity": "Medium",
+ "playbook": "04-Playbooks/02-Investigation-Response/01-phishing.md",
+ "playbook_version": "2026-11-13",
+ "incident_category": "IC-01",
+ "alerts": [
+  {
+   "id": "DF-2101-1",
+   "confidence": "High"
+  }
+ ],
+ "observations": [
+  {
+   "id": "O1",
+   "desc": "Email with a credential-harvesting link addressed to a.rossi@contoso.example; the mail gateway quarantined it before delivery.",
+   "side": "Malicious",
+   "confidence": "High",
+   "alert_type": "Malicious attachment / URL delivered",
+   "entity": "a.rossi@contoso.example",
+   "event_refs": [
+    "DF-2101-1"
+   ],
+   "first_seen": "2026-11-10T08:14:02Z",
+   "timeline": true,
+   "attacks": [
+    "T1566.002"
+   ]
+  },
+  {
+   "id": "O2",
+   "desc": "The linked page imitates the organization's sign-in page and posts what is typed to a host registered four days earlier.",
+   "side": "Malicious",
+   "confidence": "High",
+   "artifact": "url:login-contoso.example",
+   "event_refs": [
+    "EVT-2101-2"
+   ],
+   "first_seen": "2026-11-10T08:14:02Z",
+   "attacks": [
+    "T1566.002"
+   ]
+  },
+  {
+   "id": "O3",
+   "desc": "Message trace for the sender and the link over the window: four copies; three quarantined, one delivered to the inbox of m.bianchi@contoso.example eleven minutes before the gateway's rule caught the sender.",
+   "side": "Malicious",
+   "confidence": "Medium",
+   "event_refs": [
+    "EVT-2102-3"
+   ],
+   "first_seen": "2026-11-10T08:03:10Z",
+   "timeline": true,
+   "attacks": [
+    "T1566.002"
+   ]
+  },
+  {
+   "id": "O4",
+   "desc": "The device of m.bianchi requested the link's host and posted a form to it two minutes after the delivery.",
+   "side": "Malicious",
+   "confidence": "High",
+   "event_refs": [
+    "EVT-2102-4"
+   ],
+   "first_seen": "2026-11-10T08:05:21Z",
+   "timeline": true,
+   "attacks": [
+    "T1566.002",
+    "T1204.001"
+   ]
+  }
+ ],
+ "no_information_refs": [],
+ "scoped_negative_refs": [],
+ "reach": {
+  "reached": true,
+  "observations": [
+   "O3",
+   "O4"
+  ],
+  "desc": "The gateway held the alerted copy, and another copy of the same message was delivered to a person who opened the link."
+ }
+}

@@ -4,7 +4,7 @@ description: Triage a security alert under the ZeroSOC Framework (Phase 2.a). Se
 license: Apache-2.0
 metadata:
   version: "0.4.1"
-  framework: "zerosoc-framework@03fffc2 (2026-10-29)"
+  framework: "zerosoc-framework@678a9dd (2026-11-13)"
   status: draft
   author: ZeroSOC
 ---
@@ -155,6 +155,9 @@ Read per alert: the playbook section the script prints.
    indicator, a search that finds no approval, a lookup not answered) under `no_information_refs`, and each
    check that covered the question and found nothing under `scoped_negative_refs`: the decision script gives
    the first no weight on either side, whatever was tagged on it, and reads the second like any result (§2.4).
+   Malicious activity is an attack, or an unauthorized action against the organization's assets; Benign
+   activity is authorized, expected or acceptable, and it is acceptable when whoever is accountable for
+   the asset, data or policy says so and the observation cites that statement.
    A `Benign (High)` observation is one that **explains** an alert: an approved exception or documented
    change in the Knowledge Base, an authorized test window covering the host and time, a known-benign
    recurrence with the same parameters. Check the playbook's **False Positive conditions** (the detection
@@ -165,7 +168,9 @@ Read per alert: the playbook section the script prints.
 8. **Classify** (§1.4). Validate or override the source `severity_id` from asset criticality, identity
    privilege and blast radius, and state why. Record `impact_id` only when already known; never guess.
 9. **Decide** by the coverage rule: `python3 scripts/triage_decide.py ledger.json`. It repeats what the source already
-   neutralized, so that no Case is closed because everything in it was blocked. The script closes
+   neutralized, so that no Case is closed because everything in it was blocked: an attack a control
+   stopped is still Malicious, and whether it reached the environment is Investigation's question
+   (a near miss is a verdict Investigation reaches, and triage closes none). The script closes
    only when no Malicious observation exists beyond the alerts *and* the Benign observations cover every alert
    (a High alert only by a `Benign (High)` observation; a Low or Medium alert by Benign weights summing above
    its own); otherwise it promotes, including when there is no observation at all. It also computes the
@@ -174,6 +179,15 @@ Read per alert: the playbook section the script prints.
    merged), set `duplicate_of` in the ledger, and never treat the same alert on a different entity as a
    duplicate. Checklist before promoting or closing: can you say in one sentence, with evidence, why
    the activity is or is not suspicious? If not, gather more.
+   **Before a Close, read the scope of your grant** ([Supervision §4](references/framework/07-Governance/agentic_supervision.md)).
+   Automation and agents close Cases only under an autonomy grant. The grant SHOULD cover a Case whose
+   scope includes a [critical entity](references/framework/01-Foundation/definitions.md) (an asset or an
+   identity with a High requirement on confidentiality, integrity or availability in the SOC Knowledge
+   Base; a privileged identity is one by definition) only when its closing verdict is at High
+   confidence. Outside the grant, which is where a closing verdict below High confidence or one that
+   carries no confidence (a Duplicate) falls, you propose the closure: a person decides on the Case's
+   Note, and the Case is On Hold until then. An organization may narrow the grant further, by entity
+   class as by alert type.
 10. **Write the Triage Note.** The Note renders the Case and holds no state of its own: everything it shows is already
    on the Case, sampled at this gate. `python3 scripts/note_elements.py --kind triage` prints the elements in order
    and what each must contain, and `--note note.json` — the ledger with one field per element beside it — checks the
@@ -213,7 +227,10 @@ Read per alert: the playbook section the script prints.
    ([Case Schema §3](references/framework/02-Taxonomy/case_schema.md)).
 11. **Emit.** On Close: `verdict_id` 1 (False Positive; also a `tuning` ticket to Phase 1), 5 (Benign; also an
     `exception` ticket — the Knowledge Base entry you propose and a person confirms — unless the Knowledge
-    Base already holds it) or 10 (Duplicate, with `master_case_uid`). Which of
+    Base already holds it) or 10 (Duplicate, with `master_case_uid`), and `severity_id` 1 (Informational),
+    which every Close sets and `triage_decide.py` prints: the source's own severity stays in
+    `vendor_attributes`. A Close sets `status_id` to Closed (5): the triage disposition is gate G2,
+    and a Case closed there passes no further gate. Which of
     1 and 5 is the rule's, and `triage_decide.py` prints it: each covering Benign observation carries in the
     ledger the kind of the condition it named, read off the list the condition is in — `"condition":
     "false_positive"` or `"benign"` — and the Case closes as Benign when the covering observation of the
@@ -221,7 +238,7 @@ Read per alert: the playbook section the script prints.
     ([Detection & Analysis §1.5](references/framework/03-Processes/02-detection_and_analysis.md)). A
     Malicious observation resting on the alert records alone is set aside as a restatement of the alerts
     (`restated_alerts`) and never promotes by itself. On
-    Promote: `verdict_id` stays 0 and the Case carries the **Triage → Investigation contract** of
+    Promote: `verdict_id` stays 0, `status_id` stays In Progress and the Case carries the **Triage → Investigation contract** of
     [Playbook Architecture §5](references/framework/04-Playbooks/playbook_architecture.md): `uid`,
     `status_id`, `severity_id`, `confidence_id`, `impact_id` when known, `start_time`, `observables`,
     `finding_info_list` (the Alerts, each with its `alert_type`, and every triage Observation, each with
@@ -235,8 +252,8 @@ Read per alert: the playbook section the script prints.
 
 - Request permissions just in time for each query and let them expire when it completes; attribute every
   call to the Case id ([Guardrails §1](references/framework/07-Governance/agentic_guardrails.md)).
-- A Crown Jewel asset or a privileged identity in scope makes a **human** the assignee from that moment
-  (Guardrails §3, `handover_reason`); keep enriching and proposing, the human decides.
+- Any executor may take a Case over; the change of assignee is a lifecycle event of the Case and is
+  recorded on it. Nothing in this procedure makes the assignee a person.
 - Record token use per model invocation with the Case id; a budget exhaustion is not a failure: apply
   the coverage rule to the evidence at hand (Guardrails §5).
 - Never close because similar Cases were closed before; never promote out of fear; never close to clear
@@ -246,7 +263,7 @@ Read per alert: the playbook section the script prints.
 
 Exactly one outcome recorded; the Triage Note conformant (every tagged Observation has an event reference,
 what each detection asserted rendered with its Alert, each recommended action you ran rendered as the
-Observation it produced, Visibility Gaps stated); on Promote the contract populated; on Close the verdict and its
-emission done.
+Observation it produced, Visibility Gaps stated); on Promote the contract populated; on Close the verdict, at
+`severity_id` 1, and its emission done.
 A Note whose Observations lack event references, or a close that leaves an alert uncovered, is
 non-conformant and voids the run.

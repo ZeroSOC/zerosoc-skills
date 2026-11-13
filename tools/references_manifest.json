@@ -63,7 +63,8 @@
       "files": [
         "03-Processes/03-response.md",
         "03-Processes/02-detection_and_analysis.md",
-        "02-Taxonomy/incident_categories.md"
+        "02-Taxonomy/incident_categories.md",
+        "05-Metrics/operational_metrics.md"
       ],
       "globs": [
         "04-Playbooks/02-Investigation-Response/*.md"

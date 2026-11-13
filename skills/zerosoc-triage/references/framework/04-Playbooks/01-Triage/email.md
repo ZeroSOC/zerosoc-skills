@@ -1,7 +1,7 @@
 ---
 title: Email Triage Playbook
 type: playbook
-last_updated: 2026-09-19
+last_updated: 2026-11-13
 license: Apache-2.0
 domain: Email
 required_data_sources:
@@ -11,7 +11,7 @@ required_data_sources:
   - User-reported phishing mailbox
 status: draft
 ---
-<!-- generated from zerosoc-framework@03fffc2d4904 : 04-Playbooks/01-Triage/email.md — do not edit; regenerate with tools/build_references.py -->
+<!-- generated from zerosoc-framework@678a9dda7d73 : 04-Playbooks/01-Triage/email.md — do not edit; regenerate with tools/build_references.py -->
 
 # Email Triage Playbook
 
@@ -40,7 +40,7 @@ One row per alert type of this domain; each row is the index into a subsection o
   2. **Content intent.** Does the message solicit credentials, payment or urgent action, or is it unsolicited but harmless (marketing, a newsletter)? → `Malicious (Medium)` on a lure that induces action; `Benign (Medium)` on graymail with no ask.
   3. **Link/attachment verdict.** Does sandbox detonation or reputation on any embedded link or attachment return malicious? → `Malicious (High)` on a malicious verdict (a credential-harvesting page, a malware payload); `Benign (Medium)` on a clean verdict — a clean detonation does not clear a text-only social-engineering lure.
   4. **Known campaign or sender.** Does the message belong to a recorded phishing-awareness simulation, or does a known internal or vendor sender confirm through an independent channel that they sent it? → `Benign (High)` when either holds — the report is explained; `Malicious (High)` when the purported sender denies sending it.
-  5. **Reach and interaction.** How many mailboxes received the same message, sender or URL, and did the reporter or any recipient click or submit credentials? → `Malicious (Medium)` when a wave reached many recipients; context on interaction — it drives urgency and opens the Identity and Endpoint pivots, it does not change the side.
+  5. **Spread and interaction.** How many mailboxes received the same message, sender or URL, and did the reporter or any recipient click or submit credentials? → `Malicious (Medium)` when a wave reached many recipients; context on interaction — it drives urgency and opens the Identity and Endpoint pivots, it does not change the side.
 - **False Positive conditions:** unwanted marketing or graymail reported as phishing; a mistaken report on a legitimate internal or vendor email.
 - **Benign conditions:** a recorded phishing-awareness simulation by the training provider; an authorized penetration-test phishing exercise with a documented window.
 - **Candidate Incident Category(ies):** IC-01 (Phishing / Social Engineering); IC-02 (Business Email Compromise) when the lure impersonates a business counterpart to obtain payment.

@@ -5,7 +5,7 @@
     "product": "Microsoft Defender XDR",
     "api": "Microsoft Graph security API",
     "api_version": "v1.0",
-    "profile_version": "2026-10-25",
+    "profile_version": "2026-11-13",
     "description": "An incident of this source is a Case: same identifier, its alerts the Case's alerts, its evidence the Case's observables."
   },
   "fields": {
@@ -201,7 +201,7 @@
       "resolved": {
         "id": 4,
         "name": "Resolved",
-        "note": "the source's own closure of its record; the Case is closed by its own verdict, and the two are not the same event"
+        "note": "the source's one word for a record that is finished, and its own closure of it, which is a different event from the Case's. The Case's status follows the gates: Closed at a closing verdict, and for an Incident Resolved at recovery complete and Closed when Phase 4 completes. Written to the source, the word is said only of a Case that is Resolved or Closed: an Incident still under response stays inProgress, and a Case On Hold is awaitingAction"
       },
       "redirected": {
         "id": 5,
@@ -221,7 +221,8 @@
       },
       "truePositive": {
         "id": 2,
-        "name": "True Positive"
+        "name": "True Positive",
+        "note": "an Incident or a near miss: the source's classification does not tell them apart, and the Case's severity_id does (Informational on a near miss, Low to Critical on an Incident)"
       },
       "informationalExpectedActivity": {
         "id": 5,
@@ -520,7 +521,12 @@
     },
     {
       "path": "severity",
-      "case": "severity_id"
+      "case": [
+        "severity_id",
+        "vendor_attributes.severity_id",
+        "vendor_attributes.severity"
+      ],
+      "note": "severity_id through vocabularies.severity, as the severity the Case starts from: from triage on it is the executor's assessment, and every closing verdict other than an Incident sets it to Informational. vendor_attributes keeps the severity as the source reports it, its id and its own word, current while the Case is open and never written back"
     },
     {
       "path": "status",

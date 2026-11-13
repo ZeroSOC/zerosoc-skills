@@ -65,11 +65,11 @@ class TheMethodSurface(unittest.TestCase):
     def test_the_work_on_the_case_is_not_on_its_timeline(self):
         """The timeline says what happened (Case Schema §3): the Alerts, the actions the Observations
         establish and the response actions that ran. A check or a query is the Observation it produced,
-        and a handover is a lifecycle event: offered as entries, they are refused, and not placed."""
+        and a change of assignee is a lifecycle event: offered as entries, they are refused, and not placed."""
         built = timeline.build({"t0": None, "now": T + 500, "entries": [
             {"time": T + 100, "kind": "detection", "desc": "ransomware behaviour"},
             {"kind": "investigation", "desc": "Q1: what ran before it?"},
-            {"kind": "handover", "desc": "a human"},
+            {"kind": "assignee", "desc": "another executor takes the Case"},
             {"kind": "note", "desc": "the Triage Note was written"}]})
 
         self.assertEqual([e["kind"] for e in built["entries"]], ["detection"])
@@ -174,7 +174,7 @@ class TheMethodSurface(unittest.TestCase):
 
     def test_the_rule_text_a_host_composes_lives_in_the_skill(self):
         for skill, names in (("zerosoc-triage", ("checks", "note-prose")),
-                             ("zerosoc-investigation", ("verify", "tag", "note-prose"))):
+                             ("zerosoc-investigation", ("verify", "tag", "reach", "note-prose"))):
             for name in names:
                 path = os.path.join(ROOT, "skills", skill, "rules", f"{name}.md")
                 with self.subTest(rule=f"{skill}/{name}"):
@@ -535,9 +535,9 @@ class TheCaseTimeline(unittest.TestCase):
             built = timeline.build(self.ledger(other, self.observation("M1", at)))
             with self.subTest(sharing=label):
                 self.assertEqual([e["id"] for e in built["entries"] if e["is_t0"]], ["M1"])
-        handover = timeline.build(self.ledger(self.observation("M1", "2026-09-14T15:12:00Z"),
-                                              entries=[{"kind": "handover", "desc": "a human takes it"}]))
-        self.assertEqual([e.get("id") for e in handover["entries"] if e["is_t0"]], ["M1"])
+        taken_over = timeline.build(self.ledger(self.observation("M1", "2026-09-14T15:12:00Z"),
+                                                entries=[{"kind": "assignee", "desc": "another executor takes it"}]))
+        self.assertEqual([e.get("id") for e in taken_over["entries"] if e["is_t0"]], ["M1"])
 
     def test_a_benign_entry_at_t0_does_not_hide_that_the_malicious_one_is_off_the_timeline(self):
         at = "2026-09-14T14:55:41Z"
@@ -571,8 +571,25 @@ class TheCaseTimeline(unittest.TestCase):
         not a T0 and anchors no metric."""
         open_case = timeline.build(self.ledger(self.observation("M1", "2026-09-14T14:55:41Z")))
         self.assertEqual((open_case["start_time_utc"], open_case["confirmed_incident"]), ("2026-09-14T14:55:41Z", False))
-        confirmed = timeline.build(self.ledger(self.observation("M1", "2026-09-14T14:55:41Z"), recorded_verdict="True Positive"))
+        confirmed = timeline.build(self.ledger(self.observation("M1", "2026-09-14T14:55:41Z"), recorded_verdict="True Positive",
+                                               severity="High"))
         self.assertTrue(confirmed["confirmed_incident"])
+        self.assertTrue(timeline.build(self.ledger(self.observation("M1", "2026-09-14T14:55:41Z"), verdict_id=2,
+                                                   severity_id=2))["confirmed_incident"])
+
+    def test_a_near_miss_is_no_incident_and_has_no_t0(self):
+        """Definitions: an Incident is a True Positive at severity Low to Critical; a True Positive at
+        Informational is a near miss, and its start_time anchors no metric."""
+        for stated in ({"verdict_id": 2, "severity_id": 1}, {"recorded_verdict": "True Positive", "severity": "Informational"}):
+            near = timeline.build(self.ledger(self.observation("M1", "2026-09-14T14:55:41Z"), **stated))
+            self.assertEqual((near["start_time_utc"], near["confirmed_incident"]), ("2026-09-14T14:55:41Z", False), stated)
+            self.assertNotIn("confirmed_incident_note", near)
+
+    def test_a_true_positive_with_no_severity_is_not_taken_as_an_incident_and_says_so(self):
+        unsure = timeline.build(self.ledger(self.observation("M1", "2026-09-14T14:55:41Z"), recorded_verdict="True Positive"))
+        self.assertFalse(unsure["confirmed_incident"])
+        self.assertIn("no severity", unsure["confirmed_incident_note"])
+        self.assertEqual(timeline.check(unsure), [], "it is said, and fails nothing")
 
     def test_the_older_tag_shape_moves_t0_too(self):
         built = timeline.build(self.ledger({"n": 1, "observation": "ransomware behaviour", "tag": {"side": "malicious", "confidence_id": 3},
@@ -624,7 +641,7 @@ class CandidateCategoriesOfRealPlaybooks(unittest.TestCase):
 class TheRuleText(unittest.TestCase):
     FILES = [os.path.join(ROOT, "skills", skill, "rules", f"{name}.md")
              for skill, names in (("zerosoc-triage", ("checks", "note-prose")),
-                                  ("zerosoc-investigation", ("verify", "tag", "note-prose"))) for name in names]
+                                  ("zerosoc-investigation", ("verify", "tag", "reach", "note-prose"))) for name in names]
 
     def test_the_rules_name_nothing_the_skills_do_not_define(self):
         for path in self.FILES:
@@ -677,7 +694,7 @@ class FromTheCommandLine(unittest.TestCase):
         return subprocess.run([sys.executable, script, *args], cwd=base, capture_output=True, text=True)
 
     def investigation(self):
-        note = ledger_note(kind="investigation", started_at="2026-09-14T15:00:00Z", severity="High",
+        note = ledger_note(kind="investigation", severity="High",
                            incident_category="IC-02", now="2026-09-14T15:12:00Z")
         note["observations"][0]["at"] = "2026-09-14T15:03:10Z"
         del note["timeline"]  # what timeline.py builds from this same ledger, not something the ledger holds
@@ -685,7 +702,7 @@ class FromTheCommandLine(unittest.TestCase):
 
     def test_one_ledger_serves_the_rule_the_note_check_and_the_timeline(self):
         document = self.investigation()
-        resolved = self.run_script("resolve.py", "ledger.json", "--now", "2026-09-14T15:12:00Z", "--json", document=document)
+        resolved = self.run_script("resolve.py", "ledger.json", "--json", document=document)
         self.assertEqual(resolved.returncode, 0, resolved.stderr)
         built = self.run_script("timeline.py", "ledger.json", "--json", document=document)
         self.assertEqual(built.returncode, 0, built.stderr)

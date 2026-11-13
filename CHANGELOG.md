@@ -2,6 +2,115 @@
 
 ## Unreleased
 
+- **An undecided Case is held On Hold, and no clock closes it (framework #133, DD-34).**
+  - ***`resolve.py` loses the investigation timebox.*** The ledger fields `started_at`,
+    `resolved_at`, `timebox_minutes` and `timebox_expired` are read by nothing, the argument `--now`
+    is removed (the script exits 2 on it), and the output has no `timebox` and no `timebox_note`.
+    The outcome `Neither proven at timebox/budget expiry` no longer exists.
+  - *The rule in its place.* Neither side proven and a query still to run: `Neither proven`, as
+    before. With the ledger's new `no_query_left`, or with `budget_exhausted`, the outcome is
+    `On Hold`: `verdict_id` 0 (Unknown), `status_id` 3, and `questions`, the open questions of the
+    ledger's new `questions` list, each `to ask`, `waiting` or `unobtainable`. A question records who
+    was asked and when (`asked_of`, `asked_at`) and its `answer`: `observation`, naming in
+    `observation` the Observation the answer produced, which is scored like any check; or
+    `does not exist` or `cannot be reached`, with a `reason`. The outcome is `Insufficient Data`
+    (7, at `severity_id` 1, with `watch`) only when every question no Observation answered was
+    answered that the evidence does not exist or cannot be reached, and there is at least one.
+    Budget exhaustion leads to the same rule on the evidence at hand.
+  - *The procedure follows.* Investigation step 1 notes no start time, step 8 holds an undecided
+    Case and asks its questions, and `rules/verify.md` has the executor name a question no query
+    can answer, with who can answer it.
+  - *`tools/check_run.py`.* The timebox check is replaced by `hold: no clock closed the Case`: the
+    outcome is recomputed from the ledger's questions, a run that recorded Insufficient Data while a
+    question still waits fails, and so does a held Case that names no question.
+  - Two ledgers join the fixtures: a Case held On Hold while the audit records it could not reach
+    are asked for, and the same Case closed as Insufficient Data once both answers say the evidence
+    cannot be obtained.
+- **The containment autonomy matrix, and the handover removed (framework #134, DD-35, DD-36).**
+  - *`autonomy.py` is the matrix of Incident Response §2.1.* It reads the Case confidence, the
+    Incident's Impact and the action's own impact, and severity only sets the timing. The matrix is
+    derived in code from the likelihood and impact lookup of DD-35, and a test compares it cell by
+    cell with the table in the skill's own copy of `03-response.md`.
+  - ***The interface of `autonomy.py` changes.***
+    - `tier`: `pre-authorized` is now `applied without approval`; `requires approval` and
+      `not selected` are unchanged.
+    - New argument `--impact Low|Medium|High|Critical`, the Incident's Impact. Without it the
+      action requires approval, since an Impact that is not assessed gives the matrix no cell.
+    - New arguments for the action's impact: `--action-impact None|Low|Medium|High|Critical`, or
+      the preset with `--target-kind` (now also `end-user-device`) and `--availability
+      Low|Medium|High`, the target's recorded availability requirement.
+    - New arguments for what an organization adds: `--grant-up-to`, `--no-grant`,
+      `--reserved-class`, `--stricter-cell`; and `--safety-function yes`.
+    - Removed arguments: `--reversible`, `--irreversible`, `--stops-critical-service` and `--mass`.
+      State `--action-impact High` for an action that stops a critical service and `--action-impact
+      Critical` for one on many entities at once. Reversibility is no longer a key of the matrix.
+    - New output keys: `confidence`, `incident_impact`, `action_impact`, `action_impact_basis`,
+      `cell` and `approval_reasons` (each a `kind` and a `reason`). `matrix_entry`, `timing`,
+      `record` and `presentation_payload` keep their names; the payload's context names the
+      Incident's Impact, and its third part gives the reason the matrix gives.
+    - Presets: `purge-email`, `wipe-reimage-delete` and `mass-credential-reset` are eradication or
+      recovery actions and are outside the matrix: they require approval and get no cell. New
+      presets `remove-threat-actor-artifact` (no impact) and `disable-many-identities` (Critical).
+      `block-indicator` is the block of an address or domain no entity of the organization uses.
+    - A changed result: an action on a target the records do not show to be an end-user device or a
+      person's account, with no availability requirement recorded, is rated High. `suspend-sessions`
+      and `revoke-credential` therefore need `--target-kind person` to be rated Low.
+  - *No handover.* No step makes the Case's assignee a person, and `handover_reason` is gone from
+    the contracts: a change of assignee is a lifecycle event of the Case. In its place, triage step 9
+    and investigation step 10 state the scope of the autonomy grant as the framework does: it SHOULD
+    cover a Case whose scope includes a critical entity only when its closing verdict is at High
+    confidence, and outside it the executor proposes the closure and a person decides, the Case On
+    Hold until then.
+  - *Confidence and Impact at confirmation.* The confidence is the resolution rule applied again to
+    the Observations that stand, never set by judgment. The Impact is assessed at confirmation as an
+    input of the matrix, and an entity nobody rated counts as Medium. No text says any longer that
+    at Low confidence every containment action requires approval: the matrix says what Low allows.
+- **The response names its gates, and the Case's status follows them (framework #132, DD-33).** The
+  response skill names G4, containment completed (the initial containment actions, planned at
+  confirmation, applied and confirmed), G5, eradication verified, G6, recovery complete, where the
+  Case's `status_id` becomes Resolved, and G7, when Phase 4 completes and the Case is Closed. A
+  triage Close and an investigation close set `status_id` to Closed (G2, G3); a confirmed Incident
+  stays In Progress through the response. MTTC runs from the originating Alert received (G1) to G4.
+  MTTR is Mean Time To Respond and starts at G1; the framework has not settled where it stops, so
+  the skill records the gates and chooses no stop. T0 anchors MTTD only.
+- **An Incident is Malicious activity that reached the environment, and a near miss did not
+  (framework #129 and #135, DD-32).**
+  - *Reach is assessed first at confirmation.* Investigation step 11 asks, once Malicious is proven,
+    whether the activity reached the environment: something landed on a device, ran, persisted, was
+    delivered to a person, or was gained. The answer goes in the ledger's new `reach` object
+    (`reached`, the `observations` it rests on, `desc`), under the rules of the new
+    `rules/reach.md`. `resolve.py` reads it: with `reached` false and shown, the outcome is
+    `Near miss`, `verdict_id` 2 at `severity_id` 1, closed without response. It is shown when every
+    observation named stands and cites a result that carried information, and at least one stands
+    beyond the alerts, because a control's action on one alert does not make a Case a near miss.
+    With `reached` true, with no `reach`, or with one that is not shown, the outcome stays
+    `Malicious proven`, a confirmed Incident. The output adds `reach` (`reached`, `not reached`,
+    `not recorded`, `not shown`), `reach_observations`, `incident` and, where something is missing,
+    `reach_note`.
+  - *Every close states `severity_id` 1.* `triage_decide.py` on every Close and `resolve.py` on
+    Duplicate, Benign proven, Insufficient Data and the near miss. A confirmed Incident states none:
+    its severity is the executor's, Low to Critical, and a ledger that records it as Informational
+    gets a `severity_note`. The source's own severity stays in the Case's `vendor_attributes`.
+  - *A True Positive is an Incident only at severity Low or above.* `timeline.py` gives
+    `confirmed_incident` true for `verdict_id` 2 (or `recorded_verdict` True Positive) with
+    `severity_id` 2 to 5 (or `severity` as a word). A near miss has no T0. **A True Positive whose
+    ledger records no severity is no longer taken as an Incident**, and `confirmed_incident_note`
+    says so.
+  - *The words follow the definitions.* Malicious is an attack, or an unauthorized action against
+    the organization's assets; Benign is activity that is authorized, expected or acceptable, and
+    acceptable when whoever is accountable says so on the Case. An attack that was stopped is still
+    Malicious, at triage as in investigation.
+  - *The defender-xdr profile.* A near miss is `truePositive` with one of that verdict's
+    determinations, like an Incident, and the Case's `severity_id` tells them apart. The source's
+    `severity` now also lands on `vendor_attributes.severity_id` and `vendor_attributes.severity`,
+    where it stays when a closing verdict sets the Case's own to Informational. The note on
+    `resolved` follows the gates. `profile_version` is `2026-11-13`.
+  - Two ledgers join the fixtures: a phishing message quarantined before any mailbox (a near miss),
+    and the same message with another copy delivered and opened (an Incident).
+- **Framework pin to `678a9dd` (framework #129, #131, #132, #133, #134, #135).** The references are
+  regenerated and the archives rebuilt at the pin; the entries above this one say what each change
+  of the framework changes in the skills. The response skill now carries
+  `05-Metrics/operational_metrics.md`, which defines the gates G1 to G7 its procedure names.
 - **A search that finds no approval is never Malicious, whichever source answered it.** Framework #95
   and the ledger's `no_information_refs` (#57) already said it, yet three live Cases weighed "no
   directory change / no change ticket / no sanctioned role found" as Malicious (Medium): an empty

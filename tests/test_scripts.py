@@ -281,10 +281,14 @@ class ResolutionRule(unittest.TestCase):
         r = inv.resolve({"observations": f})
         self.assertEqual(r["outcome"], "Benign proven"); self.assertEqual(r["confidence"], "Medium"); self.assertEqual(r["residual_low_malicious"], ["m"])
 
-    def test_insufficient_data_at_timebox(self):
+    def test_neither_proven_runs_the_remaining_queries_and_no_clock_closes_it(self):
         f = [{"id": "m", "side": "Malicious", "confidence": "Medium"}, {"id": "b", "side": "Benign", "confidence": "Low"}]
-        self.assertIsNone(inv.resolve({"observations": f})["verdict_id"])
-        self.assertEqual(inv.resolve({"observations": f, "timebox_expired": True})["verdict_id"], 7)
+        r = inv.resolve({"observations": f})
+        self.assertEqual((r["outcome"], r["verdict_id"]), ("Neither proven", None))
+        # the fields of the removed investigation clock are read by nothing
+        late = inv.resolve({"observations": f, "timebox_expired": True, "started_at": "2020-01-01T00:00:00Z", "timebox_minutes": 1})
+        self.assertEqual((late["outcome"], late["verdict_id"]), ("Neither proven", None))
+        self.assertNotIn("timebox", late)
 
     def test_same_artifact_counts_once(self):
         f = [{"id": "t", "side": "Malicious", "confidence": "Medium", "artifact": "hash:1"}, {"id": "i", "side": "Malicious", "confidence": "Medium", "artifact": "hash:1"}]
@@ -342,53 +346,99 @@ class Scoring(unittest.TestCase):
         self.assertEqual(r["benign_score"], 0)
 
 
-class TimeboxFromLedger(unittest.TestCase):
-    # Guardrails §5: 10 minutes at High or Critical severity, 20 otherwise; an organization may tighten them
-    F = [{"id": "m", "side": "Malicious", "confidence": "Medium", "at": "2026-09-14T15:04:00Z"},
-         {"id": "b", "side": "Benign", "confidence": "Low", "at": "2026-09-14T15:09:00Z"}]
-    START, AT_12 = "2026-09-14T15:00:00Z", "2026-09-14T15:12:00Z"
+class HeldNeverClosedByAClock(unittest.TestCase):
+    """DD-34, Detection & Analysis §2.4: an undecided Case goes On Hold with its questions asked once no
+    query is left, and closes as Insufficient Data only when no evidence that could prove a side can be
+    obtained."""
 
-    def test_high_severity_expires_after_ten_minutes(self):
-        r = inv.resolve({"observations": self.F, "started_at": self.START, "severity": "High"}, now=self.AT_12)
-        self.assertEqual(r["timebox"], {"minutes": 10, "elapsed_minutes": 12.0, "expired": True, "source": "computed"})
-        self.assertEqual(r["verdict_id"], 7)
+    F = [{"id": "m", "side": "Malicious", "confidence": "Medium", "event_refs": ["E1"]},
+         {"id": "b", "side": "Benign", "confidence": "Low", "event_refs": ["E2"]}]
+    ASKED = {"id": "Q1", "question": "who approved the change?", "asked_of": "the service owner", "asked_at": "2026-09-14T15:20:00Z"}
 
-    def test_medium_severity_has_twenty_minutes(self):
-        r = inv.resolve({"observations": self.F, "started_at": self.START, "severity_id": 3}, now=self.AT_12)
-        self.assertFalse(r["timebox"]["expired"]); self.assertEqual(r["timebox"]["minutes"], 20)
-        self.assertIsNone(r["verdict_id"])
+    def fixture(self, name):
+        with open(os.path.join(FIXTURES, name), encoding="utf-8") as f:
+            return json.load(f)
 
-    def test_the_end_is_now_then_resolved_at_then_the_clock_never_the_last_observation(self):
-        ledger = {"observations": self.F, "started_at": self.START, "severity": "Low", "resolved_at": "2026-09-14T15:25:00Z"}
-        self.assertTrue(inv.resolve(ledger)["timebox"]["expired"])
-        self.assertFalse(inv.resolve(ledger, now="2026-09-14T15:05:00Z")["timebox"]["expired"])
-        del ledger["resolved_at"]  # a stalled run: the last observation is at +9 minutes, the clock is years later
-        self.assertTrue(inv.resolve(ledger)["timebox"]["expired"])
+    def ledger(self, *questions, **extra):
+        return dict({"observations": self.F, "no_query_left": True, "questions": list(questions)}, **extra)
 
-    def test_computed_value_overrides_a_self_reported_flag(self):
-        r = inv.resolve({"observations": self.F, "started_at": self.START, "severity": "Critical", "timebox_expired": False}, now=self.AT_12)
-        self.assertTrue(r["timebox"]["expired"]); self.assertIn("self-reported", r["timebox_note"])
+    def test_with_no_query_left_the_case_is_held_and_asks_its_questions(self):
+        r = inv.resolve(self.fixture("ledger_on_hold_audit_records_asked.json"))
+        self.assertEqual((r["outcome"], r["verdict_id"], r["verdict"], r["status_id"]), ("On Hold", 0, "Unknown", 3))
+        self.assertEqual([(q["id"], q["state"]) for q in r["questions"]], [("Q1", "waiting"), ("Q2", "waiting")])
+        self.assertNotIn("severity_id", r, "a held Case is open and keeps its severity")
+        self.assertIn("No clock closes the Case", r["next"])
 
-    def test_without_a_start_the_flag_is_used_and_marked_self_reported(self):
-        r = inv.resolve({"observations": self.F, "timebox_expired": True})
-        self.assertEqual(r["timebox"]["source"], "self-reported"); self.assertEqual(r["verdict_id"], 7)
+    def test_every_open_question_unobtainable_closes_as_insufficient_data_with_its_watch(self):
+        r = inv.resolve(self.fixture("ledger_insufficient_data_evidence_unobtainable.json"))
+        self.assertEqual((r["outcome"], r["verdict_id"], r["severity_id"]), ("Insufficient Data", 7, 1))
+        self.assertEqual([(q["id"], q["answer"]) for q in r["questions"]], [("Q1", "does not exist"), ("Q2", "cannot be reached")])
+        self.assertEqual(r["watch"], "re-open on recurrence of the entities")
+        self.assertIn("visibility or tuning ticket", r["next"])
+        high = dict(self.fixture("ledger_insufficient_data_evidence_unobtainable.json"), severity="High")
+        self.assertIn("active monitoring", inv.resolve(high)["watch"])
 
-    def test_an_organization_may_tighten_the_reference_value_not_extend_it(self):
-        base = {"observations": self.F, "started_at": self.START, "severity": "High"}
-        tight = inv.resolve(dict(base, timebox_minutes=5), now="2026-09-14T15:06:00Z")
-        self.assertEqual(tight["timebox"]["minutes"], 5); self.assertTrue(tight["timebox"]["expired"])
-        loose = inv.resolve(dict(base, timebox_minutes=30), now=self.AT_12)
-        self.assertEqual(loose["timebox"]["minutes"], 10); self.assertTrue(loose["timebox"]["expired"])
-        self.assertIn("ignored", loose["timebox_note"])
+    def test_one_question_still_waiting_keeps_the_case_held(self):
+        ledger = self.fixture("ledger_insufficient_data_evidence_unobtainable.json")
+        ledger["questions"][1].update(answer=None, reason=None)
+        r = inv.resolve(ledger)
+        self.assertEqual((r["outcome"], r["verdict_id"]), ("On Hold", 0))
+        self.assertEqual([q["state"] for q in r["questions"]], ["unobtainable", "waiting"])
 
-    def test_timestamps_out_of_order_are_reported(self):
-        r = inv.resolve({"observations": self.F, "started_at": "2026-09-14T15:05:00Z", "severity": "High"}, now="2026-09-14T15:00:00Z")
-        self.assertEqual(r["timebox"]["elapsed_minutes"], 0.0)
-        self.assertIn("precedes started_at", r["timebox_note"]); self.assertIn("m", r["timebox_note"])
+    def test_while_a_query_is_left_nothing_is_held_whatever_the_questions_say(self):
+        ledger = self.fixture("ledger_insufficient_data_evidence_unobtainable.json"); ledger["no_query_left"] = False
+        r = inv.resolve(ledger)
+        self.assertEqual((r["outcome"], r["verdict_id"]), ("Neither proven", None)); self.assertNotIn("questions", r)
 
-    def test_a_malformed_timestamp_is_a_value_error(self):
+    def test_budget_exhaustion_leads_to_the_same_rule_on_the_evidence_at_hand(self):
+        held = inv.resolve({"observations": self.F, "budget_exhausted": True, "questions": [self.ASKED]})
+        self.assertEqual((held["outcome"], held["verdict_id"]), ("On Hold", 0))
+        closed = inv.resolve({"observations": self.F, "budget_exhausted": True,
+                              "questions": [dict(self.ASKED, answer="cannot be reached", reason="the owner left no record")]})
+        self.assertEqual(closed["verdict_id"], 7)
+        proven = inv.resolve({"observations": [{"id": "m", "side": "Malicious", "confidence": "High", "event_refs": ["E"]}],
+                              "budget_exhausted": True, "questions": [self.ASKED]})
+        self.assertEqual(proven["outcome"], "Malicious proven", "a side the evidence proves is not held")
+
+    def test_a_held_case_with_no_question_named_says_so_and_is_never_closed(self):
+        r = inv.resolve(self.ledger())
+        self.assertEqual((r["outcome"], r["verdict_id"], r["questions"]), ("On Hold", 0, []))
+        self.assertIn("no open question is named", r["questions_note"])
+
+    def test_a_question_is_to_ask_until_somebody_is_named_to_answer_it(self):
+        r = inv.resolve(self.ledger({"id": "Q1", "question": "who approved the change?"}))
+        self.assertEqual(r["questions"][0]["state"], "to ask")
+
+    def test_an_answer_that_is_an_observation_closes_its_question_and_is_scored(self):
+        answered = dict(self.ASKED, answer="observation", observation="a1")
+        still = inv.resolve(self.ledger(answered, observations=self.F + [{"id": "a1", "side": "Benign", "confidence": "Low", "event_refs": ["E3"]}]))
+        self.assertEqual((still["outcome"], still["questions"]), ("On Hold", []), "answered, and neither side proven yet")
+        self.assertIn("no open question is named", still["questions_note"])
+        decided = inv.resolve(self.ledger(answered, observations=[self.F[1], {"id": "m", "side": "Malicious", "confidence": "Medium", "event_refs": ["E1"], "covered": True},
+                                                                   {"id": "a1", "side": "Benign", "confidence": "High", "condition": "benign", "event_refs": ["E3"]}]))
+        self.assertEqual((decided["outcome"], decided["verdict_id"]), ("Benign proven", 5), "the answer is an Observation and the Case is resolved again")
+        missing = inv.resolve(self.ledger(dict(self.ASKED, answer="observation", observation="a9")))
+        self.assertEqual(missing["questions"][0]["state"], "waiting"); self.assertIn("no observation of the ledger", missing["questions_note"])
+
+    def test_unobtainable_without_a_reason_is_not_an_answer(self):
+        r = inv.resolve(self.ledger(dict(self.ASKED, answer="does not exist")))
+        self.assertEqual((r["outcome"], r["questions"][0]["state"]), ("On Hold", "waiting"))
+        self.assertIn("gives no reason", r["questions_note"])
+
+    def test_an_answer_the_rule_does_not_know_is_an_invalid_ledger(self):
         with self.assertRaises(ValueError):
-            inv.resolve({"observations": [], "started_at": "yesterday"})
+            inv.resolve(self.ledger(dict(self.ASKED, answer="probably fine")))
+        with self.assertRaises(ValueError):
+            inv.resolve(self.ledger(questions="ask the owner"))
+
+    def test_the_script_no_longer_takes_a_clock(self):
+        import subprocess, sys
+        script = os.path.join(ROOT, "skills", "zerosoc-investigation", "scripts", "resolve.py")
+        path = os.path.join(FIXTURES, "ledger_on_hold_audit_records_asked.json")
+        self.assertEqual(subprocess.run([sys.executable, script, path, "--now=2026-09-14T15:12:00Z"], capture_output=True).returncode, 2)
+        done = subprocess.run([sys.executable, script, path, "--json"], capture_output=True, text=True)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(json.loads(done.stdout)["outcome"], "On Hold")
 
 
 class LedgerDedup(unittest.TestCase):
@@ -1322,8 +1372,7 @@ class RunCheck(unittest.TestCase):
         rows = [{"type": "device", "name": "ws-01", "alert_ids": ["A1"]},
                 {"type": "process", "name": "cmd.exe", "pid": 5120, "created": "2026-09-14T14:55:41Z",
                  "device": "ws-01", "alert_ids": ["A1"]}]
-        ledger = {"case_uid": "CASE-1", "severity": "High", "started_at": "2026-09-14T15:00:00Z",
-                  "resolved_at": "2026-09-14T15:06:00Z",
+        ledger = {"case_uid": "CASE-1", "severity": "High",
                   "evidence_inventory": {"extracted": 2, "source_count": 2, "complete": True},
                   "detection_metadata": {
                       "alerts": [{"id": "A1", "techniques": [{"id": "T1003", "rendered": "T1003 (OS Credential Dumping)"}],
@@ -1358,6 +1407,20 @@ class RunCheck(unittest.TestCase):
         code, out = self.check(self.run_dir())
         self.assertEqual(code, 0, out)
         self.assertIn("ok    triage: extracted count matches the evidence", out)
+
+    def test_a_near_miss_is_reproduced_as_the_true_positive_it_is(self):
+        base = self.run_dir()
+        path = os.path.join(base, "ledger.investigation.json")
+        with open(path, encoding="utf-8") as f:
+            ledger = json.load(f)
+        ledger["observations"].append({"id": "O2", "side": None, "at": "2026-09-14T15:03:00Z", "event_refs": ["EVT-2"],
+                                       "desc": "the tool was blocked before it read anything, and nothing else ran"})
+        ledger.update(reach={"reached": False, "observations": ["O2"]}, recorded_verdict="near miss")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(ledger, f)
+        code, out = self.check(base)
+        self.assertEqual(code, 0, out)
+        self.assertIn("ok    investigation: verdict reproduced from the ledger", out)
 
     def test_a_run_that_never_read_what_the_detection_asserts_fails(self):
         code, out = self.check(self.run_dir(detection_metadata=None))
@@ -1437,17 +1500,34 @@ class RunCheck(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("FAIL  triage: extracted count matches the evidence", out)
 
-    def test_a_declared_timebox_fails(self):
+    def held(self, recorded, *questions):
+        """A run whose investigation proved neither side, with no query left."""
         base = self.run_dir()
-        with open(os.path.join(base, "ledger.investigation.json"), encoding="utf-8") as f:
+        path = os.path.join(base, "ledger.investigation.json")
+        with open(path, encoding="utf-8") as f:
             ledger = json.load(f)
-        del ledger["started_at"]
-        ledger["timebox_expired"] = False
-        with open(os.path.join(base, "ledger.investigation.json"), "w", encoding="utf-8") as f:
+        ledger["observations"][0]["confidence"] = "Medium"
+        ledger.update(no_query_left=True, questions=list(questions), recorded_verdict=recorded)
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(ledger, f)
-        code, out = self.check(base)
+        return self.check(base)
+
+    def test_a_case_closed_while_a_question_waits_fails(self):
+        asked = {"id": "Q1", "question": "who ran the tool?", "asked_of": "the device's owner"}
+        code, out = self.held("Insufficient Data", asked)
         self.assertEqual(code, 1)
-        self.assertIn("FAIL  timebox: measured, not declared", out)
+        self.assertIn("FAIL  hold: no clock closed the Case", out)
+        code, out = self.held("On Hold", asked)
+        self.assertEqual(code, 0, out)
+        self.assertIn("ok    hold: the questions of a held Case are named", out)
+        code, out = self.held("Insufficient Data", dict(asked, answer="does not exist", reason="the device was re-imaged"))
+        self.assertEqual(code, 0, out)
+        self.assertIn("each answered that the evidence cannot be obtained", out)
+
+    def test_a_held_case_that_names_no_question_fails(self):
+        code, out = self.held("On Hold")
+        self.assertEqual(code, 1)
+        self.assertIn("FAIL  hold: the questions of a held Case are named", out)
 
     def test_a_gap_the_binding_implies_but_the_run_does_not_record_fails(self):
         base = self.run_dir(domain="Endpoint", visibility_gaps=[
@@ -1566,56 +1646,223 @@ class Procedures(unittest.TestCase):
         sweep = text[text.index("retrospective"):]
         self.assertIn("`cases.store`", sweep[:700])
 
-    def test_the_timebox_runs_from_when_the_case_is_taken_not_from_when_the_ledger_is_started(self):
-        # Guardrails §5 gives an executor assigned a Case in Investigation ten or twenty minutes: the clock
-        # starts at the assignment, so the procedure names `started_at` at its first step, before reading
-        # the Triage Note, the extraction and the playbook selection, and the ledger carries that time
-        text = self.read("zerosoc-investigation")
-        procedure = text[text.index("## Procedure"):]
-        first = procedure.index("`started_at`")
-        self.assertLess(first, procedure.index("Read what triage did"))
-        self.assertLess(first, procedure.index("2. **Extract the evidence inventory**"))
-        step = procedure[procedure.index("1. **Start the ledger"):procedure.index("2. **Extract")]
-        self.assertIn("`started_at` as noted here (never the time this file is created)", step)
+    def test_an_undecided_case_is_held_and_no_step_names_a_clock(self):
+        # DD-34: the investigation has no clock to start, and step 8 holds an undecided Case with its questions
+        text = " ".join(self.read("zerosoc-investigation").split())
+        step = text[text.index("8. **Resolve**"):text.index("9. **Re-classify on evidence drift**")]
+        self.assertIn("**No clock closes a Case.**", step)
+        self.assertLess(step.index("`questions`"), step.index("**On Hold**"))
+        self.assertLess(step.index("**On Hold**"), step.index("**Insufficient Data** (7) only when"))
+        for gone in ("`started_at`", "`resolved_at`", "`timebox_minutes`"):
+            self.assertNotIn(gone, text)
 
 
 class AutonomyMatrix(unittest.TestCase):
+    """Incident Response §2.1 (DD-35): the matrix reads the Case confidence, the Incident's Impact and the
+    action's own impact, and severity only sets the timing."""
+
+    WITHOUT, APPROVAL = "applied without approval", "requires approval"
+
+    def published(self):
+        """The matrix as the skill's own copy of Incident Response §2.1 prints it:
+        {action impact: {Incident Impact: cell}}."""
+        with open(os.path.join(ROOT, "skills", "zerosoc-response", "references", "framework", "03-Processes",
+                               "03-response.md"), encoding="utf-8") as f:
+            text = f.read()
+        rows = text[text.index("| The action's impact ↓ / the Incident's Impact →"):].split("\n\n")[0].splitlines()
+        cells = [[c.strip().strip("*") for c in row.strip().strip("|").split("|")] for row in rows]
+        self.assertEqual(cells[0][1:], auto.IMPACTS, "the columns are the Incident's Impact, Low to Critical")
+        return {row[0]: dict(zip(cells[0][1:], row[1:])) for row in cells[2:]}
+
+    def test_the_derived_matrix_is_the_published_table_cell_by_cell(self):
+        published = self.published()
+        self.assertEqual(list(published), auto.ACTION_IMPACTS, "one row per class of action impact, None to Critical")
+        derived = auto.matrix()
+        for action_impact in auto.ACTION_IMPACTS:
+            for impact in auto.IMPACTS:
+                self.assertEqual(derived[action_impact][impact], published[action_impact][impact], (action_impact, impact))
+
+    def test_a_cell_allows_every_confidence_above_the_one_it_names(self):
+        for action_impact in auto.ACTION_IMPACTS:
+            for impact in auto.IMPACTS:
+                lowest = auto.lowest_confidence(action_impact, impact)
+                for confidence in auto.CONFIDENCES:
+                    allowed = auto.proportionate(action_impact, impact) and auto.waiting_outweighs_acting(confidence, impact, action_impact)
+                    expected = lowest is not None and auto.CONFIDENCES.index(confidence) >= auto.CONFIDENCES.index(lowest)
+                    self.assertEqual(allowed, expected, (action_impact, impact, confidence))
+                    r = auto.classify("x", confidence, "High", impact=impact, action_impact=action_impact)
+                    self.assertEqual(r["tier"], self.WITHOUT if expected else self.APPROVAL, (action_impact, impact, confidence))
+
+    def test_proportionality_alone_decides_two_cells(self):
+        # DD-35: an action of High impact at Medium Impact, and one of Critical impact at High Impact
+        alone = [(a, i) for a in auto.ACTION_IMPACTS for i in auto.IMPACTS
+                 if not auto.proportionate(a, i) and auto.waiting_outweighs_acting("High", i, a)]
+        self.assertEqual(alone, [("High", "Medium"), ("Critical", "High")])
+        r = auto.classify("isolate the file server", "High", "High", impact="Medium", action_impact="High")
+        self.assertEqual([x["kind"] for x in r["approval_reasons"]], ["proportionality"])
+
+    def test_the_frameworks_examples(self):
+        # an administrator's account and a domain controller: High confidence, High Impact
+        disable = auto.classify("disable the administrator's account", "High", "High", impact="High",
+                                preset="disable-user-identity", target="admin.rossi", target_kind="person")
+        self.assertEqual((disable["tier"], disable["action_impact"], disable["cell"]), (self.WITHOUT, "Low", "Medium or above"))
+        isolate = auto.classify("isolate DC01", "High", "High", impact="High", preset="isolate-domain-controller")
+        self.assertEqual((isolate["tier"], isolate["action_impact"], isolate["cell"]), (self.APPROVAL, "Critical", "requires approval"))
+        # Low confidence: a developer's own access key, Medium Impact
+        revoke = dict(impact="Medium", preset="revoke-credential", target_kind="person")
+        low = auto.classify("revoke the key", "Low", "Medium", **revoke)
+        self.assertEqual((low["tier"], low["cell"], low["approval_reasons"][0]["kind"]), (self.APPROVAL, "Medium or above", "matrix"))
+        self.assertEqual(auto.classify("revoke the key", "Medium", "Medium", **revoke)["tier"], self.WITHOUT)
+        # ransomware on an availability-critical file server: High confidence, High Impact
+        server = dict(impact="High", preset="isolate-server", availability="High")
+        at_once = auto.classify("isolate FS01", "High", "High", **server)
+        self.assertEqual((at_once["tier"], at_once["action_impact"], at_once["cell"]), (self.WITHOUT, "High", "High"))
+        self.assertIn("immediately", at_once["timing"])
+        limited = auto.classify("isolate FS01", "High", "High", grant_up_to="Low", **server)
+        self.assertEqual((limited["tier"], limited["approval_reasons"][0]["kind"]), (self.APPROVAL, "grant-limit"))
+
+    def test_an_impact_that_is_not_assessed_requires_approval(self):
+        r = auto.classify("isolate WS-07", "High", "High", preset="isolate-workstation")
+        self.assertEqual((r["tier"], r["cell"], r["incident_impact"]), (self.APPROVAL, None, None))
+        self.assertEqual([x["kind"] for x in r["approval_reasons"]], ["impact-not-assessed"])
+        self.assertIn("presentation_payload", r)
+
+    def test_the_actions_impact_is_derived_from_what_the_records_show_of_its_target(self):
+        def rated(**given):
+            return auto.action_impact_of(**given)[0]
+        self.assertEqual(rated(preset="isolate-workstation"), "Low")
+        self.assertEqual(rated(preset="disable-user-identity"), "Low")
+        self.assertEqual(rated(preset="suspend-sessions", kind="person"), "Low")
+        self.assertEqual(rated(preset="egress-block", kind="end-user-device"), "Low")
+        # not shown to be an end-user device or a person's account, no availability requirement recorded: High
+        for preset in ("isolate-server", "suspend-sessions", "revoke-credential", "disable-service-identity",
+                       "blocklist-partner-network", None):
+            self.assertEqual(rated(preset=preset), "High", preset)
+        # a recorded requirement below High is a non-critical service; High stops an availability-critical entity
+        self.assertEqual(rated(preset="isolate-server", availability="Medium"), "Medium")
+        self.assertEqual(rated(preset="disable-service-identity", availability="Low"), "Medium")
+        self.assertEqual(rated(preset="disable-user-identity", availability="High"), "High")
+        self.assertEqual(rated(preset="isolate-workstation", availability="High"), "High")
+        # the classes a preset fixes
+        self.assertEqual([rated(preset=p) for p in ("block-indicator", "remove-threat-actor-artifact", "quarantine-file",
+                                                    "quarantine-email", "isolate-domain-controller", "isolate-subnet",
+                                                    "disable-many-identities")],
+                         ["None", "None", "Low", "Low", "Critical", "Critical", "Critical"])
+        self.assertEqual(rated(preset="isolate-domain-controller", stated="High"), "High", "a stated impact wins")
+
+    def test_severity_sets_the_timing_and_nothing_else(self):
+        given = dict(impact="High", preset="isolate-workstation")
+        results = {severity: auto.classify("isolate WS-07", "High", severity, **given) for severity in ("Low", "Medium", "High", "Critical")}
+        self.assertEqual({r["tier"] for r in results.values()}, {self.WITHOUT})
+        self.assertEqual({r["cell"] for r in results.values()}, {"Medium or above"})
+        self.assertIn("immediately", results["Critical"]["timing"]); self.assertIn("scheduled", results["Low"]["timing"])
+
+    def test_an_organization_adds_approvals_and_removes_none(self):
+        allowed = dict(impact="High", preset="isolate-workstation")
+        self.assertEqual(auto.classify("isolate WS-07", "High", "High", **allowed)["tier"], self.WITHOUT)
+        reserved = auto.classify("isolate WS-07", "High", "High", reserved_class="VIPs", **allowed)
+        self.assertEqual((reserved["tier"], reserved["approval_reasons"][0]["kind"]), (self.APPROVAL, "reserved-class"))
+        self.assertIn("VIPs", reserved["presentation_payload"]["3_action_and_matrix_entry"])
+        self.assertEqual(auto.classify("isolate WS-07", "High", "High", no_grant=True, **allowed)["approval_reasons"][0]["kind"], "grant-limit")
+        self.assertEqual(auto.classify("block c2.example", "Low", "High", impact="Low", preset="block-indicator", grant_up_to="None")["tier"],
+                         self.WITHOUT, "a grant up to no impact still covers an action of no impact")
+        # a stricter cell is read only where it asks for more than the matrix
+        self.assertEqual(auto.classify("isolate WS-07", "Medium", "High", stricter_cell="High", **allowed)["tier"], self.APPROVAL)
+        self.assertEqual(auto.classify("isolate WS-07", "High", "High", stricter_cell="High", **allowed)["tier"], self.WITHOUT)
+        self.assertEqual(auto.classify("isolate WS-07", "High", "High", stricter_cell="approval", **allowed)["tier"], self.APPROVAL)
+        held_back = auto.classify("isolate DC01", "High", "High", impact="High", preset="isolate-domain-controller", stricter_cell="Medium")
+        self.assertEqual(held_back["tier"], self.APPROVAL, "a looser cell removes no approval")
+        looser = auto.classify("isolate WS-07", "Medium", "High", stricter_cell="Medium", **allowed)
+        self.assertEqual(looser["tier"], self.WITHOUT); self.assertIn("adds nothing", " ".join(looser["matrix_entry"]))
+
+    def test_a_safety_function_is_never_stopped_without_approval(self):
+        r = auto.classify("stop the safety controller", "High", "Critical", impact="Critical", action_impact="Low", safety_function=True)
+        self.assertEqual((r["tier"], r["approval_reasons"][0]["kind"]), (self.APPROVAL, "safety-function"))
+
+    def test_eradication_and_recovery_actions_that_destroy_are_outside_the_matrix(self):
+        for preset in ("purge-email", "wipe-reimage-delete", "mass-credential-reset"):
+            r = auto.classify(preset, "High", "Critical", impact="Critical", preset=preset, action_impact="None")
+            self.assertEqual((r["tier"], r["cell"], r["action_impact"]), (self.APPROVAL, None, None), preset)
+            self.assertEqual([x["kind"] for x in r["approval_reasons"]], ["eradication-or-recovery"])
+            self.assertIn("matrix covers containment only", r["matrix_entry"][0])
+
     def test_an_identity_action_on_a_hosts_own_identity_is_not_selected(self):
         # live: a confirmed Incident named the computer account a scheduled task ran under, and an executor
         # asked a person to approve disabling it (Incident Response §1, §2.1)
         for target in ("VWIN01$", "SYSTEM", "NT AUTHORITY\\NETWORK SERVICE", "Administrators"):
             for preset in auto.IDENTITY_ACTIONS:
-                r = auto.classify(f"{preset} {target}", "High", "High", preset=preset, target=target)
+                r = auto.classify(f"{preset} {target}", "High", "High", impact="High", preset=preset, target=target)
                 self.assertEqual(r["tier"], "not selected", (preset, target))
                 self.assertIn("isolate", r["instead"])
                 self.assertNotIn("presentation_payload", r, "never sent for approval")
 
     def test_a_stated_kind_wins_over_what_the_name_states(self):
-        r = auto.classify("disable svc$", "High", "High", preset="disable-service-identity", target="svc$", target_kind="service")
-        self.assertEqual(r["tier"], "requires approval")
-        self.assertEqual(auto.classify("disable app01", "High", "High", preset="disable-user-identity", target="app01", target_kind="host")["tier"], "not selected")
+        r = auto.classify("disable svc$", "High", "High", impact="Medium", preset="disable-service-identity", target="svc$", target_kind="service")
+        self.assertEqual((r["tier"], r["action_impact"]), (self.APPROVAL, "High"))
+        self.assertEqual(auto.classify("disable app01", "High", "High", impact="High", preset="disable-user-identity", target="app01",
+                                       target_kind="host")["tier"], "not selected")
+        service = auto.classify("disable app01", "High", "High", impact="High", preset="disable-user-identity", target="app01",
+                                target_kind="service", availability="Medium")
+        self.assertEqual(service["action_impact"], "Medium", "a service identity no critical service runs under")
 
     def test_a_persons_account_follows_the_matrix_and_the_payload_names_it(self):
-        r = auto.classify("disable elena", "Low", "High", preset="disable-user-identity", target="elena@contoso.example", target_kind="person")
-        self.assertEqual(r["tier"], "requires approval")
+        r = auto.classify("disable elena", "Low", "High", impact="High", preset="disable-user-identity", target="elena@contoso.example", target_kind="person")
+        self.assertEqual(r["tier"], self.APPROVAL)
         self.assertIn("on elena@contoso.example (person)", r["presentation_payload"]["3_action_and_matrix_entry"])
-        self.assertEqual(auto.classify("isolate VWIN01", "High", "High", preset="isolate-workstation", target="VWIN01$")["tier"], "pre-authorized",
-                         "a host action on the host is unaffected")
+        self.assertIn("the Incident's Impact", r["presentation_payload"]["1_context"])
+        self.assertEqual(auto.classify("isolate VWIN01", "High", "High", impact="High", preset="isolate-workstation", target="VWIN01$")["tier"],
+                         self.WITHOUT, "a host action on the host is unaffected")
 
-    def test_workstation_isolation_preauthorized_immediate(self):
-        r = auto.classify("isolate WS-07", "High", "High", preset="isolate-workstation")
-        self.assertEqual(r["tier"], "pre-authorized"); self.assertIn("immediately", r["timing"])
+    def test_the_script_answers_from_the_command_line(self):
+        import subprocess, sys
+        script = os.path.join(ROOT, "skills", "zerosoc-response", "scripts", "autonomy.py")
+        def run(*arguments):
+            return subprocess.run([sys.executable, script, *arguments], capture_output=True, text=True)
+        done = run("--action", "isolate WS-07", "--preset", "isolate-workstation", "--confidence", "High", "--severity", "High",
+                   "--impact", "High", "--json")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        held = json.loads(done.stdout)
+        self.assertEqual((held["tier"], held["cell"], held["action_impact"], held["incident_impact"], held["confidence"]),
+                         (self.WITHOUT, "Medium or above", "Low", "High", "High"))
+        self.assertEqual(run("--action", "disable", "--preset", "suspend-sessions", "--target", "SYSTEM", "--confidence", "High",
+                             "--severity", "High", "--json").returncode, 1, "not selected exits 1")
+        retired = run("--action", "x", "--confidence", "High", "--severity", "High", "--reversible", "yes")
+        self.assertEqual(retired.returncode, 2, "the attributes of the earlier matrix are no longer arguments")
 
-    def test_low_confidence_requires_approval(self):
-        r = auto.classify("revoke key", "Low", "Medium", preset="revoke-credential")
-        self.assertEqual(r["tier"], "requires approval"); self.assertIn("presentation_payload", r)
 
-    def test_domain_controller_isolation_requires_approval(self):
-        self.assertEqual(auto.classify("isolate DC01", "High", "Critical", preset="isolate-domain-controller")["tier"], "requires approval")
+class RetiredWording(unittest.TestCase):
+    """What the framework removed is in no text an executor or a host reads verbatim: a rule that outlives
+    its removal is still applied by whoever reads it."""
 
-    def test_disable_user_identity_on_crown_jewel_case_is_preauthorized(self):
-        # §2.1 example: a personal admin account on a domain controller Incident
-        self.assertEqual(auto.classify("disable admin account", "High", "High", preset="disable-user-identity")["tier"], "pre-authorized")
+    RETIRED = ("pre-authori", "preauthori", "approval tier", "handover", "crown jewel", "crown-jewel",
+               "requires human review", "timebox", "started_at", "resolved_at",
+               # "at Low confidence every containment action requires approval": the matrix says what Low allows
+               r"low\W{0,3}confidence[^.]{0,80}every containment action", r"confidence is low")
+
+    def texts(self):
+        import glob
+        patterns = ("skills/*/SKILL.md", "skills/*/rules/*.md", "skills/*/scripts/*.py", "skills/*/source_profile.json",
+                    "tools/*.py", "tools/shared/*.py", "capabilities/*.md", "capabilities/*.json", "README.md",
+                    "CONTRIBUTING.md", "tests/fixtures/ledger_*.json")
+        for pattern in patterns:
+            for path in sorted(glob.glob(os.path.join(ROOT, pattern))):
+                with open(path, encoding="utf-8") as f:
+                    yield os.path.relpath(path, ROOT), f.read().lower()
+
+    def test_no_text_states_a_rule_the_framework_removed(self):
+        import re
+        found = [f"{rel}: {word}" for rel, text in self.texts() for word in self.RETIRED if re.search(word, text)]
+        self.assertEqual(found, [])
+
+    def test_the_closes_state_the_scope_of_the_grant_as_a_should(self):
+        with open(os.path.join(ROOT, "skills", "zerosoc-response", "references", "framework", "07-Governance",
+                               "agentic_supervision.md"), encoding="utf-8") as f:
+            self.assertIn("The grant to close Cases **SHOULD** cover a Case whose scope includes a [critical entity]", f.read())
+        for skill in ("zerosoc-triage", "zerosoc-investigation"):
+            with open(os.path.join(ROOT, "skills", skill, "SKILL.md"), encoding="utf-8") as f:
+                text = " ".join(f.read().split())
+            self.assertIn("The grant SHOULD cover a Case whose scope includes a [critical entity]", text, skill)
+            self.assertIn("you propose the closure: a person decides on the Case's Note, and the Case is On Hold until then", text, skill)
 
 
 if __name__ == "__main__":
@@ -1692,9 +1939,14 @@ class AlertsAloneDoNotProve(unittest.TestCase):
         f = [{"id": "O1", "side": "Malicious", "confidence": "High", "event_refs": ["x1"]}]
         self.assertEqual(inv.resolve({"alerts": alerts, "observations": f})["outcome"], "Malicious proven")
 
-    def test_at_the_timebox_the_unchecked_alerts_close_as_insufficient_data(self):
-        r = inv.resolve({"alerts": self.ALERTS, "observations": self._obs(), "timebox_expired": True})
-        self.assertEqual((r["verdict_id"], r["outcome"]), (7, "Neither proven at timebox/budget expiry"))
+    def test_with_no_query_left_the_unchecked_alerts_are_held_and_ask_for_what_they_could_not_reach(self):
+        # §2.4, "the alerts alone do not prove it": On Hold, then Insufficient Data if the records cannot be obtained
+        asked = {"id": "Q1", "question": "the audit records of the change", "asked_of": "the tenant's administrator"}
+        r = inv.resolve({"alerts": self.ALERTS, "observations": self._obs(), "no_query_left": True, "questions": [asked]})
+        self.assertEqual((r["verdict_id"], r["outcome"]), (0, "On Hold"))
+        r = inv.resolve({"alerts": self.ALERTS, "observations": self._obs(), "no_query_left": True,
+                         "questions": [dict(asked, answer="does not exist", reason="auditing was off")]})
+        self.assertEqual((r["verdict_id"], r["outcome"]), (7, "Insufficient Data"))
 
     def test_a_ledger_that_names_no_alerts_is_resolved_as_before_and_says_so(self):
         r = inv.resolve({"observations": self._obs()})
@@ -1936,3 +2188,164 @@ class InventoryBasis(unittest.TestCase):
             evidence.completeness(self.built(), 4, basis="guess")
         note = evidence.note({"extracted": 4, "source_count": 4, "source_count_basis": "reproduced", "complete": True})
         self.assertIn("unverified", note)
+
+
+class SeverityAtTheClose(unittest.TestCase):
+    """DD-32: every closing verdict other than an Incident sets the Case's severity to Informational (1)."""
+
+    def test_every_triage_close_states_severity_1_and_a_promote_states_none(self):
+        alert = {"id": "A", "type": "OAuth app consent", "entity": "u1", "confidence": "Medium"}
+        def decide(*benign, **extra):
+            return triage.decide(dict({"alerts": [alert], "observations": [dict(b, side="Benign", event_refs=["E"]) for b in benign]}, **extra))
+        closes = [decide({"id": "B", "confidence": "High", "condition": "benign"}),
+                  decide({"id": "B", "confidence": "High", "condition": "false_positive"}),
+                  decide({"id": "B", "confidence": "High"}),  # a ledger written before conditions: the caller names the kind
+                  decide(duplicate_of="CASE-0")]
+        self.assertEqual([r["verdict_id"] for r in closes], [5, 1, None, 10])
+        for r in closes:
+            self.assertEqual((r["decision"], r["severity_id"]), ("Close", 1))
+        promoted = decide()
+        self.assertEqual(promoted["decision"], "Promote"); self.assertNotIn("severity_id", promoted)
+
+    def test_every_investigation_close_states_severity_1(self):
+        benign = [{"id": "B", "side": "Benign", "confidence": "High", "condition": "benign", "event_refs": ["E"]}]
+        undecided = [{"id": "m", "side": "Malicious", "confidence": "Medium"}, {"id": "b", "side": "Benign", "confidence": "Low"}]
+        self.assertEqual(inv.resolve({"observations": benign})["severity_id"], 1)
+        self.assertEqual(inv.resolve({"observations": benign, "duplicate_of": "CASE-0"})["severity_id"], 1)
+        self.assertNotIn("severity_id", inv.resolve({"observations": undecided}), "an open Case keeps its severity")
+
+    def test_a_confirmed_incident_states_none_and_one_recorded_as_informational_is_told(self):
+        proven = [{"id": "m", "side": "Malicious", "confidence": "High", "event_refs": ["E"]}]
+        r = inv.resolve({"observations": proven, "severity": "High"})
+        self.assertEqual((r["verdict_id"], r["incident"]), (2, True))
+        self.assertNotIn("severity_id", r); self.assertNotIn("severity_note", r)
+        self.assertIn("Low (2) to Critical (5)", inv.resolve({"observations": proven, "severity_id": 1})["severity_note"])
+
+
+class ReachTellsAnIncidentFromANearMiss(unittest.TestCase):
+    """DD-32, Detection & Analysis §2.5: Malicious activity that reached the environment is an Incident;
+    activity that did not is a near miss, True Positive at severity Informational, closed without response."""
+
+    def fixture(self, name):
+        with open(os.path.join(FIXTURES, name), encoding="utf-8") as f:
+            return json.load(f)
+
+    def test_a_phish_quarantined_before_any_mailbox_is_a_near_miss(self):
+        r = inv.resolve(self.fixture("ledger_near_miss_quarantined_phish.json"))
+        self.assertEqual((r["outcome"], r["verdict_id"], r["verdict"], r["severity_id"]), ("Near miss", 2, "True Positive", 1))
+        self.assertEqual((r["reach"], r["incident"], r["confidence"]), ("not reached", False, "High"))
+        self.assertEqual(r["reach_observations"], ["O1", "O3", "O4"])
+        self.assertIn("without response", r["next"])
+        self.assertNotIn("attacks", r, "the Incident's techniques are a confirmed Incident's")
+
+    def test_a_control_acting_on_one_alert_while_another_copy_landed_is_an_incident(self):
+        r = inv.resolve(self.fixture("ledger_blocked_alert_other_copy_delivered.json"))
+        self.assertEqual((r["outcome"], r["verdict_id"], r["reach"], r["incident"]), ("Malicious proven", 2, "reached", True))
+        self.assertNotIn("severity_id", r)
+        self.assertIn("T1204.001", r["attacks"]["shown"])
+
+    def test_not_reached_resting_on_the_blocked_alert_alone_is_not_shown(self):
+        # a control's action on one alert does not make a Case a near miss (Definitions, Near miss)
+        ledger = self.fixture("ledger_blocked_alert_other_copy_delivered.json")
+        ledger["reach"] = {"reached": False, "observations": ["O1"], "desc": "the gateway quarantined the message"}
+        r = inv.resolve(ledger)
+        self.assertEqual((r["outcome"], r["reach"], r["incident"]), ("Malicious proven", "not shown", True))
+        self.assertIn("restate the alerts", r["reach_note"]); self.assertNotIn("severity_id", r)
+
+    def test_what_shows_nothing_cannot_show_that_nothing_reached(self):
+        base = self.fixture("ledger_near_miss_quarantined_phish.json")
+        def with_reach(observations, **changes):
+            ledger = json.loads(json.dumps(base)); ledger.update(changes)
+            ledger["reach"] = {"reached": False, "observations": observations}
+            return inv.resolve(ledger)
+        self.assertIn("no observation is named", with_reach([])["reach_note"])
+        self.assertIn("O9 is no observation of the ledger", with_reach(["O3", "O9"])["reach_note"])
+        unanswered = with_reach(["O4"], no_information_refs=["EVT-2101-4"], scoped_negative_refs=[])
+        self.assertEqual(unanswered["reach"], "not shown", "a query that was not answered shows nothing")
+        self.assertIn("O4 cites no result that carried information", unanswered["reach_note"])
+        retracted = json.loads(json.dumps(base)); retracted["observations"][2]["retracted"] = True
+        retracted["reach"]["observations"] = ["O3"]
+        self.assertIn("O3 is retracted", inv.resolve(retracted)["reach_note"])
+        for r in (with_reach([]), unanswered, inv.resolve(retracted)):
+            self.assertEqual((r["outcome"], r["incident"]), ("Malicious proven", True))
+
+    def test_no_reach_recorded_is_taken_as_an_incident_and_asks_for_the_assessment(self):
+        ledger = self.fixture("ledger_near_miss_quarantined_phish.json"); del ledger["reach"]
+        r = inv.resolve(ledger)
+        self.assertEqual((r["outcome"], r["reach"], r["incident"]), ("Malicious proven", "not recorded", True))
+        self.assertIn("Assess first", r["reach_note"]); self.assertTrue(r["next"].startswith("assess first"))
+
+    def test_reach_is_read_only_once_malicious_is_proven(self):
+        r = inv.resolve({"observations": [{"id": "B", "side": "Benign", "confidence": "High", "condition": "benign", "event_refs": ["E"]}],
+                         "reach": {"reached": False, "observations": ["B"]}})
+        self.assertEqual(r["outcome"], "Benign proven"); self.assertNotIn("reach", r); self.assertNotIn("incident", r)
+
+    def test_a_reach_that_does_not_say_true_or_false_is_an_invalid_ledger(self):
+        ledger = self.fixture("ledger_near_miss_quarantined_phish.json")
+        for held in ("no", {"reached": "no"}, {"observations": ["O3"]}):
+            ledger["reach"] = held
+            with self.assertRaises(ValueError):
+                inv.resolve(ledger)
+
+    def test_a_near_miss_keeps_the_case_techniques_empty(self):
+        ledger = self.fixture("ledger_near_miss_quarantined_phish.json"); ledger["attacks"] = ["T1566.002"]
+        self.assertIn("no Incident is confirmed", inv.resolve(ledger)["attacks_note"])
+
+    def test_the_timeline_gives_a_near_miss_no_t0(self):
+        timeline = load("tools/shared/timeline.py", "timeline_for_reach")
+        ledger = self.fixture("ledger_near_miss_quarantined_phish.json")
+        ledger.update(verdict_id=2, severity_id=1, entries=[{"kind": "detection", "desc": "the alert", "time": "2026-11-10T08:14:02Z"}])
+        self.assertFalse(timeline.build(ledger)["confirmed_incident"])
+        ledger = self.fixture("ledger_blocked_alert_other_copy_delivered.json"); ledger["verdict_id"] = 2
+        built = timeline.build(ledger)
+        self.assertEqual((built["confirmed_incident"], built["t0_utc"]), (True, "2026-11-10T08:03:10Z"))
+
+    def test_the_procedure_assesses_reach_before_it_confirms(self):
+        with open(os.path.join(ROOT, "skills", "zerosoc-investigation", "SKILL.md"), encoding="utf-8") as f:
+            text = f.read()
+        step = text[text.index("11. **On Malicious proven"):text.index("12. **On Benign proven")]
+        self.assertLess(step.index("reach the environment"), step.index("confirm the Incident"))
+        self.assertIn("`reach`", step); self.assertIn("rules/reach.md", step)
+        with open(os.path.join(ROOT, "skills", "zerosoc-investigation", "rules", "reach.md"), encoding="utf-8") as f:
+            rule = f.read()
+        self.assertIn("A control's action on one alert does not make a Case a", rule)
+
+
+class GatesAndStatus(unittest.TestCase):
+    """DD-33: seven gates from the Alert to the closed Case, and the Case's status follows them."""
+
+    def read(self, *rel):
+        with open(os.path.join(ROOT, *rel), encoding="utf-8") as f:
+            return f.read()
+
+    def gates(self):
+        """The gates as the response skill's own reference copy of Operational Metrics §2 names them."""
+        import re
+        metrics = self.read("skills", "zerosoc-response", "references", "framework", "05-Metrics", "operational_metrics.md")
+        return dict(re.findall(r"^\| \*\*(G\d) — ([^*]+)\*\* \|", metrics, re.M))
+
+    def test_the_response_skill_names_the_gates_as_the_framework_does(self):
+        gates = self.gates()
+        self.assertEqual(sorted(gates), ["G1", "G2", "G3", "G4", "G5", "G6", "G7"])
+        skill = " ".join(self.read("skills", "zerosoc-response", "SKILL.md").split()).lower()
+        for gate in ("G4", "G5", "G6"):  # the skill says "containment is completed (G4)" for "Containment completed"
+            self.assertIn(f"{gates[gate].lower()} (**{gate.lower()}**)", skill.replace(" is ", " ").replace(" are ", " "), gate)
+        self.assertIn("(**g7**, `status_id` closed)", skill)
+        self.assertIn("`status_id` to resolved (4)", skill)
+
+    def test_the_metrics_are_the_ones_the_framework_defines(self):
+        metrics = self.read("skills", "zerosoc-response", "references", "framework", "05-Metrics", "operational_metrics.md")
+        self.assertIn("### Mean Time To Respond (MTTR)", metrics)
+        self.assertIn("**Start:** the originating Alert received (G1). **Stop:** containment completed (G4).", metrics)
+        skill = " ".join(self.read("skills", "zerosoc-response", "SKILL.md").split())
+        self.assertIn("MTTC runs from the originating Alert received (G1) to containment completed (G4)", skill)
+        self.assertIn("MTTR is Mean Time To Respond and starts at G1", skill)
+        self.assertIn("not yet settled", skill, "where MTTR stops is open in the framework, and the skill chooses nothing")
+        self.assertNotIn("Recover (MTTR)", skill); self.assertNotIn("Time To Recover", skill)
+
+    def test_a_close_is_closed_and_an_incident_stays_in_progress(self):
+        triage_text = " ".join(self.read("skills", "zerosoc-triage", "SKILL.md").split())
+        self.assertIn("A Close sets `status_id` to Closed (5): the triage disposition is gate G2", triage_text)
+        investigation = " ".join(self.read("skills", "zerosoc-investigation", "SKILL.md").split())
+        self.assertIn("Every close also sets `status_id` to Closed (5), at gate G3", investigation)
+        self.assertIn("A confirmed Incident stays In Progress", investigation)
