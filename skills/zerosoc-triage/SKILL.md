@@ -255,7 +255,7 @@ Read per alert: the playbook section the script prints.
 - Any executor may take a Case over; the change of assignee is a lifecycle event of the Case and is
   recorded on it. Nothing in this procedure makes the assignee a person.
 - Record token use per model invocation with the Case id; a budget exhaustion is not a failure: apply
-  the coverage rule to the evidence at hand (Guardrails §5).
+  the coverage rule to the evidence at hand (Guardrails §4).
 - Never close because similar Cases were closed before; never promote out of fear; never close to clear
   the queue.
 

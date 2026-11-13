@@ -19,9 +19,9 @@ the Case and not against the Observation that prompted it: the reasoning may be 
 still happened. Paths are relative to this
 skill's directory.
 
-Read once per session: [Incident Response](references/framework/03-Processes/03-response.md) (the method
-and the autonomy matrix, §2.1), [Guardrails §2–§3](references/framework/07-Governance/agentic_guardrails.md)
-(the approval payload, the autonomy grant) and [Operational Metrics §2 and §4](references/framework/05-Metrics/operational_metrics.md)
+Read once per session: [Incident Response](references/framework/03-Processes/03-response.md) (the method;
+the autonomy matrix and the approval payload, §2.1), [Guardrails §2](references/framework/07-Governance/agentic_guardrails.md)
+(the autonomy grant) and [Operational Metrics §2 and §4](references/framework/05-Metrics/operational_metrics.md)
 (the gates G1 to G7 and the metrics measured between them). Read per Incident: the playbook's Incident
 Response section.
 
@@ -63,7 +63,7 @@ does not carry.
 1. **Confirm scope** (§1). From the contract confirm the affected entities and the category. Read the
    Case **confidence**, as the resolution rule produced it, and the Incident's **Impact**, as assessed
    at confirmation: with the impact of each action they decide what is applied without approval
-   (step 4); the Case **severity** sets the timing. You re-estimate neither. Read the kind and the
+   (step 4). You re-estimate neither. Read the kind and the
    requirements recorded for each affected entity: they rate the actions on it. Read what each affected
    **identity** is: a person's account, a service identity (an account or service principal software runs
    under), or a host's own identity (the computer account a directory gives a joined device, an operating
@@ -92,7 +92,7 @@ does not carry.
    resets credentials beyond the confirmed scope. When no playbook exists for the category at this
    framework pin, select actions from §2.1 directly.
 4. **Decide each containment action** under the autonomy matrix (§2.1):
-   `python3 scripts/autonomy.py --action "isolate WS-07" --preset isolate-workstation --confidence High --impact High --severity High`.
+   `python3 scripts/autonomy.py --action "isolate WS-07" --preset isolate-workstation --confidence High --impact High`.
    The matrix reads three inputs: the Case confidence, the Incident's Impact (`--impact`; when it is not
    assessed the action requires approval) and the **action's impact**, what the organization cannot use
    while the action holds, in five classes: None (nothing, even if the Incident proves false), Low (the
@@ -116,21 +116,18 @@ does not carry.
    every action. An organization may add approvals and remove none: a stricter cell (`--stricter-cell`),
    a limit on the grant, and classes of entities it reserves in the SOC Knowledge Base
    (`--reserved-class`), on which every containment action requires approval. A safety function is
-   never stopped without approval (`--safety-function yes`). Severity sets the timing of an action the
-   matrix allows: at High or Critical severity it is applied immediately, before the internal
-   notification completes; at Low or Medium severity it may be scheduled with the owner of the
-   affected entity.
+   never stopped without approval (`--safety-function yes`).
 5. **Request approval** with the five-part payload the script prints
-   ([Guardrails §2](references/framework/07-Governance/agentic_guardrails.md)): Context (category,
+   ([Incident Response §2.1](references/framework/03-Processes/03-response.md)): Context (category,
    severity, confidence, the Incident's Impact, why Malicious was proven with score and observations),
    Evidence (observations with tags, event references, queries), the action and the reason the matrix
    gives for requiring approval (the action's impact, the Incident's Impact and the confidence; the
    proportionality condition; a limit of the grant; or the reserved class), Blast radius, Rollback. The
-   same payload whoever the executor is. The approver follows the action's impact: the SOC Manager by
-   default, the owner of the service for High, the organization's crisis authority for Critical.
+   same payload whoever the executor is. The approver follows the action's impact, e.g.: the owner
+   of the service for High, the organization's crisis authority for Critical.
    Record the decision (approved, modified, rejected) on the action's entry; a rejection is a review
    event. While pending, apply what the matrix allows and continue the investigation. Waiting time is
-   HITL dwell, never containment time.
+   HITL dwell.
 6. **Apply and record** each containment action: entity, timestamp, how it is reversed. An identity is
    contained **where it is held** (§2): an on-premises account is disabled in the directory that manages it
    and its synchronized cloud copy as well; sessions are ended by each system that granted them; a
@@ -159,8 +156,8 @@ does not carry.
    (**G6**): set the Case's `status_id` to Resolved (4) and hand the Case, its timeline, Notes and
    metrics to Phase 4 post-incident activity; feed indicators and lure patterns to Phase 1 as tuning
    signals. The metrics are those of Operational Metrics §4: T0, the Incident's `start_time`, anchors
-   MTTD; MTTC runs from the originating Alert received (G1) to containment completed (G4), HITL dwell
-   excluded; MTTR is Mean Time To Respond and starts at G1. Where MTTR stops is not yet settled in the
+   MTTD; MTTC runs from the originating Alert received (G1) to containment completed (G4); MTTR is
+   Mean Time To Respond and starts at G1. Where MTTR stops is not yet settled in the
    framework, containment completed (G4) or eradication verified (G5): record the time of each gate
    and choose no stop of your own. Phase 4 closes the Case (**G7**, `status_id` Closed) when its
    review has been held and its action items recorded, or when no review is required.
