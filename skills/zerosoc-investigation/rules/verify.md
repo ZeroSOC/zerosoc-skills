@@ -7,8 +7,9 @@ data beside it, and does not restate it.
 `$language` stands for the language the deployment writes its Notes in. Whoever gives this text to an
 executor puts that language in its place; read as it is, it means the language of the deployment.
 
-- Both hypotheses are always stated: the Malicious one (a threat actor) and the Benign one
-  (administration, testing, scheduled or expected activity). Where the detection named a threat or
+- Both hypotheses are always stated: the Malicious one (an attack, or an unauthorized action against
+  the organization's assets) and the Benign one (activity that is authorized, expected or
+  acceptable: administration, testing, scheduled work). Where the detection named a threat or
   a family, start the Malicious one there: a named family has documented behaviour, persistence and
   follow-on activity, so ask whether **those** are present rather than whether the activity is
   malicious in general. The name is a lead, not a verdict: retract it if the evidence does not

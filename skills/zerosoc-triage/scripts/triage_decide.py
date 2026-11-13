@@ -54,6 +54,10 @@ condition belongs to (Playbook Architecture §4.1) — never a kind the executor
 Close carries is the rule's (§1.5): Benign (5) when the covering observation of the highest confidence names a
 Benign condition, False Positive (1) otherwise — both kinds at that confidence, or no condition named at all.
 --close-as is read only for a ledger whose observations carry no "condition" key, written before it existed.
+A Close states "severity_id" 1 (Informational), whichever verdict it carries: every closing verdict other
+than an Incident sets the Case's severity to it (Definitions §7), so that a closed Case is never read as a
+live one, and the source's own severity stays in the Case's `vendor_attributes`. A Promote states none: the
+severity of an open Case is the one triage validated (§1.4).
 Observations with side null are context and do not score.
 Which alerts a Benign observation covers is read off the evidence, not chosen: "about" (and "artifact") name
 the entities of "entities" it rests on, by any value the inventory holds for them (a name, a hash, a sign-in
@@ -127,6 +131,9 @@ def close_verdict(covering):
         return 5, "Benign Positive"
     return 1, "False Positive"
 
+
+CLOSED = 1
+"""The severity a Close states: Informational, at every closing verdict other than an Incident (Definitions §7)."""
 
 EMIT = {1: "tuning ticket to Phase 1", 5: "exception ticket: the Knowledge Base entry proposed for a person to confirm, unless the Knowledge Base already holds it"}
 
@@ -236,15 +243,15 @@ def _decide(ledger):
     if notes:
         result["coverage_note"] = "; ".join(notes)
     if ledger.get("duplicate_of"):
-        result.update(decision="Close", verdict_id=10, verdict="Duplicate", master_case_uid=ledger["duplicate_of"],
+        result.update(decision="Close", verdict_id=10, verdict="Duplicate", severity_id=CLOSED, master_case_uid=ledger["duplicate_of"],
                       reminder="Duplicate only if all four §1.5 criteria were validated: matching core entities, overlapping timeline, active assignment, evidence merged.")
     elif close_ok:
         covering_ids = {i for c in coverage for i in c["covering"]}
         verdict_id, verdict = close_verdict([b for b in ben if b["id"] in covering_ids])
         if verdict_id is None:
-            result.update(decision="Close", verdict_id=None, verdict="False Positive (1) if a False Positive condition explains the alerts; Benign (5) if a Benign condition does (use --close-as)")
+            result.update(decision="Close", verdict_id=None, severity_id=CLOSED, verdict="False Positive (1) if a False Positive condition explains the alerts; Benign (5) if a Benign condition does (use --close-as)")
         else:
-            result.update(decision="Close", verdict_id=verdict_id, verdict=verdict, emit=EMIT[verdict_id],
+            result.update(decision="Close", verdict_id=verdict_id, verdict=verdict, severity_id=CLOSED, emit=EMIT[verdict_id],
                           verdict_rule="the covering observation of the highest confidence names a Benign condition" if verdict_id == 5
                           else "no Benign condition named by a covering observation of the highest confidence")
     else:
@@ -318,6 +325,7 @@ def main():
     if "--json" in sys.argv:
         print(json.dumps(r, indent=2)); return
     print(f"Decision: {r['decision']}  verdict: {r.get('verdict')}")
+    if r.get("severity_id"): print(f"Severity at the close: Informational ({r['severity_id']}); the source's own stays in vendor_attributes")
     for c in r["coverage"]:
         print(f"  alert {c['alert']} ({c['confidence']}): {'covered' if c['covered'] else 'NOT covered'} by {c['covering'] or '-'} — {c['rule']}")
     if r.get("why"): print("  why: " + "; ".join(r["why"]))

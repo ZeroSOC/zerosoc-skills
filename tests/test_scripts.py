@@ -1359,6 +1359,20 @@ class RunCheck(unittest.TestCase):
         self.assertEqual(code, 0, out)
         self.assertIn("ok    triage: extracted count matches the evidence", out)
 
+    def test_a_near_miss_is_reproduced_as_the_true_positive_it_is(self):
+        base = self.run_dir()
+        path = os.path.join(base, "ledger.investigation.json")
+        with open(path, encoding="utf-8") as f:
+            ledger = json.load(f)
+        ledger["observations"].append({"id": "O2", "side": None, "at": "2026-09-14T15:03:00Z", "event_refs": ["EVT-2"],
+                                       "desc": "the tool was blocked before it read anything, and nothing else ran"})
+        ledger.update(reach={"reached": False, "observations": ["O2"]}, recorded_verdict="near miss")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(ledger, f)
+        code, out = self.check(base)
+        self.assertEqual(code, 0, out)
+        self.assertIn("ok    investigation: verdict reproduced from the ledger", out)
+
     def test_a_run_that_never_read_what_the_detection_asserts_fails(self):
         code, out = self.check(self.run_dir(detection_metadata=None))
         self.assertEqual(code, 1)
@@ -1936,3 +1950,124 @@ class InventoryBasis(unittest.TestCase):
             evidence.completeness(self.built(), 4, basis="guess")
         note = evidence.note({"extracted": 4, "source_count": 4, "source_count_basis": "reproduced", "complete": True})
         self.assertIn("unverified", note)
+
+
+class SeverityAtTheClose(unittest.TestCase):
+    """DD-32: every closing verdict other than an Incident sets the Case's severity to Informational (1)."""
+
+    def test_every_triage_close_states_severity_1_and_a_promote_states_none(self):
+        alert = {"id": "A", "type": "OAuth app consent", "entity": "u1", "confidence": "Medium"}
+        def decide(*benign, **extra):
+            return triage.decide(dict({"alerts": [alert], "observations": [dict(b, side="Benign", event_refs=["E"]) for b in benign]}, **extra))
+        closes = [decide({"id": "B", "confidence": "High", "condition": "benign"}),
+                  decide({"id": "B", "confidence": "High", "condition": "false_positive"}),
+                  decide({"id": "B", "confidence": "High"}),  # a ledger written before conditions: the caller names the kind
+                  decide(duplicate_of="CASE-0")]
+        self.assertEqual([r["verdict_id"] for r in closes], [5, 1, None, 10])
+        for r in closes:
+            self.assertEqual((r["decision"], r["severity_id"]), ("Close", 1))
+        promoted = decide()
+        self.assertEqual(promoted["decision"], "Promote"); self.assertNotIn("severity_id", promoted)
+
+    def test_every_investigation_close_states_severity_1(self):
+        benign = [{"id": "B", "side": "Benign", "confidence": "High", "condition": "benign", "event_refs": ["E"]}]
+        undecided = [{"id": "m", "side": "Malicious", "confidence": "Medium"}, {"id": "b", "side": "Benign", "confidence": "Low"}]
+        self.assertEqual(inv.resolve({"observations": benign})["severity_id"], 1)
+        self.assertEqual(inv.resolve({"observations": benign, "duplicate_of": "CASE-0"})["severity_id"], 1)
+        self.assertNotIn("severity_id", inv.resolve({"observations": undecided}), "an open Case keeps its severity")
+
+    def test_a_confirmed_incident_states_none_and_one_recorded_as_informational_is_told(self):
+        proven = [{"id": "m", "side": "Malicious", "confidence": "High", "event_refs": ["E"]}]
+        r = inv.resolve({"observations": proven, "severity": "High"})
+        self.assertEqual((r["verdict_id"], r["incident"]), (2, True))
+        self.assertNotIn("severity_id", r); self.assertNotIn("severity_note", r)
+        self.assertIn("Low (2) to Critical (5)", inv.resolve({"observations": proven, "severity_id": 1})["severity_note"])
+
+
+class ReachTellsAnIncidentFromANearMiss(unittest.TestCase):
+    """DD-32, Detection & Analysis §2.5: Malicious activity that reached the environment is an Incident;
+    activity that did not is a near miss, True Positive at severity Informational, closed without response."""
+
+    def fixture(self, name):
+        with open(os.path.join(FIXTURES, name), encoding="utf-8") as f:
+            return json.load(f)
+
+    def test_a_phish_quarantined_before_any_mailbox_is_a_near_miss(self):
+        r = inv.resolve(self.fixture("ledger_near_miss_quarantined_phish.json"))
+        self.assertEqual((r["outcome"], r["verdict_id"], r["verdict"], r["severity_id"]), ("Near miss", 2, "True Positive", 1))
+        self.assertEqual((r["reach"], r["incident"], r["confidence"]), ("not reached", False, "High"))
+        self.assertEqual(r["reach_observations"], ["O1", "O3", "O4"])
+        self.assertIn("without response", r["next"])
+        self.assertNotIn("attacks", r, "the Incident's techniques are a confirmed Incident's")
+
+    def test_a_control_acting_on_one_alert_while_another_copy_landed_is_an_incident(self):
+        r = inv.resolve(self.fixture("ledger_blocked_alert_other_copy_delivered.json"))
+        self.assertEqual((r["outcome"], r["verdict_id"], r["reach"], r["incident"]), ("Malicious proven", 2, "reached", True))
+        self.assertNotIn("severity_id", r)
+        self.assertIn("T1204.001", r["attacks"]["shown"])
+
+    def test_not_reached_resting_on_the_blocked_alert_alone_is_not_shown(self):
+        # a control's action on one alert does not make a Case a near miss (Definitions, Near miss)
+        ledger = self.fixture("ledger_blocked_alert_other_copy_delivered.json")
+        ledger["reach"] = {"reached": False, "observations": ["O1"], "desc": "the gateway quarantined the message"}
+        r = inv.resolve(ledger)
+        self.assertEqual((r["outcome"], r["reach"], r["incident"]), ("Malicious proven", "not shown", True))
+        self.assertIn("restate the alerts", r["reach_note"]); self.assertNotIn("severity_id", r)
+
+    def test_what_shows_nothing_cannot_show_that_nothing_reached(self):
+        base = self.fixture("ledger_near_miss_quarantined_phish.json")
+        def with_reach(observations, **changes):
+            ledger = json.loads(json.dumps(base)); ledger.update(changes)
+            ledger["reach"] = {"reached": False, "observations": observations}
+            return inv.resolve(ledger)
+        self.assertIn("no observation is named", with_reach([])["reach_note"])
+        self.assertIn("O9 is no observation of the ledger", with_reach(["O3", "O9"])["reach_note"])
+        unanswered = with_reach(["O4"], no_information_refs=["EVT-2101-4"], scoped_negative_refs=[])
+        self.assertEqual(unanswered["reach"], "not shown", "a query that was not answered shows nothing")
+        self.assertIn("O4 cites no result that carried information", unanswered["reach_note"])
+        retracted = json.loads(json.dumps(base)); retracted["observations"][2]["retracted"] = True
+        retracted["reach"]["observations"] = ["O3"]
+        self.assertIn("O3 is retracted", inv.resolve(retracted)["reach_note"])
+        for r in (with_reach([]), unanswered, inv.resolve(retracted)):
+            self.assertEqual((r["outcome"], r["incident"]), ("Malicious proven", True))
+
+    def test_no_reach_recorded_is_taken_as_an_incident_and_asks_for_the_assessment(self):
+        ledger = self.fixture("ledger_near_miss_quarantined_phish.json"); del ledger["reach"]
+        r = inv.resolve(ledger)
+        self.assertEqual((r["outcome"], r["reach"], r["incident"]), ("Malicious proven", "not recorded", True))
+        self.assertIn("Assess first", r["reach_note"]); self.assertTrue(r["next"].startswith("assess first"))
+
+    def test_reach_is_read_only_once_malicious_is_proven(self):
+        r = inv.resolve({"observations": [{"id": "B", "side": "Benign", "confidence": "High", "condition": "benign", "event_refs": ["E"]}],
+                         "reach": {"reached": False, "observations": ["B"]}})
+        self.assertEqual(r["outcome"], "Benign proven"); self.assertNotIn("reach", r); self.assertNotIn("incident", r)
+
+    def test_a_reach_that_does_not_say_true_or_false_is_an_invalid_ledger(self):
+        ledger = self.fixture("ledger_near_miss_quarantined_phish.json")
+        for held in ("no", {"reached": "no"}, {"observations": ["O3"]}):
+            ledger["reach"] = held
+            with self.assertRaises(ValueError):
+                inv.resolve(ledger)
+
+    def test_a_near_miss_keeps_the_case_techniques_empty(self):
+        ledger = self.fixture("ledger_near_miss_quarantined_phish.json"); ledger["attacks"] = ["T1566.002"]
+        self.assertIn("no Incident is confirmed", inv.resolve(ledger)["attacks_note"])
+
+    def test_the_timeline_gives_a_near_miss_no_t0(self):
+        timeline = load("tools/shared/timeline.py", "timeline_for_reach")
+        ledger = self.fixture("ledger_near_miss_quarantined_phish.json")
+        ledger.update(verdict_id=2, severity_id=1, entries=[{"kind": "detection", "desc": "the alert", "time": "2026-11-10T08:14:02Z"}])
+        self.assertFalse(timeline.build(ledger)["confirmed_incident"])
+        ledger = self.fixture("ledger_blocked_alert_other_copy_delivered.json"); ledger["verdict_id"] = 2
+        built = timeline.build(ledger)
+        self.assertEqual((built["confirmed_incident"], built["t0_utc"]), (True, "2026-11-10T08:03:10Z"))
+
+    def test_the_procedure_assesses_reach_before_it_confirms(self):
+        with open(os.path.join(ROOT, "skills", "zerosoc-investigation", "SKILL.md"), encoding="utf-8") as f:
+            text = f.read()
+        step = text[text.index("11. **On Malicious proven"):text.index("12. **On Benign proven")]
+        self.assertLess(step.index("reach the environment"), step.index("confirm the Incident"))
+        self.assertIn("`reach`", step); self.assertIn("rules/reach.md", step)
+        with open(os.path.join(ROOT, "skills", "zerosoc-investigation", "rules", "reach.md"), encoding="utf-8") as f:
+            rule = f.read()
+        self.assertIn("A control's action on one alert does not make a Case a", rule)

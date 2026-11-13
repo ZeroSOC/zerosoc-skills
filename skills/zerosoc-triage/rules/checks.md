@@ -15,7 +15,8 @@ executor puts that language in its place; read as it is, it means the language o
 - A remediation is what the source reports as one, in an entity's remediation state; a process that
   handles a download (scanning or marking it, as every download is) is not one.
 - A remediation the source performed is **not** an explanation of an alert: the behaviour happened
-  and the block is a response. It never makes a Benign observation. What stays open is how the entity
+  and the block is a response. It never makes a Benign observation: an attack that was stopped is
+  still an attack. What stays open is how the entity
   arrived, what ran before it was stopped, and whether the same thing is elsewhere — aim the checks
   there, and at the entities the source left active.
 - The source's recommended actions come with the Case as context. They are a procedure written

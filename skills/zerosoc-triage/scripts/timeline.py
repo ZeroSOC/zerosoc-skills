@@ -12,15 +12,21 @@ event. Triage compiles the timeline and investigation extends it, so both gates 
 their own ledger, and a Case closed at triage keeps the timeline triage built. T0 is the earliest Malicious event of the Case — its `start_time`, which only a
 Malicious Observation moves: a benign precursor or a piece of context earlier than it is part of the
 account and moves nothing. Exactly one entry carries T0: two detections of the same activity share
-a time, and the first of them is the anchor while the rest are entries like any other. It is **T0**,
-the anchor of the response metrics, only on a confirmed Incident (`recorded_verdict` True Positive):
-until then the same moment is the Case's `start_time`, and the output gives it under both names with
-`confirmed_incident` saying which it is.
+a time, and the first of them is the anchor while the rest are entries like any other. It is **T0**
+only on a confirmed Incident: the verdict the run recorded is True Positive (`verdict_id` 2, or
+`recorded_verdict`) and the Case's severity (`severity_id`, or `severity`) is Low (2) to Critical (5).
+A True Positive at Informational (1) is a near miss, which is no Incident and has no T0 (Definitions,
+Near miss). Until then, and on a near miss, the same moment is the Case's `start_time`, and the output
+gives it under both names with `confirmed_incident` saying which it is. A True Positive whose ledger
+records no severity cannot be told from a near miss: it is not taken as an Incident, and
+`confirmed_incident_note` says so.
 
 Input: **the ledger** of triage_decide.py or resolve.py, whose observations say when the thing they
 report happened and whether the timeline shows them:
 
 {"now": "2026-09-14T15:12:00Z",                    when this gate ran
+ "verdict_id": 2, "severity_id": 4,                 the verdict and the severity the run recorded, where it
+                                                    recorded them ("recorded_verdict" and "severity" as words)
  "t0": null,                                        the Case's start_time if it states one; it is checked
  "observations": [{"id": "1", "desc": "...", "side": "Malicious"|"Benign"|null, "retracted": false,
                "first_seen": "2026-09-14T14:55:41Z",   when it happened — never "at", when it was made
@@ -95,9 +101,28 @@ def _malicious(observation):
     return str(side or "").strip().lower() == "malicious" and observation.get("retracted") is not True
 
 
+SEVERITIES = {"informational": 1, "low": 2, "medium": 3, "high": 4, "critical": 5}
+
+
+def _severity(ledger):
+    """The Case's severity as the ledger records it, 1 to 5, or None."""
+    held = ledger.get("severity_id")
+    if isinstance(held, int) and not isinstance(held, bool) and 1 <= held <= 5:
+        return held
+    return SEVERITIES.get(str(ledger.get("severity") or "").strip().lower())
+
+
 def _confirmed(ledger):
-    """A confirmed Incident: the verdict the run recorded is True Positive."""
-    return ledger.get("verdict_id") == 2 or "true positive" in str(ledger.get("recorded_verdict") or "").lower()
+    """(a confirmed Incident, a note or None). An Incident is a True Positive at severity Low (2) to
+    Critical (5); a True Positive at Informational (1) is a near miss (Definitions, Security Incident)."""
+    if not (ledger.get("verdict_id") == 2 or "true positive" in str(ledger.get("recorded_verdict") or "").lower()):
+        return False, None
+    severity = _severity(ledger)
+    if severity is None:
+        return False, ("the ledger records a True Positive and no severity: an Incident is a True Positive at severity "
+                       "Low (2) to Critical (5) and a near miss one at Informational (1), so the start time is not "
+                       "given as T0 until the ledger states the Case's severity")
+    return severity >= 2, None
 
 
 def build(ledger):
@@ -173,6 +198,7 @@ def build(ledger):
         entry["is_t0"] = anchor is None and t0 is not None and entry["moves_t0"] and _same(t0, entry["when"])
         if entry["is_t0"]:
             anchor = entry
+    confirmed, unsure = _confirmed(ledger)
     for entry in placed:
         when = entry.pop("when")
         del entry["moves_t0"]
@@ -183,7 +209,7 @@ def build(ledger):
         # the same moment under the name the Case Schema gives it: it is T0, and anchors the metrics,
         # only once the Malicious hypothesis is proven
         "start_time": t0[0] if t0 else None, "start_time_utc": _utc(t0[0]) if t0 else None,
-        "confirmed_incident": _confirmed(ledger),
+        "confirmed_incident": confirmed, **({"confirmed_incident_note": unsure} if unsure else {}),
         "stated_t0": stated[0] if stated else None, "derived_t0": derived[0] if derived else None,
         "stated_matches": None if not (stated and derived) else _same(stated, derived),
         "entries": placed, "unplaced": unplaced, "problems": problems,

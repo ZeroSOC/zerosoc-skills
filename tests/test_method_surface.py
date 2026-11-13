@@ -174,7 +174,7 @@ class TheMethodSurface(unittest.TestCase):
 
     def test_the_rule_text_a_host_composes_lives_in_the_skill(self):
         for skill, names in (("zerosoc-triage", ("checks", "note-prose")),
-                             ("zerosoc-investigation", ("verify", "tag", "note-prose"))):
+                             ("zerosoc-investigation", ("verify", "tag", "reach", "note-prose"))):
             for name in names:
                 path = os.path.join(ROOT, "skills", skill, "rules", f"{name}.md")
                 with self.subTest(rule=f"{skill}/{name}"):
@@ -571,8 +571,25 @@ class TheCaseTimeline(unittest.TestCase):
         not a T0 and anchors no metric."""
         open_case = timeline.build(self.ledger(self.observation("M1", "2026-09-14T14:55:41Z")))
         self.assertEqual((open_case["start_time_utc"], open_case["confirmed_incident"]), ("2026-09-14T14:55:41Z", False))
-        confirmed = timeline.build(self.ledger(self.observation("M1", "2026-09-14T14:55:41Z"), recorded_verdict="True Positive"))
+        confirmed = timeline.build(self.ledger(self.observation("M1", "2026-09-14T14:55:41Z"), recorded_verdict="True Positive",
+                                               severity="High"))
         self.assertTrue(confirmed["confirmed_incident"])
+        self.assertTrue(timeline.build(self.ledger(self.observation("M1", "2026-09-14T14:55:41Z"), verdict_id=2,
+                                                   severity_id=2))["confirmed_incident"])
+
+    def test_a_near_miss_is_no_incident_and_has_no_t0(self):
+        """Definitions: an Incident is a True Positive at severity Low to Critical; a True Positive at
+        Informational is a near miss, and its start_time anchors no metric."""
+        for stated in ({"verdict_id": 2, "severity_id": 1}, {"recorded_verdict": "True Positive", "severity": "Informational"}):
+            near = timeline.build(self.ledger(self.observation("M1", "2026-09-14T14:55:41Z"), **stated))
+            self.assertEqual((near["start_time_utc"], near["confirmed_incident"]), ("2026-09-14T14:55:41Z", False), stated)
+            self.assertNotIn("confirmed_incident_note", near)
+
+    def test_a_true_positive_with_no_severity_is_not_taken_as_an_incident_and_says_so(self):
+        unsure = timeline.build(self.ledger(self.observation("M1", "2026-09-14T14:55:41Z"), recorded_verdict="True Positive"))
+        self.assertFalse(unsure["confirmed_incident"])
+        self.assertIn("no severity", unsure["confirmed_incident_note"])
+        self.assertEqual(timeline.check(unsure), [], "it is said, and fails nothing")
 
     def test_the_older_tag_shape_moves_t0_too(self):
         built = timeline.build(self.ledger({"n": 1, "observation": "ransomware behaviour", "tag": {"side": "malicious", "confidence_id": 3},
@@ -624,7 +641,7 @@ class CandidateCategoriesOfRealPlaybooks(unittest.TestCase):
 class TheRuleText(unittest.TestCase):
     FILES = [os.path.join(ROOT, "skills", skill, "rules", f"{name}.md")
              for skill, names in (("zerosoc-triage", ("checks", "note-prose")),
-                                  ("zerosoc-investigation", ("verify", "tag", "note-prose"))) for name in names]
+                                  ("zerosoc-investigation", ("verify", "tag", "reach", "note-prose"))) for name in names]
 
     def test_the_rules_name_nothing_the_skills_do_not_define(self):
         for path in self.FILES:

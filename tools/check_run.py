@@ -359,6 +359,8 @@ def check_decision(report, ledger, result, label, decide):
         return report.fail(f"{label}: verdict reproduced from the ledger", "a ledger the rule can read", f"invalid ledger: {exc}")
     recorded = ledger.get("recorded_verdict")
     printed = fresh.get("verdict") or fresh.get("decision")
+    if fresh.get("incident") is False:
+        printed = f"{printed}, a near miss"  # a True Positive that did not reach the environment (§2.5)
     if recorded is None:
         report.skip(f"{label}: verdict reproduced from the ledger",
                     f"the rule gives {printed!r}; add \"recorded_verdict\" to compare it with the Note")

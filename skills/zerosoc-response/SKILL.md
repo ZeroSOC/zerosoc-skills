@@ -1,6 +1,6 @@
 ---
 name: zerosoc-response
-description: Respond to a confirmed Incident under the ZeroSOC Framework (Phase 3). Confirms scope and category from the Investigation to Response contract, selects containment actions from the Incident Category playbook, classifies each under the autonomy matrix (pre-authorized or requires approval, with the presentation payload for approvals), then eradicates, recovers, handles NIS2 and DORA notification deadlines and hands over to post-incident activity. Use when a Case has verdict True Positive and an Investigation Note.
+description: Respond to a confirmed Incident under the ZeroSOC Framework (Phase 3). Confirms scope and category from the Investigation to Response contract, selects containment actions from the Incident Category playbook, classifies each under the autonomy matrix (pre-authorized or requires approval, with the presentation payload for approvals), then eradicates, recovers, handles NIS2 and DORA notification deadlines and hands over to post-incident activity. Use when a Case is a confirmed Incident (verdict True Positive at severity Low or above) with an Investigation Note.
 license: Apache-2.0
 metadata:
   version: "0.4.1"
@@ -11,7 +11,7 @@ metadata:
 
 # ZeroSOC Incident Response (Phase 3)
 
-The Case arrives confirmed (`verdict_id = 2`) with its Investigation → Response contract. The assignee
+The Case arrives confirmed (`verdict_id = 2` at `severity_id` 2 to 5) with its Investigation → Response contract. The assignee
 carries it through containment, eradication and recovery; there is no separate incident commander. Every
 action is its own entry in the Case's `finding_info_list`, typed `action`, carrying the Remediation
 Activity event in `related_events` with its timestamp, entity and rollback. An action is recorded against
@@ -27,6 +27,8 @@ and the autonomy matrix, §2.1) and [Guardrails §2–§3](references/framework/
 
 - A Confirmed Incident with its contract and Investigation Note. Not before: a Case without
   `verdict_id = 2` goes to the `zerosoc-investigation` skill.
+- Not for a near miss (`verdict_id = 2` at `severity_id` 1): its activity did not reach the
+  environment, and it is closed without response.
 
 ## Inputs
 

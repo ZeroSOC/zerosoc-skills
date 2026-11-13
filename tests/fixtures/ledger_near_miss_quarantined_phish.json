@@ -1,0 +1,74 @@
+{
+ "case_uid": "CASE-2101",
+ "severity": "Medium",
+ "playbook": "04-Playbooks/02-Investigation-Response/01-phishing.md",
+ "playbook_version": "2026-11-13",
+ "incident_category": "IC-01",
+ "alerts": [
+  {
+   "id": "DF-2101-1",
+   "confidence": "High"
+  }
+ ],
+ "observations": [
+  {
+   "id": "O1",
+   "desc": "Email with a credential-harvesting link addressed to a.rossi@contoso.example; the mail gateway quarantined it before delivery.",
+   "side": "Malicious",
+   "confidence": "High",
+   "alert_type": "Malicious attachment / URL delivered",
+   "entity": "a.rossi@contoso.example",
+   "event_refs": [
+    "DF-2101-1"
+   ],
+   "first_seen": "2026-11-10T08:14:02Z",
+   "timeline": true,
+   "attacks": [
+    "T1566.002"
+   ]
+  },
+  {
+   "id": "O2",
+   "desc": "The linked page imitates the organization's sign-in page and posts what is typed to a host registered four days earlier.",
+   "side": "Malicious",
+   "confidence": "High",
+   "artifact": "url:login-contoso.example",
+   "event_refs": [
+    "EVT-2101-2"
+   ],
+   "first_seen": "2026-11-10T08:14:02Z",
+   "attacks": [
+    "T1566.002"
+   ]
+  },
+  {
+   "id": "O3",
+   "desc": "Message trace for the sender and the link over the window: four copies, to four mailboxes, every one quarantined and none delivered.",
+   "side": null,
+   "event_refs": [
+    "EVT-2101-3"
+   ]
+  },
+  {
+   "id": "O4",
+   "desc": "No device and no account of the organization resolved or requested the link's host in the window; proxy and DNS logs cover every recipient.",
+   "side": null,
+   "event_refs": [
+    "EVT-2101-4"
+   ]
+  }
+ ],
+ "no_information_refs": [],
+ "scoped_negative_refs": [
+  "EVT-2101-4"
+ ],
+ "reach": {
+  "reached": false,
+  "observations": [
+   "O1",
+   "O3",
+   "O4"
+  ],
+  "desc": "Every copy of the message was held in the gateway's quarantine and nobody reached the page: nothing was delivered to a person."
+ }
+}

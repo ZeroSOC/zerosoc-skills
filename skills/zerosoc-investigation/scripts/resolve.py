@@ -16,6 +16,8 @@ Ledger (JSON):
                 "event_refs": ["<event id or link>"], "first_seen": "2026-09-14T14:55:41Z", "timeline": false,
                 "attacks": ["T1003.001"]}],
   "attacks": ["T1003.001"],     the Incident's techniques, recorded at confirmation (§2.5)
+  "reach": {"reached": false, "observations": ["O5", "O6"], "desc": "..."},
+                                whether the proven Malicious activity reached the environment (§2.5)
   "evidence_inventory": {"extracted": 31, "source_count": 31, "complete": true},
   "detection_metadata": {...},  what the detections asserted (§1.1), carried from triage and refreshed at
                                 this gate: the remediation state as it now stands, and the disposition of
@@ -59,6 +61,23 @@ each standing observation entered its side's score, in ledger order: "weight" an
 counted (the weights of a side add up to its score; "capped_by_alert" where the alert it restates capped it,
 "counts_for" the observations counted as this one), else "reason": "no-information", "same-evidence" or
 "restates-alert", with "same_as" the observation it counts as and, for a restatement, its "alert".
+"reach" is assessed once Malicious is proven, before anything else at confirmation (§2.5): the activity
+reached the environment when something landed on a device, ran, persisted, was delivered to a person, or
+was gained; activity held in a gateway's quarantine, a sandbox or a decoy did not (Definitions, Security
+Incident). "reached" is true or false, "observations" the ids of the ledger's observations the answer
+rests on, of either side or of none, and "desc" the answer in words. Malicious proven with "reached" true,
+or with no "reach" at all, is a confirmed Incident: verdict 2, its severity the executor's, Low (2) to
+Critical (5). With "reached" false it is a near miss: outcome "Near miss", verdict 2, "severity_id" 1,
+closed without response. A control's action on one alert does not make a Case a near miss (Definitions,
+Near miss), so "reached" false is taken only when it is shown: every observation it names stands and
+cites a result that carried information, and at least one of them stands beyond the alerts, as a query
+that covered the rest of the activity and found nothing does. Otherwise the outcome is the Incident, and
+"reach_note" says what is missing. "reach" in the output is "reached", "not reached", "not recorded" or
+"not shown", and "incident" says which of the two the True Positive is.
+Every close states "severity_id" 1 (Informational): Duplicate, False Positive, Benign Positive,
+Insufficient Data and the near miss (Definitions §7). The source's own severity stays in the Case's
+`vendor_attributes`. A confirmed Incident states none: its severity is re-assessed at confirmation, and a
+ledger that records it as Informational is told so in "severity_note".
 "attacks" on an observation are the techniques it shows, as identifiers (`T1003.001`, or `T1003.001 (Name)`):
 an alert's are the ones its detection asserted, and a Malicious observation's the ones it establishes. The
 ledger's own "attacks" are the Incident's, recorded at confirmation from the observations that stand (§2.5).
@@ -176,6 +195,52 @@ def timebox(ledger, now=None):
     if reported is not None and bool(reported) != record["expired"]:
         notes.append(f"timebox computed from the ledger timestamps; the self-reported timebox_expired={str(bool(reported)).lower()} was ignored")
     return record, notes
+
+
+CLOSED = 1
+"""The severity every close states: Informational, at every closing verdict other than an Incident (Definitions §7)."""
+
+
+def severity_of(ledger):
+    """The Case's severity as the ledger records it, as a word, or None."""
+    word = ledger.get("severity") or SEVERITY.get(ledger.get("severity_id"))
+    return str(word).strip().capitalize() if word else None
+
+
+def reach(ledger, empty):
+    """§2.5: whether the proven Malicious activity reached the environment, as the ledger records it:
+    (state, the observations it rests on, a note or None). "not reached" is taken only when it is shown
+    (Definitions, Near miss): a control's action on one alert does not make a Case a near miss."""
+    held = ledger.get("reach")
+    if held is None:
+        return "not recorded", [], ('the ledger records no "reach": the Case is taken as an Incident. Assess first whether the '
+                                    "activity reached the environment (§2.5) and record the answer")
+    if not isinstance(held, dict) or not isinstance(held.get("reached"), bool):
+        raise ValueError('"reach" is an object whose "reached" is true or false')
+    named = [str(i) for i in held.get("observations") or []]
+    if held["reached"]:
+        return "reached", named, None
+    by_id = {str(f.get("id")): f for f in ledger.get("observations", [])}
+    owner, _ = alert_index(ledger)
+    missing = []
+    for i in named:
+        f = by_id.get(i)
+        if f is None:
+            missing.append(f"{i} is no observation of the ledger")
+        elif f.get("retracted"):
+            missing.append(f"{i} is retracted")
+        elif not no_information.informative(f, empty):
+            missing.append(f"{i} cites no result that carried information")
+    if not named:
+        missing.append("no observation is named")
+    elif not missing and all(alert_bound(by_id[i], owner, empty) is not None for i in named):
+        missing.append("the observations named restate the alerts, and nothing shows what else in the same activity did")
+    if missing:
+        return "not shown", named, ('"reach" says the activity did not reach the environment and does not show it: '
+                                    + "; ".join(missing) + ". A control's action on one alert does not make a Case a near "
+                                    "miss, so the Case is taken as an Incident until an observation beyond the alerts shows "
+                                    "that nothing else in the same activity succeeded")
+    return "not reached", named, None
 
 
 EMIT = {1: "tuning ticket to Phase 1", 5: "exception ticket: the Knowledge Base entry proposed for a person to confirm, unless the Knowledge Base already holds it"}
@@ -334,28 +399,41 @@ def resolve(ledger, now=None):
     if record:
         r["neutralized_entities"] = neutralized(record)
     if ledger.get("duplicate_of"):
-        r.update(outcome="Duplicate", verdict_id=10, confidence_id=None, master_case_uid=ledger["duplicate_of"], next="close; merge evidence into the master Case")
+        r.update(outcome="Duplicate", verdict_id=10, confidence_id=None, severity_id=CLOSED, master_case_uid=ledger["duplicate_of"], next="close; merge evidence into the master Case")
     elif benign_proven:
         conf = max(W[f["confidence"]] for f in ben)
         if residual_low: conf -= 1
         conf = max(1, conf)
         verdict_id, verdict = benign_verdict(ben)
-        r.update(outcome="Benign proven", verdict_id=verdict_id, confidence_id=conf, confidence=LEVELS[conf - 1],
+        r.update(outcome="Benign proven", verdict_id=verdict_id, confidence_id=conf, confidence=LEVELS[conf - 1], severity_id=CLOSED,
                  verdict=verdict or "False Positive (1) if the detection was wrong, Benign Positive (5) if the activity was authorized (use --benign-kind)",
                  next="close" + ("; Low-confidence close carries a monitoring watch and is flagged for QA sampling" if conf == 1 else ""))
         if verdict_id: r["emit"] = EMIT[verdict_id]
     elif malicious_proven:
         conf = max(W[f["confidence"]] for f in mal)
-        r.update(outcome="Malicious proven", verdict_id=2, verdict="True Positive", confidence_id=conf, confidence=LEVELS[conf - 1],
-                 attacks=attacks,
-                 next="confirm the Incident (§2.5): re-assess severity, confidence and category, estimate the impact, plan the initial response actions; then the definitive category, the Incident's techniques in \"attacks\" from the observations that stand, start_time carrying T0, the retrospective entity sweep (§3.1) and the Investigation → Response contract" + ("; at Low confidence every containment action requires approval" if conf == 1 else ""))
+        state, shown_by, reach_note = reach(ledger, empty)
+        r.update(verdict_id=2, verdict="True Positive", confidence_id=conf, confidence=LEVELS[conf - 1],
+                 reach=state, reach_observations=shown_by, incident=state != "not reached")
+        if reach_note: r["reach_note"] = reach_note
+        if state == "not reached":
+            r.update(outcome="Near miss", severity_id=CLOSED,
+                     next="close the Case as a near miss, without response (§2.5): verdict_id 2 at severity_id 1, and the Investigation Note says what shows that nothing reached the environment; the Incident's techniques, T0 and the Investigation → Response contract belong to a confirmed Incident and are not recorded")
+        else:
+            if severity_of(ledger) == "Informational":
+                r["severity_note"] = "the ledger records the severity as Informational: a confirmed Incident keeps Low (2) to Critical (5), so re-assess it (§2.5)"
+            first = {"reached": "the activity reached the environment: ",
+                     "not recorded": "assess first whether the activity reached the environment and record it in \"reach\" (§2.5); where it did, ",
+                     "not shown": "show that nothing in the activity reached the environment, or take it that something did; then "}[state]
+            r.update(outcome="Malicious proven", attacks=attacks,
+                     next=first + "confirm the Incident (§2.5): re-assess severity (Low to Critical), confidence and category, estimate the impact, plan the initial response actions; then the definitive category, the Incident's techniques in \"attacks\" from the observations that stand, start_time carrying T0, the retrospective entity sweep (§3.1) and the Investigation → Response contract" + ("; at Low confidence every containment action requires approval" if conf == 1 else ""))
     else:
         if box["expired"] or ledger.get("budget_exhausted"):
             r.update(outcome="Neither proven at timebox/budget expiry", verdict_id=7, verdict="Insufficient Data", confidence_id=None,
+                     severity_id=CLOSED,
                      next="close as Insufficient Data with a monitoring watch (re-open on recurrence of the entities); emit a visibility or tuning ticket; record the state reached")
         else:
             r.update(outcome="Neither proven", verdict_id=None, next="run the remaining discriminating queries (listed or added); seek evidence against the favoured side")
-    if attacks["recorded"] and r.get("verdict_id") != 2:
+    if attacks["recorded"] and not r.get("incident"):
         r["attacks_note"] = "the ledger records the Incident's techniques, but no Incident is confirmed: the Case's \"attacks\" stay empty"
     return r
 
@@ -380,6 +458,8 @@ def main():
     print(f"Malicious {r['malicious_score']} ({', '.join(r['malicious_observations']) or '-'})  |  Benign {r['benign_score']} ({', '.join(r['benign_observations']) or '-'})")
     if r["retracted"]: print("Retracted: " + ", ".join(r["retracted"]))
     print(f"Outcome: {r['outcome']}  verdict: {r.get('verdict', '-')} ({r.get('verdict_id')})  confidence: {r.get('confidence', '-')}")
+    if r.get("severity_id"): print(f"Severity at the close: Informational ({r['severity_id']}); the source's own stays in vendor_attributes")
+    if r.get("reach"): print(f"Reach: {r['reach']}" + (f" ({', '.join(r['reach_observations'])})" if r["reach_observations"] else ""))
     if r["uncovered_medium_high_malicious"]: print("Uncovered Medium/High Malicious observations (block a Benign verdict): " + ", ".join(r["uncovered_medium_high_malicious"]))
     if r["residual_low_malicious"]: print("Residual Low Malicious observations (listed in the Note, monitoring watch): " + ", ".join(r["residual_low_malicious"]))
     if r.get("confidence_note"): print(r["confidence_note"])
@@ -401,7 +481,7 @@ def main():
                   + " + ".join(f"{x['id']} {x['weight']}" for x in held if x["counted"])
                   + "".join(f"; {x['id']} counts as {x['same_as']}" for x in held if x.get("same_as"))
                   + "".join(f"; {x['id']} carries no information" for x in held if x.get("reason") == "no-information"))
-    for key in ("timebox_note", "evidence_inventory_note", "no_information_note", "attacks_note"):
+    for key in ("reach_note", "severity_note", "timebox_note", "evidence_inventory_note", "no_information_note", "attacks_note"):
         if r.get(key): print("Note: " + r[key])
     for note in r.get("detection_notes", []): print("Note: " + note)
     print("Next: " + r["next"])

@@ -2,6 +2,40 @@
 
 ## Unreleased
 
+- **An Incident is Malicious activity that reached the environment, and a near miss did not
+  (framework #129 and #135, DD-32).**
+  - *Reach is assessed first at confirmation.* Investigation step 11 asks, once Malicious is proven,
+    whether the activity reached the environment: something landed on a device, ran, persisted, was
+    delivered to a person, or was gained. The answer goes in the ledger's new `reach` object
+    (`reached`, the `observations` it rests on, `desc`), under the rules of the new
+    `rules/reach.md`. `resolve.py` reads it: with `reached` false and shown, the outcome is
+    `Near miss`, `verdict_id` 2 at `severity_id` 1, closed without response. It is shown when every
+    observation named stands and cites a result that carried information, and at least one stands
+    beyond the alerts, because a control's action on one alert does not make a Case a near miss.
+    With `reached` true, with no `reach`, or with one that is not shown, the outcome stays
+    `Malicious proven`, a confirmed Incident. The output adds `reach` (`reached`, `not reached`,
+    `not recorded`, `not shown`), `reach_observations`, `incident` and, where something is missing,
+    `reach_note`.
+  - *Every close states `severity_id` 1.* `triage_decide.py` on every Close and `resolve.py` on
+    Duplicate, Benign proven, Insufficient Data and the near miss. A confirmed Incident states none:
+    its severity is the executor's, Low to Critical, and a ledger that records it as Informational
+    gets a `severity_note`. The source's own severity stays in the Case's `vendor_attributes`.
+  - *A True Positive is an Incident only at severity Low or above.* `timeline.py` gives
+    `confirmed_incident` true for `verdict_id` 2 (or `recorded_verdict` True Positive) with
+    `severity_id` 2 to 5 (or `severity` as a word). A near miss has no T0. **A True Positive whose
+    ledger records no severity is no longer taken as an Incident**, and `confirmed_incident_note`
+    says so.
+  - *The words follow the definitions.* Malicious is an attack, or an unauthorized action against
+    the organization's assets; Benign is activity that is authorized, expected or acceptable, and
+    acceptable when whoever is accountable says so on the Case. An attack that was stopped is still
+    Malicious, at triage as in investigation.
+  - *The defender-xdr profile.* A near miss is `truePositive` with one of that verdict's
+    determinations, like an Incident, and the Case's `severity_id` tells them apart. The source's
+    `severity` now also lands on `vendor_attributes.severity_id` and `vendor_attributes.severity`,
+    where it stays when a closing verdict sets the Case's own to Informational. The note on
+    `resolved` follows the gates. `profile_version` is `2026-11-13`.
+  - Two ledgers join the fixtures: a phishing message quarantined before any mailbox (a near miss),
+    and the same message with another copy delivered and opened (an Incident).
 - **Framework pin to `678a9dd` (framework #129, #131, #132, #133, #134, #135).** The references are
   regenerated and the archives rebuilt at the pin; the entries above this one say what each change
   of the framework changes in the skills. The response skill now carries
