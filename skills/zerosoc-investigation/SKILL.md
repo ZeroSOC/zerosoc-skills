@@ -170,8 +170,9 @@ per Case: the playbook the script prints.
     did not. Answer for the whole activity: a control's action on one alert does not make a Case a near
     miss. Record in the ledger's `reach` what each observation shows (`observations`: its `id`, `shows`
     and `what`; and `desc`, the answer in words) and run `python3 scripts/resolve.py ledger.json` again:
-    the script computes the answer. Where no observation shows any of these and one stands beyond the
-    alerts, the outcome is a **near miss**: `verdict_id` 2 at `severity_id` 1, the Investigation Note
+    the script computes the answer. Where no observation shows any of these, and one beyond the alerts
+    shows a query that covered the rest of the activity and found nothing or where the activity was
+    held, the outcome is a **near miss**: `verdict_id` 2 at `severity_id` 1, the Investigation Note
     written (step 13) and the Case closed without response; the rest of this step is skipped. In every other
     case the activity reached the environment and you **confirm the Incident**, before writing the
     Note. **Re-assess** the severity, which stays Low to Critical on an Incident, and the Incident

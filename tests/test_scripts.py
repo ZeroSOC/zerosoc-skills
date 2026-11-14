@@ -1415,7 +1415,8 @@ class RunCheck(unittest.TestCase):
             ledger = json.load(f)
         ledger["observations"].append({"id": "O2", "side": None, "at": "2026-09-14T15:03:00Z", "event_refs": ["EVT-2"],
                                        "desc": "the tool was blocked before it read anything, and nothing else ran"})
-        ledger.update(reach={"observations": [{"id": o["id"], "shows": "none of these"} for o in ledger["observations"]]},
+        shows = {"O2": "covered the rest of the activity and found nothing"}
+        ledger.update(reach={"observations": [{"id": o["id"], "shows": shows.get(o["id"], "none of these")} for o in ledger["observations"]]},
                       recorded_verdict="near miss")
         with open(path, "w", encoding="utf-8") as f:
             json.dump(ledger, f)
@@ -2245,7 +2246,7 @@ class ReachTellsAnIncidentFromANearMiss(unittest.TestCase):
         r = inv.resolve(self.fixture("ledger_near_miss_quarantined_phish.json"))
         self.assertEqual((r["outcome"], r["verdict_id"], r["verdict"], r["severity_id"]), ("Near miss", 2, "True Positive", 1))
         self.assertEqual((r["reach"], r["incident"], r["confidence"]), ("not reached", False, "High"))
-        self.assertEqual(r["reach_observations"], ["O2", "O3", "O4"], "the observations beyond the alerts")
+        self.assertEqual(r["reach_observations"], ["O3", "O4"], "the observations that show nothing reached the environment")
         self.assertIn("without response", r["next"])
         self.assertNotIn("attacks", r, "the Incident's techniques are a confirmed Incident's")
 
@@ -2257,8 +2258,10 @@ class ReachTellsAnIncidentFromANearMiss(unittest.TestCase):
         self.assertIn("T1204.001", r["attacks"]["shown"])
 
     def marked(self, ledger, **shows):
-        """The ledger with every observation marked "none of these", but for the ones given."""
-        ledger["reach"] = {"observations": [{"id": o["id"], "shows": shows.get(o["id"], "none of these")} for o in ledger["observations"]]}
+        """The ledger with what it says each observation shows, but for the ones given."""
+        held = {m["id"]: m["shows"] for m in ledger["reach"]["observations"]}
+        ledger["reach"] = {"observations": [{"id": o["id"], "shows": shows.get(o["id"], held.get(o["id"], "none of these"))}
+                                            for o in ledger["observations"]]}
         return ledger
 
     def test_one_observation_that_shows_it_makes_the_incident_whatever_the_others_show(self):
@@ -2279,9 +2282,19 @@ class ReachTellsAnIncidentFromANearMiss(unittest.TestCase):
         # a control's action on one alert does not make a Case a near miss (Definitions, Near miss)
         ledger = self.fixture("ledger_blocked_alert_other_copy_delivered.json")
         ledger["observations"] = ledger["observations"][:1]
-        r = inv.resolve(self.marked(ledger))
+        r = inv.resolve(self.marked(ledger, O1="where the activity was held"))
         self.assertEqual((r["outcome"], r["reach"], r["incident"]), ("Malicious proven", "not shown", True))
         self.assertIn("beyond the alerts", r["reach_note"]); self.assertNotIn("severity_id", r)
+
+    def test_a_near_miss_needs_an_observation_that_shows_nothing_reached(self):
+        # the investigation must show that nothing else in the same activity succeeded (Definitions, Near miss)
+        none = "none of these"
+        r = inv.resolve(self.marked(self.fixture("ledger_near_miss_quarantined_phish.json"), O3=none, O4=none))
+        self.assertEqual((r["outcome"], r["reach"], r["incident"]), ("Malicious proven", "not shown", True))
+        self.assertIn("covered the rest of the activity and found nothing, or where the activity was held", r["reach_note"])
+        for dropped, kept in (("O3", "O4"), ("O4", "O3")):
+            r = inv.resolve(self.marked(self.fixture("ledger_near_miss_quarantined_phish.json"), **{dropped: none}))
+            self.assertEqual((r["outcome"], r["reach"], r["reach_observations"]), ("Near miss", "not reached", [kept]), "one is enough")
 
     def test_what_shows_nothing_cannot_show_that_nothing_reached(self):
         base = self.fixture("ledger_near_miss_quarantined_phish.json")

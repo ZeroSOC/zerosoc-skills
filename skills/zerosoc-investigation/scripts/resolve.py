@@ -17,7 +17,8 @@ Ledger (JSON):
                 "attacks": ["T1003.001"]}],
   "attacks": ["T1003.001"],     the Incident's techniques, recorded at confirmation (§2.5)
   "reach": {"observations": [{"id": "O1", "shows": "none of these", "what": ""},
-                             {"id": "O2", "shows": "ran", "what": "the loader"}], "desc": "..."},
+                             {"id": "O2", "shows": "where the activity was held", "what": "the gateway's quarantine"}],
+            "desc": "..."},
                                 what each observation shows of the activity reaching the environment (§2.5)
   "evidence_inventory": {"extracted": 31, "source_count": 31, "complete": true},
   "detection_metadata": {...},  what the detections asserted (§1.1), carried from triage and refreshed at
@@ -80,19 +81,20 @@ counted (the weights of a side add up to its score; "capped_by_alert" where the 
 "reach" is assessed once Malicious is proven, before anything else at confirmation (§2.5): the activity
 reached the environment when something landed on a device, ran, persisted, was delivered to a person, or
 was gained; activity held in a gateway's quarantine, a sandbox or a decoy did not (Definitions, Security
-Incident). Its "observations" say, for each observation of the ledger by "id", what it "shows": "landed
-on a device", "ran", "persisted", "delivered to a person", "gained" or "none of these", with "what" the
-thing is; "desc" is the answer in words. The answer is computed from them. Where an observation that
-stands shows one of the five, the activity reached the environment, and Malicious proven is a confirmed
-Incident: verdict 2, its severity the executor's, Low (2) to Critical (5). So it is with no "reach" at
-all. It is a near miss, outcome "Near miss", verdict 2, "severity_id" 1, closed without response, only
-when every observation that stands is marked, none shows any of the five, and at least one of them stands
-beyond the alerts on a result that carried information, as a query that covered the rest of the activity
-and found nothing does: a control's action on one alert does not make a Case a near miss (Definitions,
-Near miss). Otherwise the outcome is the Incident, and "reach_note" says what is missing. "reach" in the
-output is "reached", "not reached", "not recorded" or "not shown"; "reach_observations" are the
-observations that show what reached the environment, or on a near miss those beyond the alerts; and
-"incident" says which of the two the True Positive is.
+Incident). Its "observations" say, for each observation of the ledger by "id", what it "shows", with
+"what" the thing is: that something reached the environment ("landed on a device", "ran", "persisted",
+"delivered to a person", "gained"), that nothing did ("covered the rest of the activity and found
+nothing", "where the activity was held"), or "none of these"; "desc" is the answer in words. The answer
+is computed from them. Where an observation that stands shows one of the first five, the activity
+reached the environment, and Malicious proven is a confirmed Incident: verdict 2, its severity the
+executor's, Low (2) to Critical (5). So it is with no "reach" at all. It is a near miss, outcome "Near
+miss", verdict 2, "severity_id" 1, closed without response, only when every observation that stands is
+marked, none shows any of the five, and at least one that stands beyond the alerts, on a result that
+carried information, shows that nothing did: a control's action on one alert does not make a Case a
+near miss (Definitions, Near miss). Otherwise the outcome is the Incident, and "reach_note" says what
+is missing. "reach" in the output is "reached", "not reached", "not recorded" or "not shown";
+"reach_observations" are the observations that show what reached the environment, or on a near miss
+those that show nothing did; and "incident" says which of the two the True Positive is.
 Every close states "severity_id" 1 (Informational): Duplicate, False Positive, Benign Positive,
 Insufficient Data and the near miss (Definitions §7). The source's own severity stays in the Case's
 `vendor_attributes`. A confirmed Incident states none: its severity is re-assessed at confirmation, and a
@@ -223,6 +225,7 @@ def severity_of(ledger):
 
 
 REACHED = ("landed on a device", "ran", "persisted", "delivered to a person", "gained")
+HELD_BACK = ("covered the rest of the activity and found nothing", "where the activity was held")
 NOT_REACHED = "none of these"
 
 
@@ -231,27 +234,29 @@ def reach(ledger, empty):
     ledger says each observation shows: (state, the observations the answer rests on, a note or None).
     One observation that stands and shows something of REACHED is enough for "reached". "not reached"
     is taken only when it is shown (Definitions, Near miss): every observation that stands is marked,
-    none shows any of them, and one stands beyond the alerts."""
+    none shows any of them, and one that stands beyond the alerts shows something of HELD_BACK."""
     held = ledger.get("reach")
     if held is None:
         return "not recorded", [], ('the ledger records no "reach": the Case is taken as an Incident. Assess first whether the '
                                     "activity reached the environment (§2.5) and record what each observation shows")
     marks = held.get("observations") if isinstance(held, dict) else None
-    if not isinstance(marks, list) or not all(isinstance(m, dict) and m.get("shows") in REACHED + (NOT_REACHED,) for m in marks):
+    if not isinstance(marks, list) or not all(isinstance(m, dict) and m.get("shows") in REACHED + HELD_BACK + (NOT_REACHED,) for m in marks):
         raise ValueError('"reach" is an object whose "observations" give each observation\'s "id" and what it "shows": '
-                         + ", ".join(f'"{s}"' for s in REACHED) + f' or "{NOT_REACHED}"')
+                         + ", ".join(f'"{s}"' for s in REACHED + HELD_BACK) + f' or "{NOT_REACHED}"')
     shows = {str(m.get("id")): m["shows"] for m in marks}
     standing = [f for f in ledger.get("observations", []) if not f.get("retracted")]
-    reached = [str(f.get("id")) for f in standing if shows.get(str(f.get("id")), NOT_REACHED) != NOT_REACHED]
+    reached = [str(f.get("id")) for f in standing if shows.get(str(f.get("id"))) in REACHED]
     if reached:
         return "reached", reached, None
     known = {str(f.get("id")) for f in ledger.get("observations", [])}
     owner, _ = alert_index(ledger)
-    beyond = [str(f.get("id")) for f in standing if no_information.informative(f, empty) and alert_bound(f, owner, empty) is None]
+    beyond = [str(f.get("id")) for f in standing if shows.get(str(f.get("id"))) in HELD_BACK
+              and no_information.informative(f, empty) and alert_bound(f, owner, empty) is None]
     missing = [f"{i} is no observation of the ledger" for i in shows if i not in known]
     missing += [f"{f.get('id')} is not marked" for f in standing if str(f.get("id")) not in shows]
     if not beyond:
-        missing.append("no observation stands beyond the alerts on a result that carried information")
+        missing.append("no observation beyond the alerts, on a result that carried information, shows a query that "
+                       "covered the rest of the activity and found nothing, or where the activity was held")
     if missing:
         return "not shown", [], ('"reach" marks nothing as having reached the environment and does not show that nothing did: '
                                  + "; ".join(missing) + ". A control's action on one alert does not make a Case a near "
