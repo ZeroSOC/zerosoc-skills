@@ -1,7 +1,50 @@
 # Changelog
 
-## Unreleased
+## v0.5.0 (2026-11-14) — conforms to zerosoc-framework@555e891
 
+Everything since `v0.4.1`, with the framework pin moved from `b5f4966` to `555e891`. The entries are
+listed newest first, and where two of them describe the same thing the one higher up is the release.
+
+**Breaking, for an implementation moving from `v0.4.1`.** These four are the latest; the entries
+below state the earlier ones where they apply.
+
+- **The ledger's `reach` records what each observation shows.** `observations` holds one entry for
+  each observation of the ledger (`id`, `shows`, `what`), and `resolve.py` computes the answer. A
+  ledger with `reached` is an invalid ledger.
+- **`autonomy.py` follows the containment matrix.** It takes `--impact`, no longer takes
+  `--severity`, prints no `timing`, and its `tier` reads `applied without approval` where it read
+  `pre-authorized`.
+- **`resolve.py` has no investigation timebox.** `--now` is removed, the output has no `timebox`,
+  and an undecided Case with no query left is `On Hold`.
+- **No handover.** `handover_reason` is gone and no step makes the Case's assignee a person.
+
+- **Reach is assessed observation by observation, and `resolve.py` computes the answer.** A near
+  miss is a Case where none of the observations shows that something reached the environment and
+  one shows that nothing did. The ledger now records exactly that.
+  - ***The ledger's `reach` changes shape.*** It was `reached` (true or false) with the `observations`
+    the answer rested on. It is now `observations`, one entry for each observation of the ledger:
+    its `id`, what it `shows` and `what` the thing is; `desc` stays. An observation shows that
+    something reached the environment (`landed on a device`, `ran`, `persisted`,
+    `delivered to a person`, `gained`), that nothing did
+    (`covered the rest of the activity and found nothing`, `where the activity was held`), or
+    `none of these`. A ledger in the old shape is an invalid ledger. A host that writes `reach`
+    changes with this release.
+  - *The rule.* One observation that stands and shows that something reached the environment makes
+    the Incident. The outcome is a near miss only when every observation that stands is marked,
+    none shows that something reached the environment, and one that stands beyond the alerts, on a
+    result that carried information, shows that nothing did. Otherwise `reach` is `not shown`,
+    `reach_note` says what is missing, and the Case is taken as an Incident. A mark on a retracted
+    observation is not read.
+  - *The output.* `reach_observations` are the observations that show what reached the environment
+    or, on a near miss, those that show nothing did.
+  - *`rules/reach.md` and Investigation step 11.* The executor says, for each observation, whether
+    it shows that something landed on a device, ran, persisted, was delivered to a person or was
+    gained, and what that thing is; and it says which observations beyond the alerts show a query
+    that covered the rest of the activity and found nothing, or where the activity was held. Four
+    sentences of the rule are removed: that the observations must show that nothing else in the same
+    activity succeeded, what a block leaves open, the instruction to name the observations the
+    answer rests on, and the default for what the observations do not settle. Step 11 loses the
+    first of them too.
 - **Framework pin to `555e891`, and the skills follow it (framework #136).** The references are
   regenerated and the archives rebuilt at the pin. The approval payload is specified in Incident
   Response §2.1 and the later sections of Agentic Guardrails moved up one number: the skills cite the
@@ -571,8 +614,6 @@
   read as an answer for every alert's, and a live 59-alert Case whose Note was complete was refused
   for two recommendations that had each been answered where they were published. The check now
   reads them per alert, and names the alert when it refuses.
-
-## Unreleased — conforms to zerosoc-framework@80af9d7
 
 - **The Note check reports advisories beside the failures, and only a failure refuses a Note.**
   `note_elements.check()` returned one flat list and every entry in it was a gate condition,

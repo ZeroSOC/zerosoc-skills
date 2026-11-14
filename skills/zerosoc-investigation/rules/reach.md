@@ -12,15 +12,14 @@ executor puts that language in its place; read as it is, it means the language o
   ran, persisted, was delivered to a person, or was gained. Activity held in a gateway's quarantine,
   a sandbox or a decoy has not reached the environment.
 - Answer for the whole activity of the Case. A control's action on one alert does not make a Case a
-  near miss: the observations must show that nothing else in the same activity succeeded. What a
-  block leaves open is what decides it: how the entity arrived, what ran before it was stopped, and
-  whether the same thing is elsewhere.
-- Name the observations the answer rests on. An answer that nothing reached the environment rests on
-  at least one observation beyond the alerts: a query that covered the rest of the activity and
-  found nothing, or a record that shows where the activity was held. A query that was not run, or
-  that the source could not answer, shows nothing.
-- Where the observations do not settle it, the activity is taken to have reached the environment.
-  Say what is not known.
+  near miss.
+- For each observation, say whether it shows that something landed on a device, ran, persisted,
+  was delivered to a person or was gained, and what that thing is. The activity reached the
+  environment when one of them does.
+- Nothing reached the environment only when none of them does and at least one observation beyond
+  the alerts shows it: a query that covered the rest of the activity and found nothing, or a record
+  that shows where the activity was held. Say so for those observations. A query that was not run,
+  or that the source could not answer, shows nothing.
 - An attack that was stopped is still Malicious. The answer changes no observation's side or
   confidence, and a Case is never Benign because its activity was blocked.
 - Do not state a verdict or a severity for the Case: the resolution rule computes them from the

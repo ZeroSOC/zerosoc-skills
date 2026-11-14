@@ -3,7 +3,7 @@ name: zerosoc-investigation
 description: Investigate a promoted Case under the ZeroSOC Framework (Phase 2.b). Selects the Investigation and Response playbook by candidate Incident Category, verifies or retracts the triage observations, runs discriminating validation queries tagged Malicious or Benign with a confidence, resolves the verdict by score and coverage, tells an Incident from a near miss by whether the activity reached the environment, and produces the Investigation Note plus the Investigation to Response contract or the closure verdict. Use for a Case promoted at triage or opened by threat hunting.
 license: Apache-2.0
 metadata:
-  version: "0.4.1"
+  version: "0.5.0"
   framework: "zerosoc-framework@555e891 (2026-11-13)"
   status: draft
   author: ZeroSOC
@@ -168,12 +168,12 @@ per Case: the playbook the script prints.
     activity reach the environment? It did when something landed on a device, ran, persisted, was
     delivered to a person, or was gained; activity held in a gateway's quarantine, a sandbox or a decoy
     did not. Answer for the whole activity: a control's action on one alert does not make a Case a near
-    miss, and the observations must show that nothing else in the same activity succeeded. Record the
-    answer in the ledger's `reach` (`reached`, the `observations` it rests on, `desc`) and run
-    `python3 scripts/resolve.py ledger.json` again. With `reached` false and shown, the outcome is a
-    **near miss**: `verdict_id` 2 at `severity_id` 1, the Investigation Note written (step 13) and the
-    Case closed without response; the rest of this step is skipped. The script takes a near miss only
-    when an observation beyond the alerts shows it, and says what is missing otherwise. In every other
+    miss. Record in the ledger's `reach` what each observation shows (`observations`: its `id`, `shows`
+    and `what`; and `desc`, the answer in words) and run `python3 scripts/resolve.py ledger.json` again:
+    the script computes the answer. Where no observation shows any of these, and one beyond the alerts
+    shows a query that covered the rest of the activity and found nothing or where the activity was
+    held, the outcome is a **near miss**: `verdict_id` 2 at `severity_id` 1, the Investigation Note
+    written (step 13) and the Case closed without response; the rest of this step is skipped. In every other
     case the activity reached the environment and you **confirm the Incident**, before writing the
     Note. **Re-assess** the severity, which stays Low to Critical on an Incident, and the Incident
     Category from your understanding of the Incident (§1.4). The **confidence** is the resolution rule
