@@ -1,6 +1,22 @@
 # Changelog
 
-## Unreleased
+## v0.5.0 (2026-11-14) — conforms to zerosoc-framework@555e891
+
+Everything since `v0.4.1`, with the framework pin moved from `b5f4966` to `555e891`. The entries are
+listed newest first, and where two of them describe the same thing the one higher up is the release.
+
+**Breaking, for an implementation moving from `v0.4.1`.** These four are the latest; the entries
+below state the earlier ones where they apply.
+
+- **The ledger's `reach` records what each observation shows.** `observations` holds one entry for
+  each observation of the ledger (`id`, `shows`, `what`), and `resolve.py` computes the answer. A
+  ledger with `reached` is an invalid ledger.
+- **`autonomy.py` follows the containment matrix.** It takes `--impact`, no longer takes
+  `--severity`, prints no `timing`, and its `tier` reads `applied without approval` where it read
+  `pre-authorized`.
+- **`resolve.py` has no investigation timebox.** `--now` is removed, the output has no `timebox`,
+  and an undecided Case with no query left is `On Hold`.
+- **No handover.** `handover_reason` is gone and no step makes the Case's assignee a person.
 
 - **Reach is assessed observation by observation, and `resolve.py` computes the answer.** A near
   miss is a Case where none of the observations shows that something reached the environment and
@@ -598,8 +614,6 @@
   read as an answer for every alert's, and a live 59-alert Case whose Note was complete was refused
   for two recommendations that had each been answered where they were published. The check now
   reads them per alert, and names the alert when it refuses.
-
-## Unreleased — conforms to zerosoc-framework@80af9d7
 
 - **The Note check reports advisories beside the failures, and only a failure refuses a Note.**
   `note_elements.check()` returned one flat list and every entry in it was a gate condition,
