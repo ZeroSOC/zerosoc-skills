@@ -196,12 +196,13 @@
       },
       "awaitingAction": {
         "id": 3,
-        "name": "On Hold"
+        "name": "On Hold",
+        "note": "set by the source's managed detection and response service when a record waits on the customer, and by nobody else: read as On Hold, never written"
       },
       "resolved": {
         "id": 4,
         "name": "Resolved",
-        "note": "the source's one word for a record that is finished, and its own closure of it, which is a different event from the Case's. The Case's status follows the gates: Closed at a closing verdict, and for an Incident Resolved at recovery complete and Closed when Phase 4 completes. Written to the source, the word is said only of a Case that is Resolved or Closed: an Incident still under response stays inProgress, and a Case On Hold is awaitingAction"
+        "note": "the source's one word for a record that is finished, and its own closure of it, which is a different event from the Case's. The Case's status follows the gates: Closed at a closing verdict, and for an Incident Resolved at recovery complete and Closed when Phase 4 completes. Written to the source, the word is said only of a Case that is Resolved or Closed: an Incident still under response stays inProgress, and so does a Case On Hold, which the source has no word an executor can write for"
       },
       "redirected": {
         "id": 5,
